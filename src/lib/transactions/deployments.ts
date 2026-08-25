@@ -6,6 +6,16 @@ export interface ContractDeployment {
   address: string;
 }
 
+// Registered Testnet contract deployments, keyed by network + componentSlug.
+//
+// To make a new component Testnet-usable, deploy its wasm via the contract
+// workspace (e.g. `make -C contracts/contracts/<pkg> deploy-testnet`) and add
+// an entry here with the printed `C...` address. The registry validates the
+// address before it is used, and the generic transaction flow discovers the
+// component automatically once its catalog `capabilities.testnet` is true.
+//
+// Example (once Payment is deployed):
+//   { network: "testnet", componentSlug: "payment", address: "C..." }
 const DEPLOYMENTS: ContractDeployment[] = [
   {
     network: "testnet",

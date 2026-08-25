@@ -287,8 +287,9 @@ The fields that currently exist:
   placeholder rather than generated code.
 
 No deployment, versioning, or ownership fields exist on a component today beyond
-the single entry in `src/lib/transactions/deployments.ts` (which maps
-`{network, componentSlug}` → contract address for the `token` on testnet).
+the registry in `src/lib/transactions/deployments.ts` (which maps
+`{network, componentSlug}` → contract address for any deployed component, e.g.
+`token` and — once deployed — `payment`).
 
 ### Proposed: first-class component abstraction
 

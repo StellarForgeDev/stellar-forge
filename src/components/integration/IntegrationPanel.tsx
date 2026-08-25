@@ -110,7 +110,7 @@ export function IntegrationPanel({
         {copied ? "Integration code copied to clipboard" : ""}
       </span>
 
-      <pre className="mt-4 max-h-96 overflow-auto rounded-default border border-border bg-canvas/60 p-4 font-mono text-xs leading-relaxed text-text-secondary">
+      <pre className="mt-4 max-h-96 min-w-0 overflow-auto rounded-default border border-border bg-canvas/60 p-4 font-mono text-xs leading-relaxed text-text-secondary">
         <code>{code}</code>
       </pre>
     </Card>

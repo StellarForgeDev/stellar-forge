@@ -6,8 +6,8 @@ A developer platform for discovering, understanding, experimenting with, and reu
 
 - **Release Candidate.**
 - Focused on **Stellar Testnet** (a Testnet + Futurenet configuration exists; no mainnet support).
-- **One implemented component**: the `Token` contract, which is deployed on Stellar Testnet.
-- The other **five catalog entries are concepts/documentation only** — they describe patterns but have no contract implementation.
+- **Two implemented components**: the `Token` contract (deployed on Stellar Testnet) and the `Payment` contract (sandbox-ready; Testnet deployment pending a manual, credentialed deploy).
+- The other **four catalog entries are concepts/documentation only** — they describe patterns but have no contract implementation.
 - Transaction flows run against real Testnet RPC, but the project is **not production/mainnet ready**.
 
 The distinction between implemented functionality and catalog concepts is maintained throughout this document and in the [Component Catalog Status](#component-catalog-status) section.
@@ -133,9 +133,8 @@ This setup is **not** a statement of production/mainnet readiness.
 
 ## Component Catalog Status
 
-- **Token** is the only currently **implemented** component. It is a standard SEP-41 fungible token contract and is **deployed on Stellar Testnet** (the deployment address is registered in `src/lib/transactions/deployments.ts`). It supports real local sandbox execution and real Testnet simulation/submission.
-- The remaining **five catalog entries are concepts**, not implemented contracts:
-  - **Payment**
+- **Token** and **Payment** are the implemented components. `Token` is a standard SEP-41 fungible token contract **deployed on Stellar Testnet** (address registered in `src/lib/transactions/deployments.ts`); it supports local sandbox execution and real Testnet simulation/submission. `Payment` is a stateless `pay` primitive that runs in the local sandbox and is Testnet-ready in the generic flow, but its Testnet contract has not yet been deployed, so `testnet` is `false`.
+- The remaining **four catalog entries are concepts**, not implemented contracts:
   - **Access Control**
   - **Escrow**
   - **Subscription**

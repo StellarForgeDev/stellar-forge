@@ -44,6 +44,33 @@ export function callRequestFor(fn: FunctionSpec, args: string[]): CallRequest {
     : { fn: fn.name, args };
 }
 
+/**
+ * Human-readable authorization description for the sandbox UI. It describes the
+ * operation generically (by the authorizing parameter name) rather than naming
+ * the currently selected sandbox identity, which would wrongly imply a contract
+ * role. For example, Payment's `pay` is authorized by its `from` address — it
+ * has no admin — so we say "Authorized by the from address" and only note the
+ * selected identity as supplementary context.
+ */
+export function authorizationSummary(
+  fn: FunctionSpec,
+  signer: string | undefined,
+): string {
+  if (fn.authorization === "admin") {
+    return signer
+      ? `Requires the contract administrator's authorization (currently ${signer}).`
+      : `Requires the contract administrator's authorization.`;
+  }
+  if (fn.authorization === "first-address") {
+    const index = fn.params.findIndex((param) => ADDRESS_TYPES.has(param.type));
+    const paramName = index >= 0 ? fn.params[index].name : "sender";
+    return signer
+      ? `Authorized by the ${paramName} address (currently ${signer}).`
+      : `Authorized by the ${paramName} address.`;
+  }
+  return "Requires no authorization.";
+}
+
 export function buildConstructorRequest(
   component: StellarComponent,
   configValues: Record<string, string>,

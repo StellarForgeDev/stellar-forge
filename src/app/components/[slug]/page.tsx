@@ -80,7 +80,7 @@ export default async function ComponentDetailPage({
           </p>
         </div>
 
-        <div className="mt-12 grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
+        <div className="mt-12 grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)]">
           <Card>
             <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
               Overview
@@ -140,7 +140,7 @@ export default async function ComponentDetailPage({
         </section>
 
         {hasInterface || hasImplementation ? (
-          <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
+          <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)]">
             {hasInterface && (
               <Card>
                 <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">

@@ -156,7 +156,7 @@ export default function PlaygroundPage() {
   }
 
   return (
-    <main className="flex-1">
+    <main className="flex-1 min-w-0">
       <section className="mx-auto max-w-6xl px-6 py-16">
         <div>
           <p className="mb-4 font-mono text-xs tracking-[0.18em] text-accent-stellar">
@@ -180,7 +180,7 @@ export default function PlaygroundPage() {
           </Link>
         </div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-[280px_1fr]">
+        <div className="mt-10 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
           <Card>
             <div>
               <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
@@ -212,7 +212,7 @@ export default function PlaygroundPage() {
             </div>
           </Card>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <Card>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -281,7 +281,7 @@ export default function PlaygroundPage() {
                 <span className="text-accent-forge">Ready</span>
               </div>
 
-              <pre className="mt-4 overflow-x-auto leading-relaxed text-text-secondary">
+              <pre className="mt-4 min-w-0 overflow-x-auto leading-relaxed text-text-secondary">
                 <code>{generatedCode}</code>
               </pre>
             </Card>

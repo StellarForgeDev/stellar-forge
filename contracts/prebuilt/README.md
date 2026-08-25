@@ -8,6 +8,7 @@ Playground works on Vercel without a Rust toolchain during deployment.
 | File | Purpose | Platform |
 | --- | --- | --- |
 | `token.wasm` | Soroban contract WASM executed inside the sandbox | platform-independent |
+| `payment.wasm` | Soroban contract WASM executed inside the sandbox | platform-independent |
 
 Contract WASM is compiled once from the Rust source in
 `contracts/contracts/<package>` and is byte-identical on every OS, so the

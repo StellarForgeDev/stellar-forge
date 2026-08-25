@@ -9,6 +9,7 @@ import {
   ADDRESS_TYPES,
   IDENTITY_OPTIONS,
   applyExecution,
+  authorizationSummary,
   buildConstructorRequest,
   callsForSteps,
   defaultArgValue,
@@ -376,9 +377,7 @@ export function SandboxPanel({
         )}
 
         <p className="mt-2 font-sans text-xs text-text-secondary">
-          {signer
-            ? `${selectedOp.name} is authorized by ${signer}.`
-            : `${selectedOp.name} requires no authorization.`}
+          {authorizationSummary(selectedOp, signer)}
         </p>
       </div>
 

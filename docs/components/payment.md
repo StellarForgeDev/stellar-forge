@@ -1,11 +1,20 @@
 # Payment Component Specification
 
-> Status: **Implemented (v1), not yet on Testnet.** The Payment contract lives
-> in `contracts/contracts/payment`, is registered in the catalog as
+> Status: **Implemented (v1), sandbox-ready, Testnet-not-yet-deployed.**
+> The Payment contract lives in `contracts/contracts/payment`, builds for
+> `wasm32v1-none`, is registered in the catalog as
 > `implemented: true, sandbox: true, testnet: false`, runs in the local
-> Playground sandbox, and ships with a passing Rust test suite. `testnet` stays
-> `false` until a real deployment address is registered in
-> `src/lib/transactions/deployments.ts`.
+> Playground sandbox (with its token dependency provisioned generically), and
+> ships with a passing Rust test suite.
+>
+> The generic transaction machinery is already Testnet-ready for Payment: once a
+> real deployment address is registered in `src/lib/transactions/deployments.ts`
+> and `capabilities.testnet` is flipped to `true`, the existing
+> builder/validate/prepare/submit flow discovers `pay` automatically with **no**
+> component-specific code. The actual deployment is a manual step (Stellar CLI +
+> a funded `deployer` identity) that has **not** been performed in this
+> environment, so `testnet` remains `false` and Payment is correctly excluded
+> from Testnet transactions until the address exists.
 
 ## Purpose
 
@@ -101,6 +110,16 @@ contract that implements `soroban_sdk::token::TokenInterface` (SEP-41):
 Payment imposes no asset-specific logic; it only requires the target to expose
 `transfer`. This deliberately composes with the existing `token` component rather
 than duplicating token behavior.
+
+### Which asset on Testnet
+
+On Testnet there is no automatic dependency provisioning (that is a sandbox-only
+feature). The `asset` argument is supplied at invocation time by the caller. The
+simplest legitimate choice is to **reuse the existing deployed `token` contract**
+(already registered in `deployments.ts` under `testnet` / `token`) as the
+`asset` — there is no need to deploy a second asset contract. Any other
+SEP-41-compatible contract address works equally well. This is a per-transaction
+input, not a hardcoded linkage, so it stays generic.
 
 ## Errors
 
@@ -210,9 +229,21 @@ semantically "an address" — acceptable for a starting-point example.)
 - **Integration tests** (`tests/integration`): `generateRustIntegration` for
   Payment yields output containing `pay` and a `PaymentClient` call; the snippet
   compiles against the Payment interface.
-- **Eventual Testnet smoke test** (manual / gated): deploy Payment to Testnet,
-  register the address, then build+simulate+submit a `pay` and confirm the asset
-  balance changed. This is the gate that flips `testnet: true`.
+- **Eventual Testnet smoke test** (manual / gated — not yet performed): the
+  concrete procedure, requiring a funded `deployer` identity (never stored in
+  this repo):
+
+  1. `make -C contracts/contracts/payment deploy-testnet` → prints `C...`.
+  2. Add `{ network: "testnet", componentSlug: "payment", address: "C..." }` to
+     `DEPLOYMENTS` in `src/lib/transactions/deployments.ts`.
+  3. Set `capabilities.testnet: true` on the Payment catalog record.
+  4. In the Transaction Builder, pick Payment → `pay`, use the deployed `token`
+     address as `asset`, fund `from`/`to` accounts (Friendbot), sign with
+     `from`, submit, and confirm the asset balance moved.
+
+  Steps 1–2 are the only ones requiring credentials/signing; steps 3–4 reuse the
+  existing generic flow. Until a real address from step 1 exists, `testnet`
+  stays `false` and the smoke test is intentionally not run.
 
 ## Future Extensions
 

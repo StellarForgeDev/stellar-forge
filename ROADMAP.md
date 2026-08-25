@@ -124,8 +124,21 @@ It was implemented as a **stateless** payment primitive that delegates balance
 movement to a SEP-41 asset declared as a generic `asset` dependency on `token`
 (with a `mint` setup call). The sandbox-runner provisions that dependency
 generically, so no Payment-specific code was added to the runner, route, or
-UI. The remaining standard stage — **Testnet** — is intentionally not yet done
-(`testnet: false`); see [Subsequent Milestones](#production-readiness).
+UI.
+
+**Testnet readiness (v1)** — the generic transaction machinery already supports
+Payment end-to-end: once a real `payment` deployment address is registered in
+`src/lib/transactions/deployments.ts` and `capabilities.testnet` is set to
+`true`, the existing builder / validate / prepare / submit flow discovers
+`pay` automatically with no component-specific branching. The plumbing is in
+place (a `deploy-testnet` Makefile target, a `payment.wasm` prebuilt artifact,
+and a registry comment documenting the registration step). The actual Testnet
+deployment is a **manual, credentialed step** (Stellar CLI + a funded
+`deployer` identity) that has **not** been performed in this environment, so
+`testnet` remains `false` and Payment is correctly excluded from Testnet
+transactions until the address exists. On Testnet the `asset` argument is
+supplied by the caller and should reuse the existing deployed `token` contract.
+See [Subsequent Milestones](#production-readiness).
 
 ### Component Ecosystem
 
