@@ -358,7 +358,7 @@ export const stellarComponents: StellarComponent[] = [
         ],
       },
     ],
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {

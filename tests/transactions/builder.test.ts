@@ -27,7 +27,7 @@ describe("transaction builder", () => {
   describe("transactionComponents", () => {
     it("includes only components deployed on Testnet with a callable interface", () => {
       const result = transactionComponents(stellarComponents);
-      expect(result.map((c) => c.slug)).toEqual(["token"]);
+      expect(result.map((c) => c.slug)).toEqual(["token", "payment"]);
     });
 
     it("excludes components without the testnet capability", () => {

@@ -70,7 +70,11 @@ describe("validateTransactionRequest", () => {
       expect(error?.message).toContain("not available on Testnet");
     });
 
-    it("rejects a concept component (all capabilities false)", () => {
+    it("rejects a component whose capabilities are all false", () => {
+      const concept = {
+        ...getComponentBySlug("payment")!,
+        capabilities: { implemented: false, sandbox: false, testnet: false },
+      };
       const result = validateTransactionRequest(
         {
           network: "testnet",
@@ -79,7 +83,7 @@ describe("validateTransactionRequest", () => {
           sourceAccount: validAddress,
           parameters: {},
         },
-        [getComponentBySlug("payment")!],
+        [concept],
       );
 
       expect(result.ok).toBe(false);
@@ -88,7 +92,7 @@ describe("validateTransactionRequest", () => {
       ).toBe(true);
     });
 
-    it("rejects Payment for Testnet while keeping Token available", () => {
+    it("accepts both Payment and Token for Testnet once deployed", () => {
       const components = [
         getComponentBySlug("token")!,
         getComponentBySlug("payment")!,
@@ -100,14 +104,16 @@ describe("validateTransactionRequest", () => {
           component: "payment",
           method: "pay",
           sourceAccount: validAddress,
-          parameters: {},
+          parameters: {
+            from: validAddress,
+            to: validAddress,
+            asset: validAddress,
+            amount: "100",
+          },
         },
         components,
       );
-      expect(paymentResult.ok).toBe(false);
-      expect(
-        paymentResult.errors.some((e) => e.code === "component.not-deployed"),
-      ).toBe(true);
+      expect(paymentResult.ok).toBe(true);
 
       const tokenResult = validateTransactionRequest(
         tokenTransferRequest(),

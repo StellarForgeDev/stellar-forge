@@ -15,10 +15,12 @@ import { validateTransactionRequest } from "@/lib/transactions/validate";
 const payment = getComponentBySlug("payment")!;
 const validAddress = Keypair.random().publicKey();
 
-function paymentOnTestnet(): StellarComponent {
+function paymentWith(
+  overrides: Partial<StellarComponent["capabilities"]>,
+): StellarComponent {
   return {
     ...payment,
-    capabilities: { ...payment.capabilities, testnet: true },
+    capabilities: { ...payment.capabilities, ...overrides },
   };
 }
 
@@ -38,18 +40,20 @@ const payRequest = {
 describe("Payment Testnet readiness (generic machinery)", () => {
   describe("discovery", () => {
     it("is excluded from Testnet transactions while testnet=false", () => {
-      expect(transactionComponents([payment])).toHaveLength(0);
+      expect(
+        transactionComponents([paymentWith({ testnet: false })]),
+      ).toHaveLength(0);
     });
 
-    it("appears in transactionComponents once testnet=true", () => {
-      const discovered = transactionComponents([paymentOnTestnet()]);
+    it("is discoverable from the catalog once testnet=true", () => {
+      const discovered = transactionComponents([payment]);
       expect(discovered.map((component) => component.slug)).toContain(
         "payment",
       );
     });
 
     it("discovers the pay method and its parameters", () => {
-      const methods = callableMethods(paymentOnTestnet());
+      const methods = callableMethods(payment);
       const pay = methods.find((fn) => fn.name === "pay");
       expect(pay).toBeDefined();
       expect(pay!.params.map((param) => param.name)).toEqual([
@@ -69,17 +73,17 @@ describe("Payment Testnet readiness (generic machinery)", () => {
 
   describe("validation gating", () => {
     it("rejects Payment for Testnet while testnet=false", () => {
-      const result = validateTransactionRequest(payRequest, [payment]);
+      const result = validateTransactionRequest(payRequest, [
+        paymentWith({ testnet: false }),
+      ]);
       expect(result.ok).toBe(false);
       expect(
         result.errors.some((error) => error.code === "component.not-deployed"),
       ).toBe(true);
     });
 
-    it("accepts a valid pay request once testnet=true", () => {
-      const result = validateTransactionRequest(payRequest, [
-        paymentOnTestnet(),
-      ]);
+    it("accepts a valid pay request now that Payment is deployed (testnet=true)", () => {
+      const result = validateTransactionRequest(payRequest, [payment]);
       expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -100,16 +104,25 @@ describe("Payment Testnet readiness (generic machinery)", () => {
   });
 
   describe("deployment registry", () => {
-    it("is componentSlug-driven and null for the unregistered Payment", () => {
-      expect(getDeployment("testnet", "payment")).toBeNull();
-      expect(getDeployment("testnet", "does-not-exist")).toBeNull();
-      expect(getDeployment("futurenet", "token")).toBeNull();
+    it("returns the real registered Payment address on Testnet", () => {
+      const address = getDeployment("testnet", "payment");
+      expect(address).not.toBeNull();
+      expect(address).toMatch(/^C[2-7A-Z]{55}$/);
+      expect(address).toBe(
+        "CDHHS2W3TYYHQ3RJSZKB4HLUGMQ4TX6KPBBUUH7B57CVYSNXO646DABR",
+      );
     });
 
     it("returns the registered Token address on Testnet", () => {
       const address = getDeployment("testnet", "token");
       expect(address).not.toBeNull();
       expect(address).toMatch(/^C[2-7A-Z]{55}$/);
+    });
+
+    it("returns null for unregistered or wrong-network lookups", () => {
+      expect(getDeployment("testnet", "does-not-exist")).toBeNull();
+      expect(getDeployment("futurenet", "token")).toBeNull();
+      expect(getDeployment("futurenet", "payment")).toBeNull();
     });
   });
 });

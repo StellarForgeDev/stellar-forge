@@ -13,14 +13,16 @@ export interface ContractDeployment {
 // an entry here with the printed `C...` address. The registry validates the
 // address before it is used, and the generic transaction flow discovers the
 // component automatically once its catalog `capabilities.testnet` is true.
-//
-// Example (once Payment is deployed):
-//   { network: "testnet", componentSlug: "payment", address: "C..." }
 const DEPLOYMENTS: ContractDeployment[] = [
   {
     network: "testnet",
     componentSlug: "token",
     address: "CA4F2JDF3DFAFLIZP2BKSHAPWS6ZRTZE7NISHCYU62KOOQFQCOOBGECS",
+  },
+  {
+    network: "testnet",
+    componentSlug: "payment",
+    address: "CDHHS2W3TYYHQ3RJSZKB4HLUGMQ4TX6KPBBUUH7B57CVYSNXO646DABR",
   },
 ];
 

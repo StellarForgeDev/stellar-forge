@@ -1,15 +1,15 @@
 # Payment Component Specification
 
-> Status: **Implemented (v1), sandbox-ready, Testnet-not-yet-deployed.**
+> Status: **Implemented (v1), sandbox-ready, and deployed to Stellar Testnet.**
 > The Payment contract lives in `contracts/contracts/payment`, builds for
 > `wasm32v1-none`, is registered in the catalog as
-> `implemented: true, sandbox: true, testnet: false`, runs in the local
+> `implemented: true, sandbox: true, testnet: true`, runs in the local
 > Playground sandbox (with its token dependency provisioned generically), and
 > ships with a passing Rust test suite.
 >
-> The generic transaction machinery is already Testnet-ready for Payment: once a
-> real deployment address is registered in `src/lib/transactions/deployments.ts`
-> and `capabilities.testnet` is flipped to `true`, the existing
+> The generic transaction machinery is Testnet-ready for Payment: a real
+> deployment address is registered in `src/lib/transactions/deployments.ts`
+> and `capabilities.testnet` is `true`, so the existing
 > builder/validate/prepare/submit flow discovers `pay` automatically with **no**
 > component-specific code. The actual deployment is a manual step (Stellar CLI +
 > a funded `deployer` identity) that has **not** been performed in this
@@ -155,12 +155,13 @@ In `src/data/components.ts`, Payment is added as a `StellarComponent` record:
 
 - `implemented: true` — a real contract lives in `contracts/contracts/payment`.
 - `sandbox: true` — its WASM runs in the local sandbox-runner.
-- `testnet: false` for the first landing, then `true` **only after** a deployment
-  address is registered in `src/lib/transactions/deployments.ts`.
+- `testnet: true` — the deployment address is registered in
+   `src/lib/transactions/deployments.ts`.
 
 `componentMaturity()` will report `Implemented` (since `implemented: true`).
-The rollback to `testnet: false` until a real deployment exists is intentional:
-the platform must not advertise Testnet availability it cannot honor.
+  The platform must not advertise Testnet availability it cannot honor — a
+  component's `testnet` flag stays `false` until a real deployment is registered.
+  Payment now satisfies this: it is deployed and its address is registered.
 
 ## Playground Integration
 

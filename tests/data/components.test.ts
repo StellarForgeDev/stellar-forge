@@ -30,11 +30,11 @@ describe("Component Standard v1 invariants", () => {
   describe("Payment", () => {
     const payment = getComponentBySlug("payment");
 
-    it("is implemented and sandbox-ready but not yet on Testnet", () => {
+    it("is implemented, sandbox-ready, and deployed to Testnet", () => {
       expect(payment).toBeDefined();
       expect(payment?.capabilities.implemented).toBe(true);
       expect(payment?.capabilities.sandbox).toBe(true);
-      expect(payment?.capabilities.testnet).toBe(false);
+      expect(payment?.capabilities.testnet).toBe(true);
     });
 
     it("declares a dependency on a token aliased 'asset'", () => {
@@ -49,8 +49,8 @@ describe("Component Standard v1 invariants", () => {
       ]);
     });
 
-    it("does not deploy to Testnet (no live address)", () => {
-      expect(payment?.capabilities.testnet).toBe(false);
+    it("is deployed to Testnet with a live address", () => {
+      expect(payment?.capabilities.testnet).toBe(true);
       expect(payment?.implementation?.package).toBe("payment");
     });
   });

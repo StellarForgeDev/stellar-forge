@@ -6,7 +6,7 @@ A developer platform for discovering, understanding, experimenting with, and reu
 
 - **Release Candidate.**
 - Focused on **Stellar Testnet** (a Testnet + Futurenet configuration exists; no mainnet support).
-- **Two implemented components**: the `Token` contract (deployed on Stellar Testnet) and the `Payment` contract (sandbox-ready; Testnet deployment pending a manual, credentialed deploy).
+ - **Two implemented components**: the `Token` contract (deployed on Stellar Testnet) and the `Payment` contract (deployed on Stellar Testnet; also sandbox-ready).
 - The other **four catalog entries are concepts/documentation only** — they describe patterns but have no contract implementation.
 - Transaction flows run against real Testnet RPC, but the project is **not production/mainnet ready**.
 

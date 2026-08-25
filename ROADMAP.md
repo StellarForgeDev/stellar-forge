@@ -12,8 +12,8 @@ repository before being marked done.
 
 Stellar-Forge is at **release-candidate** maturity. It is Testnet-focused; there
 is no mainnet support. Two components are implemented: `token` (deployed to
-Testnet) and `payment` (sandbox-ready via the generic dependency mechanism;
-Testnet deployment pending). The other four catalog entries are
+Testnet) and `payment` (deployed to Testnet via the generic dependency mechanism).
+The other four catalog entries are
 concepts/documentation only.
 
 ### Completed (verified)
@@ -47,7 +47,7 @@ concepts/documentation only.
   that declares a generic `asset` dependency on `token` (with a `mint` setup
   call), per-component docs, Playground sandbox execution through the generic
   dependency mechanism, and integration generation. Testnet deployment is
-  pending (`testnet: false`). No component-specific branching was added; the
+  complete (registered in `deployments.ts`, `testnet: true`). No component-specific branching was added; the
   dependency engine is data-driven.
 - **Vercel build architecture** — `vercel-build` script, Linux runner build
   (`scripts/vercel-sandbox-build.sh`), `outputFileTracingIncludes` in
@@ -195,5 +195,5 @@ Eventually consider, but do not promise dates for:
 - New work must map to a roadmap capability or milestone; speculative features
   should not displace core reliability work without justification.
 - Proposed/future capabilities are not present until the repository proves them.
-  Payment is implemented for the sandbox (`testnet: false`); an SDK and mainnet
+  Payment is implemented for the sandbox and deployed to Testnet (`testnet: true`); an SDK and mainnet
   are not present.
