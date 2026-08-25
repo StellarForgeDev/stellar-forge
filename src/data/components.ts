@@ -73,7 +73,9 @@ export interface ComponentDependency {
   package: string;
   /// Values for the dependency constructor, keyed by parameter name. Values may
   /// reference identity names (e.g. "admin") which resolve to addresses.
-  constructor?: Record<string, string>;
+  /// Named `constructorArgs` (not `constructor`) to avoid the built-in
+  /// `Object.prototype.constructor`.
+  constructorArgs?: Record<string, string>;
   /// Calls to run after deployment (e.g. seeding balances) before the component
   /// itself is exercised.
   setup?: DependencyCall[];
@@ -92,6 +94,14 @@ export interface StellarComponent {
   interface?: FunctionSpec[];
   config?: ConfigField[];
   dependencies?: ComponentDependency[];
+  /// Values for the primary component's own constructor, keyed by parameter
+  /// name. Values may reference identity names (e.g. "admin", "user1") or a
+  /// dependency alias (e.g. "asset"), both of which resolve to addresses, as
+  /// well as literal values. This keeps constructor defaults catalog-driven so
+  /// the generic execution layer never assumes a Token-shaped "admin" default.
+  /// Named `constructorArgs` (not `constructor`) to avoid the built-in
+  /// `Object.prototype.constructor`.
+  constructorArgs?: Record<string, string>;
 }
 
 const networkConfig: ConfigField = {
@@ -347,7 +357,7 @@ export const stellarComponents: StellarComponent[] = [
       {
         alias: "asset",
         package: "token",
-        constructor: {
+        constructorArgs: {
           admin: "admin",
           decimal: "7",
           name: "Payment Asset",
@@ -393,15 +403,68 @@ export const stellarComponents: StellarComponent[] = [
     slug: "escrow",
     name: "Escrow",
     description:
-      "Holds funds until a defined condition or set of signers releases them.",
+      "Holds a SEP-41 asset between a depositor and beneficiary until the arbiter releases or refunds it.",
     category: "Payments",
-    shortDescription: "Conditional fund release",
+    shortDescription: "Conditional asset release",
     overview:
-      "A pattern for holding funds under defined conditions before allowing them to be released to the intended parties.",
+      "Escrow is a small, stateful Soroban contract that locks a SEP-41 asset (the `asset` dependency) between a `depositor` and a `beneficiary`. Only the `arbiter` can move the held funds: `release` sends them to the beneficiary, `refund` returns them to the depositor. The asset itself lives in a separate SEP-41 contract — Escrow delegates the actual balance movement to it, just like the Payment primitive. The contract ships with a passing Rust test suite and runs in the local Playground sandbox.",
     useCases: [
-      "Hold funds between multiple parties",
-      "Release funds after defined conditions",
-      "Explore conditional payment workflows",
+      "Hold a SEP-41 asset between two parties",
+      "Release funds to the beneficiary via an arbiter",
+      "Refund funds to the depositor via an arbiter",
+      "Explore conditional, role-based payment workflows",
+    ],
+    implementation: {
+      language: "rust",
+      package: "escrow",
+      sourcePath: "contracts/contracts/escrow",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [
+          { name: "depositor", type: "Address" },
+          { name: "beneficiary", type: "Address" },
+          { name: "arbiter", type: "Address" },
+          { name: "asset", type: "Address" },
+        ],
+        authorization: "none",
+        description:
+          "Locks the escrow to a depositor, beneficiary, and arbiter, holding the given SEP-41 asset.",
+      },
+      {
+        name: "deposit",
+        params: [
+          { name: "depositor", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Moves `amount` of the held asset from the depositor into the contract. Authorized by the depositor.",
+      },
+      {
+        name: "release",
+        params: [{ name: "arbiter", type: "Address" }],
+        authorization: "first-address",
+        description:
+          "Releases the held asset to the beneficiary. Authorized by the arbiter.",
+      },
+      {
+        name: "refund",
+        params: [{ name: "arbiter", type: "Address" }],
+        authorization: "first-address",
+        description:
+          "Returns the held asset to the depositor. Authorized by the arbiter.",
+      },
+      {
+        name: "status",
+        params: [],
+        returns: "u32",
+        authorization: "none",
+        description:
+          "Returns the escrow state: 0 = active, 1 = released, 2 = refunded.",
+      },
     ],
     config: [
       {
@@ -410,11 +473,30 @@ export const stellarComponents: StellarComponent[] = [
         type: "text",
         default: "Escrow",
       },
-      symbolConfig("XLM"),
-      decimalsConfig(),
       networkConfig,
     ],
-    capabilities: { implemented: false, sandbox: false, testnet: false },
+    constructorArgs: {
+      depositor: "user1",
+      beneficiary: "user2",
+      arbiter: "admin",
+      asset: "asset",
+    },
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Escrow Asset",
+          symbol: "EAC",
+        },
+        setup: [
+          { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+        ],
+      },
+    ],
+    capabilities: { implemented: true, sandbox: true, testnet: false },
   },
 
   {

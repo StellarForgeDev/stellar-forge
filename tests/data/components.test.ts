@@ -10,7 +10,6 @@ import {
 
 const CONCEPT_SLUGS = [
   "access-control",
-  "escrow",
   "subscription",
   "multi-signature",
 ];
@@ -43,7 +42,7 @@ describe("Component Standard v1 invariants", () => {
       const asset = dependencies[0];
       expect(asset.alias).toBe("asset");
       expect(asset.package).toBe("token");
-      expect(asset.constructor).toMatchObject({ admin: "admin" });
+      expect(asset.constructorArgs).toMatchObject({ admin: "admin" });
       expect(asset.setup).toEqual([
         { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
       ]);
@@ -121,6 +120,51 @@ describe("Component Standard v1 invariants", () => {
     });
   });
 
+  describe("Escrow (third implemented component)", () => {
+    const escrow = getComponentBySlug("escrow")!;
+
+    it("is implemented, sandbox-ready, and not on Testnet", () => {
+      expect(escrow?.capabilities).toEqual({
+        implemented: true,
+        sandbox: true,
+        testnet: false,
+      });
+    });
+
+    it("declares a token asset dependency aliased 'asset'", () => {
+      const dependencies = escrow?.dependencies ?? [];
+      expect(dependencies).toHaveLength(1);
+      expect(dependencies[0].alias).toBe("asset");
+      expect(dependencies[0].package).toBe("token");
+    });
+
+    it("declares catalog-driven constructor defaults", () => {
+      const constructor = escrow?.constructorArgs ?? {};
+      expect(constructor.depositor).toBe("user1");
+      expect(constructor.beneficiary).toBe("user2");
+      expect(constructor.arbiter).toBe("admin");
+      expect(constructor.asset).toBe("asset");
+    });
+
+    it("exposes an interface matching the contract", () => {
+      const names = (escrow?.interface ?? []).map((fn) => fn.name);
+      expect(names).toEqual([
+        "__constructor",
+        "deposit",
+        "release",
+        "refund",
+        "status",
+      ]);
+      const ctor = escrow?.interface?.find((fn) => fn.name === "__constructor");
+      expect(ctor?.params.map((p) => p.name)).toEqual([
+        "depositor",
+        "beneficiary",
+        "arbiter",
+        "asset",
+      ]);
+    });
+  });
+
   describe("getConfigDefaults", () => {
     it("maps each config field key to its default value", () => {
       const token = getComponentBySlug("token")!;
@@ -151,7 +195,7 @@ describe("Component Standard v1 invariants", () => {
     });
 
     it("returns null when there is no implementation", () => {
-      const component = getComponentBySlug("escrow")!;
+      const component = getComponentBySlug("access-control")!;
       expect(component.implementation).toBeUndefined();
       expect(componentWasmPath(component)).toBeNull();
     });

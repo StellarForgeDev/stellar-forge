@@ -11,10 +11,12 @@ repository before being marked done.
 ## Current State
 
 Stellar-Forge is at **release-candidate** maturity. It is Testnet-focused; there
-is no mainnet support. Two components are implemented: `token` (deployed to
-Testnet) and `payment` (deployed to Testnet via the generic dependency mechanism).
-The other four catalog entries are
-concepts/documentation only.
+is no mainnet support. Three components are implemented: `token` (deployed to
+Testnet), `payment` (deployed to Testnet via the generic dependency mechanism),
+and `escrow` (sandbox-ready; not yet deployed to Testnet). `escrow` is the first
+*stateful, constructor-driven, dependency-composing, multi-role* component and
+was added to validate that the platform is generic. The other three catalog
+entries are concepts/documentation only.
 
 ### Completed (verified)
 
@@ -53,6 +55,19 @@ concepts/documentation only.
   (`scripts/vercel-sandbox-build.sh`), `outputFileTracingIncludes` in
   `next.config.ts`, committed prebuilt WASM. (End-to-end deployment is
   configured but **not independently verified**.)
+- **Escrow implementation (v1)** — stateful `escrow` contract
+  (`__constructor(depositor, beneficiary, arbiter, asset)`, `deposit`,
+  `release`, `refund`, `status`) with passing Rust tests and a cross-contract
+  sandbox execution proof (`escrow_executes_against_provisioned_dependency` in
+  the sandbox-runner). Catalog record declares `constructorArgs` (role identity
+  names + an `asset` dependency alias) and a generic `asset` token dependency
+  with a `mint` setup call. Per-component docs, Playground sandbox execution
+  through the generic dependency mechanism, and integration generation. No
+  component-specific branching was added; only two small generic platform
+  enhancements were required (`constructorArgs` catalog field and
+  `constructorArg` dependency-alias resolution). Testnet deployment is **not**
+  done (`testnet: false`); the generic transaction machinery will support it once
+  a deployment address is registered in `deployments.ts`.
 
 ## Current Priority
 
@@ -142,10 +157,11 @@ See [Subsequent Milestones](#production-readiness).
 
 ### Component Ecosystem
 
-Potential future components (all currently **concepts** unless/until
-implemented):
+Potential future components (currently **concepts** unless/until implemented):
 
-- **Escrow**
+- **Escrow** — *implemented (v1)*: stateful, constructor-driven, dependency-
+  composing, multi-role; sandbox-ready, not Testnet-deployed. Added to validate
+  the platform is generic (see Completed above).
 - **Access Control**
 - **Subscription**
 - **Multi-signature**

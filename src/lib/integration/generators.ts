@@ -133,7 +133,7 @@ export function generateRustIntegration({
   if (constructor) {
     for (const param of constructor.params) {
       lines.push(
-        `                ${constructorArg(param, configValues)}, // ${param.name}`,
+        `                ${constructorArg(param, configValues, dependencyAliases)}, // ${param.name}`,
       );
     }
   }
@@ -210,8 +210,17 @@ export function generateRustIntegration({
 function constructorArg(
   param: ParameterSpec,
   configValues: Record<string, string>,
+  dependencyAliases: Set<string> = new Set(),
 ): string {
-  if (param.type === "Address") return "admin.clone()";
+  if (param.type === "Address") {
+    // A constructor parameter that is a dependency alias resolves to the
+    // provisioned dependency address, mirroring how method arguments are handled
+    // in `placeholderArg`. This keeps the generated example correct for
+    // components whose constructor receives a dependency (e.g. Escrow's asset).
+    return dependencyAliases.has(param.name)
+      ? `&${param.name}_address`
+      : "admin.clone()";
+  }
   const candidates = [
     param.name,
     param.name.toLowerCase(),

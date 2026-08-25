@@ -80,8 +80,17 @@ export function buildConstructorRequest(
   );
   const args: ConstructorRequest = {};
   if (!constructor) return args;
+  // `constructorArgs` (not `constructor`) holds the catalog defaults so we
+  // avoid colliding with the built-in `Object.prototype.constructor`.
+  const defaults = component.constructorArgs ?? {};
   for (const param of constructor.params) {
-    if (ADDRESS_TYPES.has(param.type)) {
+    const source = defaults[param.name];
+    if (source !== undefined) {
+      // Catalog-driven default: an identity name, a dependency alias, or a
+      // literal. The API route and sandbox-runner resolve identities and
+      // aliases to addresses, so no Token-shaped "admin" assumption lives here.
+      args[param.name] = source;
+    } else if (ADDRESS_TYPES.has(param.type)) {
       args[param.name] = ADMIN_IDENTITY;
     } else {
       args[param.name] = configValueForParam(param.name, configValues);

@@ -307,7 +307,7 @@ function buildRunnerDependencies(
         error: inputError(`dependency ${dep.package} has no constructor interface`),
       };
     }
-    const provided = dep.constructor ?? {};
+    const provided = dep.constructorArgs ?? {};
     const constructorValue: Record<string, unknown> = {};
     for (const param of ctorFn.params) {
       if (!(param.name in provided)) {

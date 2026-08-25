@@ -89,6 +89,11 @@ and a `config` (form fields).
   primitive (`pay(from, to, asset, amount)`) that delegates the balance
   movement to a SEP-41 asset contract. Ships with a Rust unit test suite
   (`contracts/contracts/payment/src/test.rs`).
+- `escrow/` — the third **implemented** component: a stateful holding contract
+  (`__constructor(depositor, beneficiary, arbiter, asset)`, `deposit`,
+  `release`, `refund`, `status`) that locks a SEP-41 asset and releases or
+  refunds it via an arbiter. Ships with a Rust unit test suite
+  (`contracts/contracts/escrow/src/test.rs`).
 - `sandbox-runner/` — a **native** (non-contract) Rust binary that loads a
   contract WASM into an in-process Soroban `Env`, deploys it, and invokes the
   requested functions. It is the execution engine behind the Playground.
@@ -208,12 +213,13 @@ src/
  contracts/              Rust/Soroban workspace
    Cargo.toml            Workspace manifest (members: contracts/*)
    contracts/
-     token/              SEP-41 token contract (implemented)
-     payment/            Stateless payment primitive (implemented)
-     test-asset/         Minimal SEP-41 fixture for payment tests
-     greeter/            Example/sandbox test fixture (not a catalog component)
-     sandbox-runner/     Native runner that executes contract WASM
-   prebuilt/             Committed contract WASM (e.g. token.wasm, payment.wasm)
+      token/              SEP-41 token contract (implemented)
+      payment/            Stateless payment primitive (implemented)
+      escrow/             Stateful holding contract (implemented)
+      test-asset/         Minimal SEP-41 fixture for payment tests
+      greeter/            Example/sandbox test fixture (not a catalog component)
+      sandbox-runner/     Native runner that executes contract WASM
+    prebuilt/             Committed contract WASM (e.g. token.wasm, payment.wasm, escrow.wasm)
 
 scripts/
   sandbox-build.mjs     Local sandbox-runner + WASM build
@@ -228,8 +234,8 @@ catalog data is consumed by both the UI and the server-side logic (the API
 routes and integration generator read the same `StellarComponent` records).
 
 Within `contracts/`, the workspace separates **contract packages** (`token`,
-`payment`) from **native tooling** (`sandbox-runner`) and **fixtures**
-(`greeter`, `test-asset`). `token` and `payment` are published catalog
+`payment`, `escrow`) from **native tooling** (`sandbox-runner`) and **fixtures**
+(`greeter`, `test-asset`). `token`, `payment`, and `escrow` are published catalog
 components with committed WASM; `test-asset` is a fixture only.
 
 ## Component Model
@@ -261,7 +267,7 @@ The fields that currently exist:
     the boundary rather than silently.
 - **Metadata / documentation** — `overview`, `useCases`.
 - **Implementation** (optional) — `implementation: { language, package,
-  sourcePath, buildTarget }`. Present for `token` and `payment`.
+  sourcePath, buildTarget }`. Present for `token`, `payment`, and `escrow`.
 - **Contract interface** (optional) — `interface: FunctionSpec[]`, where each
   `FunctionSpec` has `name`, `params` (`ParameterSpec[]` with `name`/`type`/
   `placeholder`), optional `returns`, optional `description`, and optional

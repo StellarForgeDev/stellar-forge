@@ -796,4 +796,132 @@ mod tests {
             calls[0]
         );
     }
+
+    #[test]
+    fn escrow_executes_against_provisioned_dependency() {
+        // End-to-end boundary for the Escrow component's generic support:
+        //   Escrow -> asset dependency (alias "asset") -> dependency
+        //   provisioning -> Escrow deployment (asset passed into the
+        //   constructor as the dependency alias) -> deposit/release/status ->
+        //   real state transition. Proves the platform needs no Escrow-specific
+        //   branching: the same provisioning path that serves Payment serves
+        //   Escrow, and the alias resolves into the primary constructor.
+        // Skips when the wasm artifacts are not built (CI's Rust job does not
+        // run the Stellar CLI).
+        let escrow_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/escrow.wasm"
+        );
+        let token_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/token.wasm"
+        );
+        if !std::path::Path::new(escrow_wasm).exists()
+            || !std::path::Path::new(token_wasm).exists()
+        {
+            return;
+        }
+        let request = json!({
+            "wasmPath": escrow_wasm,
+            "constructorParams": [
+                { "name": "depositor", "type": "Address" },
+                { "name": "beneficiary", "type": "Address" },
+                { "name": "arbiter", "type": "Address" },
+                { "name": "asset", "type": "Address" },
+            ],
+            "constructor": {
+                "depositor": "user1",
+                "beneficiary": "user2",
+                "arbiter": "admin",
+                "asset": "asset",
+            },
+            "dependencies": [{
+                "alias": "asset",
+                "wasmPath": token_wasm,
+                "constructorParams": [
+                    { "name": "admin", "type": "Address" },
+                    { "name": "decimal", "type": "u32" },
+                    { "name": "name", "type": "String" },
+                    { "name": "symbol", "type": "String" },
+                ],
+                "constructor": {
+                    "admin": "admin",
+                    "decimal": "7",
+                    "name": "Escrow Asset",
+                    "symbol": "EAC",
+                },
+                "setup": [
+                    {
+                        "fn": "mint",
+                        "params": [
+                            { "name": "to", "type": "Address" },
+                            { "name": "amount", "type": "i128" },
+                        ],
+                        "args": ["user1", "1000000"],
+                        "signer": "admin",
+                    }
+                ],
+            }],
+            "calls": [
+                {
+                    "fn": "deposit",
+                    "params": [
+                        { "name": "depositor", "type": "Address" },
+                        { "name": "amount", "type": "i128" },
+                    ],
+                    "args": ["user1", "400"],
+                    "signer": "user1",
+                },
+                {
+                    "fn": "release",
+                    "params": [
+                        { "name": "arbiter", "type": "Address" },
+                    ],
+                    "args": ["admin"],
+                    "signer": "admin",
+                },
+                {
+                    "fn": "status",
+                    "params": [],
+                    "args": [],
+                },
+            ],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let deps = response
+            .get("deployedDependencies")
+            .and_then(Value::as_array)
+            .expect("response includes deployedDependencies");
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].get("alias").and_then(Value::as_str), Some("asset"));
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 3);
+        assert_eq!(
+            calls[0].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "deposit failed: {}",
+            calls[0]
+        );
+        assert_eq!(
+            calls[1].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "release failed: {}",
+            calls[1]
+        );
+        assert_eq!(
+            calls[2].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "status failed: {}",
+            calls[2]
+        );
+        // status() returns the u32 state; after release it must be 1 (Released).
+        let status = calls[2].get("result").and_then(Value::as_i64).unwrap_or(-1);
+        assert_eq!(status, 1, "expected Released state, got: {}", calls[2]);
+    }
 }
