@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "sandbox:build": "node scripts/sandbox-build.mjs",
     "vercel-build": "bash scripts/vercel-sandbox-build.sh && next build"
   },
@@ -25,7 +27,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   },
   "packageManager": "pnpm@11.21.0"
 }
