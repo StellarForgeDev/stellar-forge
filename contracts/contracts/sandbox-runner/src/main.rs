@@ -1067,4 +1067,78 @@ mod tests {
             calls[5]
         );
     }
+
+    #[test]
+    fn arbitrary_identity_resolves_generically() {
+        // Proves the runner accepts arbitrary identity names once the API
+        // supplies them. The API now generates deterministic addresses for
+        // novel names (e.g. `governor`); this test stands in for that by
+        // supplying `governor` with a valid strkey. The contract deploys with
+        // that identity as admin and authorizes calls with it. This is
+        // data-driven: there is no component-specific branch for the name.
+        // Skips when the wasm artifact is not built (CI's Rust job does not run
+        // the Stellar CLI).
+        let access_control_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/access_control.wasm"
+        );
+        if !std::path::Path::new(access_control_wasm).exists() {
+            return;
+        }
+        let request = json!({
+            "wasmPath": access_control_wasm,
+            "constructorParams": [
+                { "name": "admin", "type": "Address" },
+            ],
+            "constructor": { "admin": "governor" },
+            "identities": {
+                "governor": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            },
+            "calls": [
+                {
+                    "fn": "grant_role",
+                    "params": [
+                        { "name": "role", "type": "Symbol" },
+                        { "name": "account", "type": "Address" },
+                    ],
+                    "args": ["minter", "user1"],
+                    "signer": "governor",
+                },
+                {
+                    "fn": "has_role",
+                    "params": [
+                        { "name": "role", "type": "Symbol" },
+                        { "name": "account", "type": "Address" },
+                    ],
+                    "args": ["minter", "user1"],
+                },
+            ],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(
+            calls[0].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "grant_role failed: {}",
+            calls[0]
+        );
+        assert_eq!(
+            calls[1].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "has_role failed: {}",
+            calls[1]
+        );
+        assert_eq!(
+            calls[1].get("result").and_then(Value::as_bool),
+            Some(true),
+            "expected has_role == true, got: {}",
+            calls[1]
+        );
+    }
 }

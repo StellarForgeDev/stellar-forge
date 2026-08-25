@@ -7,12 +7,12 @@ import type { FunctionSpec, StellarComponent } from "@/data/components";
 import { postPlaygroundRequest } from "@/lib/playground/client";
 import {
   ADDRESS_TYPES,
-  IDENTITY_OPTIONS,
   applyExecution,
   authorizationSummary,
   buildConstructorRequest,
   callsForSteps,
   defaultArgValue,
+  playgroundIdentityOptions,
   signerFor,
 } from "@/lib/playground/execution";
 import type { ExecutionStep } from "@/lib/playground/types";
@@ -97,7 +97,10 @@ export function SandboxPanel({
     (fn) => fn.name !== "__constructor",
   );
   const dependencyAliases = (component.dependencies ?? []).map((d) => d.alias);
-  const addressOptions = [...IDENTITY_OPTIONS, ...dependencyAliases];
+  const addressOptions = playgroundIdentityOptions(component);
+  const identityOptionsOnly = addressOptions.filter(
+    (option) => !dependencyAliases.includes(option),
+  );
   const [steps, setSteps] = useState<ExecutionStep[]>([]);
   const [opName, setOpName] = useState(() => ops[0]?.name ?? "");
   const [argValues, setArgValues] = useState<Record<string, string>>(() =>
@@ -225,7 +228,7 @@ export function SandboxPanel({
             className={inputStyles}
           >
             <optgroup label="Identities">
-              {IDENTITY_OPTIONS.map((identity) => (
+              {identityOptionsOnly.map((identity) => (
                 <option key={identity} value={identity}>
                   {identity}
                 </option>

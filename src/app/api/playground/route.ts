@@ -1,8 +1,11 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { Keypair } from "@stellar/stellar-sdk";
 import {
   resolveRunner,
   resolveWasm,
 } from "@/lib/playground/artifacts";
+import { discoverIdentityNames } from "@/lib/playground/execution";
 import {
   getComponentByPackage,
   getComponentBySlug,
@@ -217,14 +220,15 @@ function validateRequest(
     identities = checked.value;
   }
 
-  const knownNames = new Set(DEFAULT_IDENTITIES);
-  if (identities !== undefined) {
-    for (const name of Object.keys(identities)) knownNames.add(name);
-  }
-  // Dependency aliases resolve to addresses, so calls may reference them.
-  for (const alias of (component.dependencies ?? []).map((d) => d.alias)) {
-    knownNames.add(alias);
-  }
+  // Derive the full identity context generically from catalog metadata: the
+  // base default identities (backwards compatibility) plus any identity names
+  // referenced by the component/dependency constructors. Novel names get a
+  // deterministic address so the runner can resolve them without the platform
+  // knowing anything component-specific.
+  const { knownNames, identities: resolvedIdentities } = resolveIdentityContext(
+    component,
+    identities,
+  );
 
   const constructor = validateConstructor(
     request.constructor,
@@ -261,7 +265,9 @@ function validateRequest(
   return {
     value: {
       component,
-      ...(identities !== undefined ? { identities } : {}),
+      ...(Object.keys(resolvedIdentities).length > 0
+        ? { identities: resolvedIdentities }
+        : {}),
       constructorParams: constructorFn.params.map((param) => ({
         name: param.name,
         type: param.type,
@@ -349,6 +355,51 @@ function buildRunnerDependencies(
     });
   }
   return { value: out };
+}
+
+/**
+ * Derives the identity context for a component generically from catalog
+ * metadata. Returns the set of names that are valid to reference (identity
+ * names + dependency aliases) and the `identities` map the runner needs to
+ * resolve those names to addresses. The base default identities are retained
+ * for backwards compatibility; any *novel* identity referenced by the catalog
+ * (e.g. `governor`) receives a deterministic address so the sandbox runner can
+ * resolve it without any component-specific code.
+ */
+export function resolveIdentityContext(
+  component: StellarComponent,
+  requestIdentities?: Record<string, string>,
+): { knownNames: Set<string>; identities: Record<string, string> } {
+  const discovered = discoverIdentityNames(component);
+  const knownNames = new Set<string>([
+    ...DEFAULT_IDENTITIES,
+    ...discovered,
+    ...(component.dependencies ?? []).map((d) => d.alias),
+  ]);
+
+  const identities: Record<string, string> = {};
+  if (requestIdentities) {
+    for (const [name, key] of Object.entries(requestIdentities)) {
+      identities[name] = key;
+    }
+  }
+  for (const name of discovered) {
+    if (name in identities) continue;
+    if (DEFAULT_IDENTITIES.has(name)) continue;
+    identities[name] = deterministicAddress(name);
+  }
+  for (const name of Object.keys(identities)) knownNames.add(name);
+
+  return { knownNames, identities };
+}
+
+// Deterministic, valid G-strkey derived from an identity name. The same name
+// always yields the same address, so sandbox executions are reproducible.
+function deterministicAddress(name: string): string {
+  const seed = createHash("sha256")
+    .update(`stellar-forge-identity:${name}`)
+    .digest();
+  return Keypair.fromRawEd25519Seed(seed).publicKey();
 }
 
 function validateIdentities(

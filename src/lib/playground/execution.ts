@@ -1,4 +1,5 @@
 import type { FunctionSpec, StellarComponent } from "@/data/components";
+import { getComponentByPackage } from "@/data/components";
 import type {
   CallRequest,
   ConstructorRequest,
@@ -11,6 +12,70 @@ import type {
 export const ADMIN_IDENTITY = "admin";
 export const IDENTITY_OPTIONS = ["admin", "user1", "user2"] as const;
 export const ADDRESS_TYPES = new Set(["Address", "MuxedAddress"]);
+
+// A valid Stellar strkey (account/contract/muxed). Used to tell identity-name
+// references apart from literal addresses that may appear in constructor args.
+const STRKEY_PATTERN = /^[GC][A-Z2-7]{55}$|^[M][A-Z2-7]{55}$/;
+
+function isLikelyStrkey(value: string): boolean {
+  return STRKEY_PATTERN.test(value);
+}
+
+/**
+ * Identity references mentioned by a component's catalog metadata, derived
+ * generically (no component-specific branching). For every Address/MuxedAddress
+ * constructor parameter whose `constructorArgs` value is a name (not a
+ * dependency alias, not a literal strkey) we treat that value as an identity
+ * reference. Dependency constructors are scanned the same way so a dependency
+ * can reference its own identities (e.g. `admin`). The names remain ordinary
+ * data; the platform never maps a name to a component.
+ */
+export function discoverIdentityNames(component: StellarComponent): string[] {
+  const names = new Set<string>();
+  const aliases = new Set((component.dependencies ?? []).map((d) => d.alias));
+
+  const ctor = (component.interface ?? []).find((fn) => fn.name === "__constructor");
+  for (const param of ctor?.params ?? []) {
+    if (!ADDRESS_TYPES.has(param.type)) continue;
+    const ref = component.constructorArgs?.[param.name];
+    if (
+      typeof ref === "string" &&
+      ref.length > 0 &&
+      !aliases.has(ref) &&
+      !isLikelyStrkey(ref)
+    ) {
+      names.add(ref);
+    }
+  }
+
+  for (const dep of component.dependencies ?? []) {
+    const depComponent = getComponentByPackage(dep.package);
+    const depCtor = depComponent?.interface?.find(
+      (fn) => fn.name === "__constructor",
+    );
+    for (const param of depCtor?.params ?? []) {
+      if (!ADDRESS_TYPES.has(param.type)) continue;
+      const ref = dep.constructorArgs?.[param.name];
+      if (typeof ref === "string" && ref.length > 0 && !isLikelyStrkey(ref)) {
+        names.add(ref);
+      }
+    }
+  }
+
+  return [...names];
+}
+
+/**
+ * Identity options offered in the Playground UI for a component: the base
+ * default identities (kept for backwards compatibility) plus the identity
+ * references discovered from the component and dependency metadata, plus
+ * dependency aliases. Purely data-driven — no component-specific list.
+ */
+export function playgroundIdentityOptions(component: StellarComponent): string[] {
+  const discovered = discoverIdentityNames(component);
+  const aliases = (component.dependencies ?? []).map((d) => d.alias);
+  return Array.from(new Set([...IDENTITY_OPTIONS, ...discovered, ...aliases]));
+}
 
 export function defaultArgValue(
   param: FunctionSpec["params"][number],
