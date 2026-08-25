@@ -11,8 +11,10 @@ repository before being marked done.
 ## Current State
 
 Stellar-Forge is at **release-candidate** maturity. It is Testnet-focused; there
-is no mainnet support. One component (`token`) is fully implemented and deployed
-to Testnet; the other five catalog entries are concepts/documentation only.
+is no mainnet support. Two components are implemented: `token` (deployed to
+Testnet) and `payment` (sandbox-ready via the generic dependency mechanism;
+Testnet deployment pending). The other four catalog entries are
+concepts/documentation only.
 
 ### Completed (verified)
 
@@ -40,6 +42,13 @@ to Testnet; the other five catalog entries are concepts/documentation only.
 - **Token implementation/deployment** — SEP-41 token contract with passing Rust
   tests, deployed to Stellar Testnet; address registered in
   `src/lib/transactions/deployments.ts`.
+- **Payment implementation (v1)** — stateless `payment` contract
+  (`pay(from, to, asset, amount)`) with passing Rust tests, a catalog record
+  that declares a generic `asset` dependency on `token` (with a `mint` setup
+  call), per-component docs, Playground sandbox execution through the generic
+  dependency mechanism, and integration generation. Testnet deployment is
+  pending (`testnet: false`). No component-specific branching was added; the
+  dependency engine is data-driven.
 - **Vercel build architecture** — `vercel-build` script, Linux runner build
   (`scripts/vercel-sandbox-build.sh`), `outputFileTracingIncludes` in
   `next.config.ts`, committed prebuilt WASM. (End-to-end deployment is
@@ -97,9 +106,8 @@ components as part of this milestone unless separately instructed.
 
 ### Payment
 
-Use **Payment** as the first major test of the Component Standard. Payment is
-currently a **concept** (no contract). A future Payment implementation should
-ideally move through:
+Use **Payment** as the first major test of the Component Standard. Payment
+exercised every layer established by the standard:
 
 ```text
 Contract
@@ -110,11 +118,14 @@ Contract
   → Documentation
   → Playground
   → Integration
-  → Testnet
 ```
 
-This exercises every layer established by the Component Standard. **Payment is
-not currently implemented** and is not claimed as such.
+It was implemented as a **stateless** payment primitive that delegates balance
+movement to a SEP-41 asset declared as a generic `asset` dependency on `token`
+(with a `mint` setup call). The sandbox-runner provisions that dependency
+generically, so no Payment-specific code was added to the runner, route, or
+UI. The remaining standard stage — **Testnet** — is intentionally not yet done
+(`testnet: false`); see [Subsequent Milestones](#production-readiness).
 
 ### Component Ecosystem
 
@@ -158,6 +169,7 @@ Eventually consider, but do not promise dates for:
 - Stable versioning and compatibility guarantees.
 - Mainnet strategy (currently unsupported).
 - Production deployment beyond Testnet.
+- Testnet deployment of additional components (e.g. `payment`) beyond `token`.
 - Long-term maintenance ownership.
 
 ## Roadmap Rules
@@ -169,5 +181,6 @@ Eventually consider, but do not promise dates for:
   done; do not mark items complete based on intent.
 - New work must map to a roadmap capability or milestone; speculative features
   should not displace core reliability work without justification.
-- Proposed/future capabilities (Payment, SDK, mainnet, etc.) are not present
-  until the repository proves them.
+- Proposed/future capabilities are not present until the repository proves them.
+  Payment is implemented for the sandbox (`testnet: false`); an SDK and mainnet
+  are not present.

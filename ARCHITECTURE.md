@@ -82,12 +82,19 @@ and a `config` (form fields).
 `contracts/` is a Cargo workspace (`contracts/Cargo.toml`) with members under
 `contracts/contracts/`:
 
-- `token/` — the only **implemented** component: a standard SEP-41 fungible
+- `token/` — an **implemented** component: a standard SEP-41 fungible
   token (`soroban_sdk::token::TokenInterface`). Ships with a Rust unit test
   suite (`contracts/contracts/token/src/test.rs`).
+- `payment/` — the second **implemented** component: a stateless payment
+  primitive (`pay(from, to, asset, amount)`) that delegates the balance
+  movement to a SEP-41 asset contract. Ships with a Rust unit test suite
+  (`contracts/contracts/payment/src/test.rs`).
 - `sandbox-runner/` — a **native** (non-contract) Rust binary that loads a
   contract WASM into an in-process Soroban `Env`, deploys it, and invokes the
   requested functions. It is the execution engine behind the Playground.
+- `test-asset/` — a minimal SEP-41 token used only as a test/sandbox fixture
+  for `payment` (listed in `scripts/sandbox-build.mjs` as a non-contract
+  package, so it is not built into a published WASM artifact).
 - `greeter/` — a small example contract used as a sandbox-runner test fixture
   (listed in `scripts/sandbox-build.mjs` as a non-contract package, so it is
   not built into a published WASM artifact).
@@ -198,13 +205,15 @@ src/
     transactions/       Preparation, simulation, signing, submission
     wallet/             Freighter wallet integration
 
-contracts/              Rust/Soroban workspace
-  Cargo.toml            Workspace manifest (members: contracts/*)
-  contracts/
-    token/              SEP-41 token contract (implemented)
-    greeter/            Example/sandbox test fixture (not a catalog component)
-    sandbox-runner/     Native runner that executes contract WASM
-  prebuilt/             Committed contract WASM (e.g. token.wasm)
+ contracts/              Rust/Soroban workspace
+   Cargo.toml            Workspace manifest (members: contracts/*)
+   contracts/
+     token/              SEP-41 token contract (implemented)
+     payment/            Stateless payment primitive (implemented)
+     test-asset/         Minimal SEP-41 fixture for payment tests
+     greeter/            Example/sandbox test fixture (not a catalog component)
+     sandbox-runner/     Native runner that executes contract WASM
+   prebuilt/             Committed contract WASM (e.g. token.wasm, payment.wasm)
 
 scripts/
   sandbox-build.mjs     Local sandbox-runner + WASM build
@@ -218,9 +227,10 @@ The meaningful boundary is **catalog data (`src/data`) ↔ domain logic
 catalog data is consumed by both the UI and the server-side logic (the API
 routes and integration generator read the same `StellarComponent` records).
 
-Within `contracts/`, the workspace separates **contract packages** (`token`) from
-**native tooling** (`sandbox-runner`) and **fixtures** (`greeter`). Only `token`
-is a published catalog component with a committed WASM.
+Within `contracts/`, the workspace separates **contract packages** (`token`,
+`payment`) from **native tooling** (`sandbox-runner`) and **fixtures**
+(`greeter`, `test-asset`). `token` and `payment` are published catalog
+components with committed WASM; `test-asset` is a fixture only.
 
 ## Component Model
 
@@ -251,7 +261,7 @@ The fields that currently exist:
     the boundary rather than silently.
 - **Metadata / documentation** — `overview`, `useCases`.
 - **Implementation** (optional) — `implementation: { language, package,
-  sourcePath, buildTarget }`. Present only for `token`.
+  sourcePath, buildTarget }`. Present for `token` and `payment`.
 - **Contract interface** (optional) — `interface: FunctionSpec[]`, where each
   `FunctionSpec` has `name`, `params` (`ParameterSpec[]` with `name`/`type`/
   `placeholder`), optional `returns`, optional `description`, and optional
@@ -259,6 +269,16 @@ The fields that currently exist:
 - **Configuration** — `config: ConfigField[]`, where each field has `key`,
   `label`, `type` (`"text" | "number" | "select"`), `default`, optional
   `min`/`max`/`options`/`disabled`/`mono`.
+- **Dependencies** (optional) — `dependencies?: ComponentDependency[]`, where each
+  `ComponentDependency` has an `alias`, a `package` (another component's
+  `implementation.package`), an optional `constructor` (values keyed by the
+  dependency's `__constructor` parameter names), and an optional `setup`
+  (calls to run after the dependency deploys). A component declares that it
+  needs another contract provisioned alongside it — for example, Payment
+  declares an `asset` dependency on `token`, with a `mint` setup call. The
+  sandbox-runner provisions every dependency **generically** (no
+  component-specific branching) and exposes each `alias` as an address
+  reference the component's own calls can resolve.
 - **Playground relationship** — the Playground reads `config` for form fields
   and, for implemented components, `interface` + `implementation` to drive the
   sandbox and integration generator.
@@ -333,9 +353,8 @@ Community-ready
 
 Meaning of each level:
 
-- **Concept** — a documented pattern with no contract. Today this is every
-  non-token catalog entry (Payment, Access Control, Escrow, Subscription,
-  Multi-signature).
+- **Concept** — a documented pattern with no contract. Today these are
+  Access Control, Escrow, Subscription, and Multi-signature.
 - **Specified** — the interface, configuration, and expected behavior are
   written down (in the catalog record and docs), even before the contract
   exists.
@@ -437,6 +456,16 @@ provided by the API route, uploads the WASM, deploys the contract (constructor
 auth mocked), then for each call builds args by type, applies `mock_auths` when a
 signer is supplied, and invokes the function. Results are ScVal→JSON.
 
+Before the main contract is deployed, the runner provisions every declared
+`dependency` with a unique salt: it deploys the dependency WASM, runs its
+constructor from the `constructor` values, executes each `setup` call (under
+host-level mock auth), and records the deployed address under its `alias`. The
+component's own calls resolve that alias to the dependency address. Every
+invocation runs under `mock_all_auths_allowing_non_root_auth`, so nested
+cross-contract authorization (e.g. Payment calling the asset's `transfer`) is
+satisfied generically — without any component-specific auth wiring in the
+runner.
+
 ### What is local vs network-based
 
 - **Local**: the sandbox execution of implemented components — no RPC, wallet,
@@ -450,8 +479,9 @@ signer is supplied, and invokes the function. Results are ScVal→JSON.
   without it the Playground API returns `503`.
 - The deployed contract address in the sandbox is deterministic (fixed salt), so
   all sandbox runs share the same address space.
-- Only components with `implementation` + `interface` can run in the sandbox;
-  the five concept components are documentation-only.
+- Only components with `implementation` + `interface` can run in the sandbox
+  (today `token` and `payment`); the four concept components are
+  documentation-only.
 - Admin-only methods (`mint`, `set_admin`) cannot be exercised by a visitor
   because the deployed token's admin key is held outside the repository; the
   sandbox is the only place a visitor can observe state changes.

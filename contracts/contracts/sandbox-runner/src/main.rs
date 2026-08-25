@@ -4,7 +4,6 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use serde_json::{json, Value};
 use soroban_sdk::{
-    testutils::{MockAuth, MockAuthInvoke},
     xdr::{ScError, ScVal},
     Address, Bytes, Env, IntoVal, MuxedAddress, String as SdkString, Symbol, TryFromVal, Val,
     Vec as SdkVec,
@@ -282,21 +281,12 @@ fn execute_call(
         Err(e) => return call_error(Some(fn_name), e),
     };
 
-    if let Some(signer) = call.get("signer").and_then(Value::as_str) {
-        let address = match resolve_address(env, identities, signer) {
-            Ok(address) => address,
-            Err(e) => return call_error(Some(fn_name), e),
-        };
-        env.mock_auths(&[MockAuth {
-            address: &address,
-            invoke: &MockAuthInvoke {
-                contract,
-                fn_name,
-                args: arg_vals.clone(),
-                sub_invokes: &[],
-            },
-        }]);
-    }
+    // The sandbox assumes host-level mock authorization (see ARCHITECTURE.md).
+    // `mock_all_auths_allowing_non_root_auth` covers both the invoked function
+    // and any nested cross-contract calls (e.g. a payment contract invoking an
+    // asset's `transfer`), so components can be exercised generically without
+    // per-component auth wiring.
+    env.mock_all_auths_allowing_non_root_auth();
 
     let result: Result<Result<Val, _>, _> =
         env.try_invoke_contract(&contract, &Symbol::new(env, fn_name), arg_vals);
@@ -720,5 +710,90 @@ mod tests {
         let calls = response.get("calls").and_then(Value::as_array).unwrap();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
+    }
+
+    #[test]
+    fn payment_executes_against_provisioned_dependency() {
+        // End-to-end boundary for the documented developer journey:
+        //   Payment -> asset dependency -> dependency provisioning ->
+        //   Payment deployment -> pay(from, to, asset, amount) ->
+        //   successful cross-contract execution.
+        // Skips when the wasm artifacts are not built (CI's Rust job does not
+        // run the Stellar CLI).
+        let payment_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/payment.wasm"
+        );
+        let token_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/token.wasm"
+        );
+        if !std::path::Path::new(payment_wasm).exists() || !std::path::Path::new(token_wasm).exists() {
+            return;
+        }
+        let request = json!({
+            "wasmPath": payment_wasm,
+            "constructorParams": [],
+            "constructor": {},
+            "dependencies": [{
+                "alias": "asset",
+                "wasmPath": token_wasm,
+                "constructorParams": [
+                    { "name": "admin", "type": "Address" },
+                    { "name": "decimal", "type": "u32" },
+                    { "name": "name", "type": "String" },
+                    { "name": "symbol", "type": "String" },
+                ],
+                "constructor": {
+                    "admin": "admin",
+                    "decimal": "7",
+                    "name": "Payment Asset",
+                    "symbol": "PAY",
+                },
+                "setup": [
+                    {
+                        "fn": "mint",
+                        "params": [
+                            { "name": "to", "type": "Address" },
+                            { "name": "amount", "type": "i128" },
+                        ],
+                        "args": ["admin", "1000000"],
+                        "signer": "admin",
+                    }
+                ],
+            }],
+            "calls": [{
+                "fn": "pay",
+                "params": [
+                    { "name": "from", "type": "Address" },
+                    { "name": "to", "type": "Address" },
+                    { "name": "asset", "type": "Address" },
+                    { "name": "amount", "type": "i128" },
+                ],
+                "args": ["admin", "user1", "asset", "100"],
+                "signer": "admin",
+            }],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let deps = response
+            .get("deployedDependencies")
+            .and_then(Value::as_array)
+            .expect("response includes deployedDependencies");
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].get("alias").and_then(Value::as_str), Some("asset"));
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "pay call failed: {}",
+            calls[0]
+        );
     }
 }

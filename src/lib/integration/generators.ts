@@ -29,6 +29,8 @@ export function generateRustIntegration({
 
   const constructor = interfaceFns.find((fn) => fn.name === "__constructor");
   const callableFns = interfaceFns.filter((fn) => fn.name !== "__constructor");
+  const dependencies = component.dependencies ?? [];
+  const dependencyAliases = new Set(dependencies.map((dependency) => dependency.alias));
   const packageName = implementation.package;
   const packageIdentifier = snakeCase(packageName);
   const clientName = `${pascalCase(packageName)}Client`;
@@ -142,7 +144,20 @@ export function generateRustIntegration({
   );
   lines.push("");
 
-  lines.push("    // 2 · Interface examples from the catalog interface.");
+  if (dependencies.length > 0) {
+    lines.push("    // 3 · Dependencies — auto-provisioned by the Playground sandbox.");
+    lines.push("    //    Each dependency is deployed from its own contract wasm; the");
+    lines.push("    //    sandbox resolves it by alias. Provide the deployed address");
+    lines.push("    //    here (illustratively generated) when adapting this example.");
+    for (const dependency of dependencies) {
+      lines.push(
+        `    let ${snakeCase(dependency.alias)}_address = Address::generate(env); // alias: ${dependency.alias} → ${dependency.package}`,
+      );
+    }
+    lines.push("");
+  }
+
+  lines.push("    // 4 · Interface examples from the catalog interface.");
   lines.push(
     "    //    Authorized operations assume host-level mock auth, like the",
   );
@@ -159,7 +174,21 @@ export function generateRustIntegration({
     if (fn.description) {
       lines.push(`    // ${fn.description}`);
     }
-    const args = fn.params.map((param) => placeholderArg(param)).join(", ");
+    if (fn.authorization === "admin") {
+      lines.push("    // requires the contract administrator's authorization");
+    } else if (fn.authorization === "first-address") {
+      const firstAddress = fn.params.find(
+        (param) => param.type === "Address" || param.type === "MuxedAddress",
+      );
+      lines.push(
+        `    // requires authorization from ${
+          firstAddress?.name ?? "the first address argument"
+        }`,
+      );
+    }
+    const args = fn.params
+      .map((param) => placeholderArg(param, dependencyAliases))
+      .join(", ");
     const call = `${clientVar}.${fn.name}(${args})`;
     if (fn.returns) {
       lines.push(`    let ${fn.name}: ${fn.returns} = ${call};`);
@@ -218,7 +247,10 @@ function pascalCase(value: string): string {
     .join("");
 }
 
-function placeholderArg(param: ParameterSpec): string {
+function placeholderArg(
+  param: ParameterSpec,
+  dependencyAliases: Set<string> = new Set(),
+): string {
   if (param.type === "i128") return "&1_000_000";
   if (param.type === "u32") return "&200";
   if (param.type === "String") {
@@ -226,6 +258,7 @@ function placeholderArg(param: ParameterSpec): string {
   }
   if (param.type === "Symbol") return '&Symbol::new(env, "value")';
   const name = param.name.toLowerCase();
+  if (dependencyAliases.has(param.name)) return `&${param.name}_address`;
   if (name.includes("admin") || name === "new_admin") return "&admin";
   if (name === "to" || name.startsWith("to_")) return "&bob";
   if (name.includes("spender")) return "&alice";

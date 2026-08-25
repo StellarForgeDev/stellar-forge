@@ -212,21 +212,41 @@ export function SandboxPanel({
       "mt-2 w-full rounded-default border border-border bg-surface px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-stellar disabled:cursor-not-allowed disabled:opacity-50";
 
     if (ADDRESS_TYPES.has(param.type)) {
+      const isDependency = dependencyAliases.includes(param.name);
       return (
-        <select
-          value={argValues[param.name] ?? ""}
-          onChange={(event) =>
-            setArgValues({ ...argValues, [param.name]: event.target.value })
-          }
-          disabled={busy}
-          className={inputStyles}
-        >
-          {addressOptions.map((identity) => (
-            <option key={identity} value={identity}>
-              {identity}
-            </option>
-          ))}
-        </select>
+        <div>
+          <select
+            value={argValues[param.name] ?? ""}
+            onChange={(event) =>
+              setArgValues({ ...argValues, [param.name]: event.target.value })
+            }
+            disabled={busy}
+            className={inputStyles}
+          >
+            <optgroup label="Identities">
+              {IDENTITY_OPTIONS.map((identity) => (
+                <option key={identity} value={identity}>
+                  {identity}
+                </option>
+              ))}
+            </optgroup>
+            {dependencyAliases.length > 0 && (
+              <optgroup label="Dependencies (auto-provisioned)">
+                {dependencyAliases.map((alias) => (
+                  <option key={alias} value={alias}>
+                    {alias}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+          {isDependency && (
+            <p className="mt-1 font-sans text-xs text-text-secondary">
+              Resolves to the auto-provisioned “{param.name}” dependency contract
+              deployed alongside this component in the sandbox.
+            </p>
+          )}
+        </div>
       );
     }
 

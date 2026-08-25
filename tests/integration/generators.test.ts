@@ -60,10 +60,16 @@ describe("integration generators", () => {
       expect(output).toContain("fn integration_example");
     });
 
-    it("references the deployed asset dependency in the example", () => {
+    it("derives a Payment client generically and references the asset dependency", () => {
       const code = generateRustIntegration({ component: payment, configValues });
       const output = code as string;
-      expect(output).toContain("asset");
+      // Generic client derivation (package "payment" -> PaymentClient), not a
+      // hardcoded TokenClient.
+      expect(output).toContain("PaymentClient");
+      expect(output).not.toContain("TokenClient");
+      // The asset dependency is surfaced with a resolvable address placeholder.
+      expect(output).toContain("asset_address");
+      expect(output).toContain("alias: asset");
     });
   });
 });

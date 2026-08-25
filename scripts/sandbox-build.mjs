@@ -39,7 +39,9 @@ run("cargo", ["build", "-p", "sandbox-runner"], CONTRACTS);
 
 // Directories under contracts/contracts that are not Soroban contracts
 // (and therefore never produce a wasm artifact).
-const NON_CONTRACT_PACKAGES = new Set(["sandbox-runner", "greeter"]);
+// `test-asset` is a fixture used only by Payment's Rust tests; it is not a
+// catalog component and must not be treated as a deployable wasm artifact.
+const NON_CONTRACT_PACKAGES = new Set(["sandbox-runner", "greeter", "test-asset"]);
 
 const implementedPackages = readdirSync(path.join(CONTRACTS, "contracts"), {
   withFileTypes: true,

@@ -31,6 +31,26 @@ describe("playground execution helpers", () => {
       expect(defaultArgValue({ name: "amount", type: "i128" }, 0)).toBe("1000");
     });
 
+    it("resolves a matching dependency alias for an address argument", () => {
+      expect(
+        defaultArgValue(
+          { name: "asset", type: "Address" },
+          2,
+          ["admin", "user1", "user2", "asset"],
+        ),
+      ).toBe("asset");
+    });
+
+    it("still seeds the admin identity for the first address when no alias matches", () => {
+      expect(
+        defaultArgValue(
+          { name: "from", type: "Address" },
+          0,
+          ["admin", "user1", "asset"],
+        ),
+      ).toBe(ADMIN_IDENTITY);
+    });
+
     it("defaults to an empty string for other types", () => {
       expect(defaultArgValue({ name: "name", type: "String" }, 0)).toBe("");
     });

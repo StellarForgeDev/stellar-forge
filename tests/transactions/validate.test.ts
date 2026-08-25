@@ -87,6 +87,34 @@ describe("validateTransactionRequest", () => {
         result.errors.some((e) => e.code === "component.not-deployed"),
       ).toBe(true);
     });
+
+    it("rejects Payment for Testnet while keeping Token available", () => {
+      const components = [
+        getComponentBySlug("token")!,
+        getComponentBySlug("payment")!,
+      ];
+
+      const paymentResult = validateTransactionRequest(
+        {
+          network: "testnet",
+          component: "payment",
+          method: "pay",
+          sourceAccount: validAddress,
+          parameters: {},
+        },
+        components,
+      );
+      expect(paymentResult.ok).toBe(false);
+      expect(
+        paymentResult.errors.some((e) => e.code === "component.not-deployed"),
+      ).toBe(true);
+
+      const tokenResult = validateTransactionRequest(
+        tokenTransferRequest(),
+        components,
+      );
+      expect(tokenResult.ok).toBe(true);
+    });
   });
 
   describe("interface validation", () => {
