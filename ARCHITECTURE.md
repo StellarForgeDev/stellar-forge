@@ -94,6 +94,11 @@ and a `config` (form fields).
   `release`, `refund`, `status`) that locks a SEP-41 asset and releases or
   refunds it via an arbiter. Ships with a Rust unit test suite
   (`contracts/contracts/escrow/src/test.rs`).
+- `access-control/` — the fourth **implemented** component: a role-based
+  authorization contract (`__constructor(admin)`, `grant_role`, `revoke_role`,
+  `has_role`, `transfer_admin`) with a single admin and `(role, account)` grants.
+  Ships with a Rust unit test suite
+  (`contracts/contracts/access-control/src/test.rs`).
 - `sandbox-runner/` — a **native** (non-contract) Rust binary that loads a
   contract WASM into an in-process Soroban `Env`, deploys it, and invokes the
   requested functions. It is the execution engine behind the Playground.
@@ -215,11 +220,12 @@ src/
    contracts/
       token/              SEP-41 token contract (implemented)
       payment/            Stateless payment primitive (implemented)
-      escrow/             Stateful holding contract (implemented)
-      test-asset/         Minimal SEP-41 fixture for payment tests
+       escrow/             Stateful holding contract (implemented)
+       access-control/     Role-based authorization contract (implemented)
+       test-asset/         Minimal SEP-41 fixture for payment tests
       greeter/            Example/sandbox test fixture (not a catalog component)
       sandbox-runner/     Native runner that executes contract WASM
-    prebuilt/             Committed contract WASM (e.g. token.wasm, payment.wasm, escrow.wasm)
+     prebuilt/             Committed contract WASM (e.g. token.wasm, payment.wasm, escrow.wasm, access-control.wasm)
 
 scripts/
   sandbox-build.mjs     Local sandbox-runner + WASM build
@@ -234,8 +240,8 @@ catalog data is consumed by both the UI and the server-side logic (the API
 routes and integration generator read the same `StellarComponent` records).
 
 Within `contracts/`, the workspace separates **contract packages** (`token`,
-`payment`, `escrow`) from **native tooling** (`sandbox-runner`) and **fixtures**
-(`greeter`, `test-asset`). `token`, `payment`, and `escrow` are published catalog
+`payment`, `escrow`, `access-control`) from **native tooling** (`sandbox-runner`) and **fixtures**
+(`greeter`, `test-asset`). `token`, `payment`, `escrow`, and `access-control` are published catalog
 components with committed WASM; `test-asset` is a fixture only.
 
 ## Component Model
@@ -267,7 +273,7 @@ The fields that currently exist:
     the boundary rather than silently.
 - **Metadata / documentation** — `overview`, `useCases`.
 - **Implementation** (optional) — `implementation: { language, package,
-  sourcePath, buildTarget }`. Present for `token`, `payment`, and `escrow`.
+  sourcePath, buildTarget }`. Present for `token`, `payment`, `escrow`, and `access-control`.
 - **Contract interface** (optional) — `interface: FunctionSpec[]`, where each
   `FunctionSpec` has `name`, `params` (`ParameterSpec[]` with `name`/`type`/
   `placeholder`), optional `returns`, optional `description`, and optional
@@ -361,7 +367,7 @@ Community-ready
 Meaning of each level:
 
 - **Concept** — a documented pattern with no contract. Today these are
-  Access Control, Escrow, Subscription, and Multi-signature.
+  Subscription and Multi-signature (Escrow and Access Control are now implemented).
 - **Specified** — the interface, configuration, and expected behavior are
   written down (in the catalog record and docs), even before the contract
   exists.
@@ -487,8 +493,8 @@ runner.
 - The deployed contract address in the sandbox is deterministic (fixed salt), so
   all sandbox runs share the same address space.
 - Only components with `implementation` + `interface` can run in the sandbox
-  (today `token` and `payment`); the four concept components are
-  documentation-only.
+  (today `token`, `payment`, `escrow`, and `access-control`); the two concept
+  components (Subscription, Multi-signature) are documentation-only.
 - Admin-only methods (`mint`, `set_admin`) cannot be exercised by a visitor
   because the deployed token's admin key is held outside the repository; the
   sandbox is the only place a visitor can observe state changes.

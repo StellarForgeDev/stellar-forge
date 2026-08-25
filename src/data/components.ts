@@ -375,28 +375,79 @@ export const stellarComponents: StellarComponent[] = [
     slug: "access-control",
     name: "Access Control",
     description:
-      "Role- and permission-based access checks for a Soroban contract.",
+      "A minimal role-based authorization contract: a single admin grants and revokes roles, and transfers administration.",
     category: "Security",
-    shortDescription: "Role and permission checks",
+    shortDescription: "Role-based admin authorization",
     overview:
-      "A reusable authorization pattern for controlling which addresses can perform specific contract operations.",
+      "Access Control is a small, stateful Soroban contract that centralizes authorization behind a single admin identity. The admin grants or revokes (role, account) pairs and can transfer administration to a new address. Read-only queries let any caller check whether an account holds a role. It ships with a passing Rust test suite and runs in the local Playground sandbox.",
     useCases: [
-      "Restrict contract operations",
-      "Define role-based permissions",
-      "Understand authorization patterns in Soroban",
+      "Gate contract operations behind an admin-controlled role",
+      "Grant and revoke roles for specific accounts",
+      "Transfer administrative control to a new address",
+      "Query role membership without authorization",
+    ],
+    implementation: {
+      language: "rust",
+      package: "access-control",
+      sourcePath: "contracts/contracts/access-control",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [{ name: "admin", type: "Address" }],
+        authorization: "none",
+        description:
+          "Initializes the contract with a single admin. Called automatically on deploy.",
+      },
+      {
+        name: "grant_role",
+        params: [
+          { name: "role", type: "Symbol" },
+          { name: "account", type: "Address" },
+        ],
+        authorization: "admin",
+        description: "Grants role to account. Admin-only.",
+      },
+      {
+        name: "revoke_role",
+        params: [
+          { name: "role", type: "Symbol" },
+          { name: "account", type: "Address" },
+        ],
+        authorization: "admin",
+        description: "Revokes role from account. Admin-only.",
+      },
+      {
+        name: "has_role",
+        params: [
+          { name: "role", type: "Symbol" },
+          { name: "account", type: "Address" },
+        ],
+        returns: "bool",
+        authorization: "none",
+        description: "Returns whether account currently holds role.",
+      },
+      {
+        name: "transfer_admin",
+        params: [{ name: "new_admin", type: "Address" }],
+        authorization: "admin",
+        description: "Transfers administration to new_admin. Admin-only.",
+      },
     ],
     config: [
       {
         key: "name",
-        label: "Role name",
+        label: "Access Control name",
         type: "text",
-        default: "Admin",
+        default: "Access Control",
       },
-      symbolConfig("ADMIN"),
-      decimalsConfig({ decimals: "0", disabled: true }),
       networkConfig,
     ],
-    capabilities: { implemented: false, sandbox: false, testnet: false },
+    constructorArgs: {
+      admin: "admin",
+    },
+    capabilities: { implemented: true, sandbox: true, testnet: false },
   },
 
   {

@@ -34,7 +34,7 @@ describe("integration generators", () => {
 
   describe("Concept component", () => {
     it("returns null because concepts have no implementation or interface", () => {
-      const concept = getComponentBySlug("access-control")!;
+      const concept = getComponentBySlug("subscription")!;
       expect(concept.implementation).toBeUndefined();
       expect(concept.interface).toBeUndefined();
       expect(

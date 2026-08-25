@@ -924,4 +924,147 @@ mod tests {
         let status = calls[2].get("result").and_then(Value::as_i64).unwrap_or(-1);
         assert_eq!(status, 1, "expected Released state, got: {}", calls[2]);
     }
+
+    #[test]
+    fn access_control_executes_generically() {
+        // End-to-end boundary for the Access Control component's generic support:
+        //   AccessControl (no dependencies) -> deploy with the admin identity ->
+        //   grant_role/revoke_role/transfer_admin (admin-authorized) ->
+        //   has_role (read-only) -> real state transitions. Proves the platform
+        //   needs no Access-Control-specific branching: the same generic deploy +
+        //   invoke path that serves Token/Payment/Escrow serves Access Control,
+        //   including its `Symbol` role argument and `admin` authorization model.
+        // Skips when the wasm artifact is not built (CI's Rust job does not run
+        // the Stellar CLI).
+        let access_control_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/access_control.wasm"
+        );
+        if !std::path::Path::new(access_control_wasm).exists() {
+            return;
+        }
+        let request = json!({
+            "wasmPath": access_control_wasm,
+            "constructorParams": [
+                { "name": "admin", "type": "Address" },
+            ],
+            "constructor": { "admin": "admin" },
+            "calls": [
+                {
+                    "fn": "grant_role",
+                    "params": [
+                        { "name": "role", "type": "Symbol" },
+                        { "name": "account", "type": "Address" },
+                    ],
+                    "args": ["minter", "user1"],
+                    "signer": "admin",
+                },
+                {
+                    "fn": "has_role",
+                    "params": [
+                        { "name": "role", "type": "Symbol" },
+                        { "name": "account", "type": "Address" },
+                    ],
+                    "args": ["minter", "user1"],
+                },
+                {
+                    "fn": "revoke_role",
+                    "params": [
+                        { "name": "role", "type": "Symbol" },
+                        { "name": "account", "type": "Address" },
+                    ],
+                    "args": ["minter", "user1"],
+                    "signer": "admin",
+                },
+                {
+                    "fn": "has_role",
+                    "params": [
+                        { "name": "role", "type": "Symbol" },
+                        { "name": "account", "type": "Address" },
+                    ],
+                    "args": ["minter", "user1"],
+                },
+                {
+                    "fn": "transfer_admin",
+                    "params": [
+                        { "name": "new_admin", "type": "Address" },
+                    ],
+                    "args": ["user2"],
+                    "signer": "admin",
+                },
+                {
+                    "fn": "grant_role",
+                    "params": [
+                        { "name": "role", "type": "Symbol" },
+                        { "name": "account", "type": "Address" },
+                    ],
+                    "args": ["manager", "user1"],
+                    "signer": "admin",
+                },
+            ],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 6);
+
+        assert_eq!(
+            calls[0].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "grant_role failed: {}",
+            calls[0]
+        );
+        // has_role returns bool; after grant it must be true.
+        assert_eq!(
+            calls[1].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "has_role (granted) failed: {}",
+            calls[1]
+        );
+        assert_eq!(
+            calls[1].get("result").and_then(Value::as_bool),
+            Some(true),
+            "expected has_role == true after grant, got: {}",
+            calls[1]
+        );
+        // revoke_role succeeds.
+        assert_eq!(
+            calls[2].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "revoke_role failed: {}",
+            calls[2]
+        );
+        // After revoke, has_role must be false.
+        assert_eq!(
+            calls[3].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "has_role (revoked) failed: {}",
+            calls[3]
+        );
+        assert_eq!(
+            calls[3].get("result").and_then(Value::as_bool),
+            Some(false),
+            "expected has_role == false after revoke, got: {}",
+            calls[3]
+        );
+        // transfer_admin succeeds.
+        assert_eq!(
+            calls[4].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "transfer_admin failed: {}",
+            calls[4]
+        );
+        // The new admin can still perform administrative actions.
+        assert_eq!(
+            calls[5].get("ok").and_then(Value::as_bool),
+            Some(true),
+            "grant_role (after transfer) failed: {}",
+            calls[5]
+        );
+    }
 }

@@ -11,12 +11,15 @@ repository before being marked done.
 ## Current State
 
 Stellar-Forge is at **release-candidate** maturity. It is Testnet-focused; there
-is no mainnet support. Three components are implemented: `token` (deployed to
+is no mainnet support. Four components are implemented: `token` (deployed to
 Testnet), `payment` (deployed to Testnet via the generic dependency mechanism),
-and `escrow` (sandbox-ready; not yet deployed to Testnet). `escrow` is the first
-*stateful, constructor-driven, dependency-composing, multi-role* component and
-was added to validate that the platform is generic. The other three catalog
-entries are concepts/documentation only.
+`escrow` (sandbox-ready; not yet deployed to Testnet), and `access-control`
+(sandbox-ready; not yet deployed to Testnet, and the first to exercise a
+`Symbol`-typed argument and the `admin` authorization model through the generic
+pipeline). `escrow` is the first *stateful, constructor-driven,
+dependency-composing, multi-role* component and was added to validate that the
+platform is generic. The other two catalog entries are concepts/documentation
+only.
 
 ### Completed (verified)
 
@@ -162,7 +165,10 @@ Potential future components (currently **concepts** unless/until implemented):
 - **Escrow** — *implemented (v1)*: stateful, constructor-driven, dependency-
   composing, multi-role; sandbox-ready, not Testnet-deployed. Added to validate
   the platform is generic (see Completed above).
-- **Access Control**
+- **Access Control** — *implemented (v1)*: role-based authorization with a
+  single admin and `(role, account)` grants; sandbox-ready, not Testnet-deployed.
+  Added to validate that the `Symbol` argument type and `admin` authorization
+  model are generic (see Completed above).
 - **Subscription**
 - **Multi-signature**
 

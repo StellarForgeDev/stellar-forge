@@ -9,7 +9,6 @@ import {
 } from "@/data/components";
 
 const CONCEPT_SLUGS = [
-  "access-control",
   "subscription",
   "multi-signature",
 ];
@@ -66,7 +65,7 @@ describe("Component Standard v1 invariants", () => {
   });
 
   describe("Concept components", () => {
-    it("keeps exactly the four current concepts", () => {
+    it("keeps exactly the current concepts", () => {
       const conceptSlugs = stellarComponents
         .filter((c) => c.capabilities.implemented === false)
         .map((c) => c.slug);
@@ -165,6 +164,54 @@ describe("Component Standard v1 invariants", () => {
     });
   });
 
+  describe("Access Control (fourth implemented component)", () => {
+    const accessControl = getComponentBySlug("access-control")!;
+
+    it("is implemented, sandbox-ready, and not on Testnet", () => {
+      expect(accessControl?.capabilities).toEqual({
+        implemented: true,
+        sandbox: true,
+        testnet: false,
+      });
+    });
+
+    it("declares a catalog-driven constructor default for the admin", () => {
+      const constructor = accessControl?.constructorArgs ?? {};
+      expect(constructor.admin).toBe("admin");
+    });
+
+    it("exposes an interface matching the contract", () => {
+      const names = (accessControl?.interface ?? []).map((fn) => fn.name);
+      expect(names).toEqual([
+        "__constructor",
+        "grant_role",
+        "revoke_role",
+        "has_role",
+        "transfer_admin",
+      ]);
+      const ctor = accessControl?.interface?.find(
+        (fn) => fn.name === "__constructor",
+      );
+      expect(ctor?.params.map((p) => p.name)).toEqual(["admin"]);
+      const grant = accessControl?.interface?.find(
+        (fn) => fn.name === "grant_role",
+      );
+      expect(grant?.params.map((p) => p.name)).toEqual(["role", "account"]);
+      expect(grant?.params.map((p) => p.type)).toEqual(["Symbol", "Address"]);
+      expect(grant?.authorization).toBe("admin");
+      const hasRole = accessControl?.interface?.find(
+        (fn) => fn.name === "has_role",
+      );
+      expect(hasRole?.returns).toBe("bool");
+      expect(hasRole?.authorization).toBe("none");
+    });
+
+    it("declares only name and network configuration", () => {
+      const keys = (accessControl?.config ?? []).map((f) => f.key);
+      expect(keys).toEqual(["name", "network"]);
+    });
+  });
+
   describe("getConfigDefaults", () => {
     it("maps each config field key to its default value", () => {
       const token = getComponentBySlug("token")!;
@@ -195,7 +242,7 @@ describe("Component Standard v1 invariants", () => {
     });
 
     it("returns null when there is no implementation", () => {
-      const component = getComponentBySlug("access-control")!;
+      const component = getComponentBySlug("subscription")!;
       expect(component.implementation).toBeUndefined();
       expect(componentWasmPath(component)).toBeNull();
     });

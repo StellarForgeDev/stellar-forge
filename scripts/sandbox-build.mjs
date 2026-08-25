@@ -51,15 +51,24 @@ const implementedPackages = readdirSync(path.join(CONTRACTS, "contracts"), {
   .filter((name) => !NON_CONTRACT_PACKAGES.has(name))
   .sort();
 
+// Cargo crate names replace hyphens with underscores, so the compiled wasm
+// artifact uses the crate name (e.g. package "access-control" -> "access_control.wasm")
+// rather than the package directory name. Prebuilt files are stored under the
+// package name (resolveWasm falls back to `${package}.wasm`), so only the
+// build-target lookup needs the crate-derived name.
+function wasmBaseName(packageName) {
+  return `${packageName.replace(/-/g, "_")}.wasm`;
+}
+
 for (const packageName of implementedPackages) {
-  const wasm = path.join(WASM_TARGET, `${packageName}.wasm`);
+  const wasm = path.join(WASM_TARGET, wasmBaseName(packageName));
   if (!existsSync(wasm)) {
     run("stellar", ["contract", "build", "--package", packageName], CONTRACTS);
   }
 }
 
 const available = implementedPackages.filter((packageName) =>
-  existsSync(path.join(WASM_TARGET, `${packageName}.wasm`)),
+  existsSync(path.join(WASM_TARGET, wasmBaseName(packageName))),
 );
 
 if (available.length === 0) {
@@ -74,7 +83,7 @@ console.log(`[sandbox] wasm artifacts available: ${available.join(", ")}`);
 if (updatePrebuilt) {
   mkdirSync(PREBUILT, { recursive: true });
   for (const packageName of available) {
-    const source = path.join(WASM_TARGET, `${packageName}.wasm`);
+    const source = path.join(WASM_TARGET, wasmBaseName(packageName));
     const destination = path.join(PREBUILT, `${packageName}.wasm`);
     copyFileSync(source, destination);
     console.log(`[sandbox] refreshed ${path.relative(ROOT, destination)}`);
