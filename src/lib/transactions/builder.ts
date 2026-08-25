@@ -27,12 +27,12 @@ export function callableMethods(
   );
 }
 
-export function implementedComponents(
+export function transactionComponents(
   components: StellarComponent[],
 ): StellarComponent[] {
   return components.filter(
     (component) =>
-      component.status === "Implemented" && callableMethods(component).length > 0,
+      component.capabilities.testnet && callableMethods(component).length > 0,
   );
 }
 
@@ -101,7 +101,7 @@ export function authorizationInfo(
 export function initialBuilderState(
   components: StellarComponent[],
 ): TransactionBuilderState {
-  const component = implementedComponents(components)[0];
+  const component = transactionComponents(components)[0];
 
   if (!component) {
     return {

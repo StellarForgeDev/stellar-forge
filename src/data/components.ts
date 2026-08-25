@@ -1,4 +1,16 @@
-export type ComponentStatus = "Concept" | "Implemented";
+export interface ComponentCapabilities {
+  implemented: boolean;
+  sandbox: boolean;
+  testnet: boolean;
+}
+
+export type ComponentMaturity = "Concept" | "Implemented";
+
+export function componentMaturity(
+  component: StellarComponent,
+): ComponentMaturity {
+  return component.capabilities.implemented ? "Implemented" : "Concept";
+}
 
 export type ConfigFieldType = "text" | "number" | "select";
 
@@ -47,7 +59,7 @@ export interface StellarComponent {
   name: string;
   description: string;
   category: string;
-  status: ComponentStatus;
+  capabilities: ComponentCapabilities;
   shortDescription: string;
   overview: string;
   useCases: string[];
@@ -101,7 +113,6 @@ export const stellarComponents: StellarComponent[] = [
     description:
       "A standard fungible token contract implementing the SEP-41 Soroban token interface — initialize, mint, transfer, and query balances.",
     category: "Tokens",
-    status: "Implemented",
     shortDescription: "SEP-41 fungible token contract",
     overview:
       "A standard Soroban fungible token contract implementing the SEP-41 token interface (soroban_sdk::token::TokenInterface). The contract is deployed with an admin, name, symbol, and decimals, and supports admin-controlled minting, authorized transfers, allowances, and burning. Source lives in the contracts workspace and ships with a passing Rust test suite.",
@@ -253,6 +264,7 @@ export const stellarComponents: StellarComponent[] = [
       decimalsConfig(),
       networkConfig,
     ],
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -261,7 +273,6 @@ export const stellarComponents: StellarComponent[] = [
     description:
       "A minimal pattern for building and submitting a Stellar payment.",
     category: "Payments",
-    status: "Concept",
     shortDescription: "Stellar payment pattern",
     overview:
       "A simple pattern for working with Stellar payments and understanding the structure behind a payment flow.",
@@ -281,6 +292,7 @@ export const stellarComponents: StellarComponent[] = [
       decimalsConfig(),
       networkConfig,
     ],
+    capabilities: { implemented: false, sandbox: false, testnet: false },
   },
 
   {
@@ -289,7 +301,6 @@ export const stellarComponents: StellarComponent[] = [
     description:
       "Role- and permission-based access checks for a Soroban contract.",
     category: "Security",
-    status: "Concept",
     shortDescription: "Role and permission checks",
     overview:
       "A reusable authorization pattern for controlling which addresses can perform specific contract operations.",
@@ -309,6 +320,7 @@ export const stellarComponents: StellarComponent[] = [
       decimalsConfig({ decimals: "0", disabled: true }),
       networkConfig,
     ],
+    capabilities: { implemented: false, sandbox: false, testnet: false },
   },
 
   {
@@ -317,7 +329,6 @@ export const stellarComponents: StellarComponent[] = [
     description:
       "Holds funds until a defined condition or set of signers releases them.",
     category: "Payments",
-    status: "Concept",
     shortDescription: "Conditional fund release",
     overview:
       "A pattern for holding funds under defined conditions before allowing them to be released to the intended parties.",
@@ -337,6 +348,7 @@ export const stellarComponents: StellarComponent[] = [
       decimalsConfig(),
       networkConfig,
     ],
+    capabilities: { implemented: false, sandbox: false, testnet: false },
   },
 
   {
@@ -345,7 +357,6 @@ export const stellarComponents: StellarComponent[] = [
     description:
       "A recurring-payment pattern for periodic, agreed-upon transfers.",
     category: "Payments",
-    status: "Concept",
     shortDescription: "Recurring payment pattern",
     overview:
       "A reusable pattern for representing recurring payments between an authorized payer and a service or recipient.",
@@ -365,6 +376,7 @@ export const stellarComponents: StellarComponent[] = [
       decimalsConfig(),
       networkConfig,
     ],
+    capabilities: { implemented: false, sandbox: false, testnet: false },
   },
 
   {
@@ -373,7 +385,6 @@ export const stellarComponents: StellarComponent[] = [
     description:
       "Requires multiple approving signers before a transaction executes.",
     category: "Security",
-    status: "Concept",
     shortDescription: "Multiple signer approval",
     overview:
       "A security pattern that requires multiple authorized parties to approve an operation before it can execute.",
@@ -398,6 +409,7 @@ export const stellarComponents: StellarComponent[] = [
       decimalsConfig({ decimals: "7", disabled: true }),
       networkConfig,
     ],
+    capabilities: { implemented: false, sandbox: false, testnet: false },
   },
 ];
 

@@ -9,6 +9,7 @@ import { SandboxPanel } from "@/components/playground/SandboxPanel";
 import {
   getConfigDefaults,
   stellarComponents,
+  componentMaturity,
   type ConfigField,
   type StellarComponent,
 } from "@/data/components";
@@ -229,7 +230,7 @@ export default function PlaygroundPage() {
                 </div>
 
                 <span className="rounded-default border border-border px-2 py-1 font-mono text-xs text-text-secondary">
-                  {selectedComponent.status}
+                  {componentMaturity(selectedComponent)}
                 </span>
               </div>
             </Card>
@@ -262,7 +263,7 @@ export default function PlaygroundPage() {
               </div>
             </Card>
 
-            {selectedComponent.status === "Implemented" &&
+            {selectedComponent.capabilities.sandbox &&
             (selectedComponent.interface?.length ?? 0) > 0 ? (
               <SandboxPanel
                 key={selectedSlug}

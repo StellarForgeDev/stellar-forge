@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import {
   getComponentBySlug,
   stellarComponents,
+  componentMaturity,
 } from "@/data/components";
 
 interface ComponentDetailPageProps {
@@ -61,12 +62,12 @@ export default async function ComponentDetailPage({
 
             <span
               className={`rounded-default border px-2 py-1 font-mono text-xs ${
-                component.status === "Implemented"
+                component.capabilities.implemented
                   ? "border-accent-stellar/60 text-accent-stellar"
                   : "border-border text-text-secondary"
               }`}
             >
-              {component.status}
+              {componentMaturity(component)}
             </span>
           </div>
 
@@ -101,11 +102,11 @@ export default async function ComponentDetailPage({
 
             <div className="mt-4">
               <p className="font-display text-lg font-medium text-text-primary">
-                {component.status}
+                {componentMaturity(component)}
               </p>
 
               <p className="mt-2 font-sans text-sm leading-relaxed text-text-secondary">
-                {component.status === "Implemented"
+                {component.capabilities.implemented
                   ? "This component has a real, tested Soroban contract in the Stellar-Forge contracts workspace."
                   : "This component is currently represented as a reusable pattern in the Stellar-Forge catalog."}
               </p>
@@ -239,7 +240,7 @@ export default async function ComponentDetailPage({
                 </h2>
 
                 <p className="mt-2 max-w-xl font-sans text-sm leading-relaxed text-text-secondary">
-                  {component.status === "Implemented"
+                  {component.capabilities.implemented
                     ? "Open the playground with this component preselected, execute it locally in the sandbox, and inspect its generated structure before integrating it into a project."
                     : "Open the playground with this pattern preselected to configure it and inspect its generated structure before integrating it into a project."}
                 </p>

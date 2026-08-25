@@ -38,11 +38,11 @@ export function validateTransactionRequest(
       message: "Select an implemented component.",
     });
   } else {
-    if (component.status !== "Implemented") {
+    if (!component.capabilities.testnet) {
       errors.push({
-        code: "component.not-implemented",
+        code: "component.not-deployed",
         field: "component",
-        message: `${component.name} is a concept component. Only implemented components can be used in a transaction.`,
+        message: `${component.name} is not available on Testnet. Transactions require a component with a deployed Testnet contract.`,
       });
     }
 

@@ -3,14 +3,15 @@ import { CodeBlock } from "@/components/docs/CodeBlock";
 import { InterfaceReference } from "@/components/docs/InterfaceReference";
 import { Card } from "@/components/ui/Card";
 import type { StellarComponent } from "@/data/components";
+import { componentMaturity } from "@/data/components";
 import { buildConfigSnippet } from "@/lib/docs/snippets";
 
 const ctaLink =
   "rounded-default border border-accent-stellar px-4 py-2 font-mono text-xs text-accent-stellar transition-colors hover:bg-accent-stellar/10";
 
-const statusBadge = (status: StellarComponent["status"]) =>
+const statusBadge = (implemented: boolean) =>
   `rounded-default border px-2 py-1 font-mono text-xs ${
-    status === "Implemented"
+    implemented
       ? "border-accent-stellar/60 text-accent-stellar"
       : "border-border text-text-secondary"
   }`;
@@ -51,8 +52,8 @@ export function ComponentDocs({
             {component.category}
           </span>
 
-          <span className={statusBadge(component.status)}>
-            {component.status}
+          <span className={statusBadge(component.capabilities.implemented)}>
+            {componentMaturity(component)}
           </span>
         </div>
 

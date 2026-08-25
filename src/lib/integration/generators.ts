@@ -1,4 +1,5 @@
 import type { ParameterSpec } from "@/data/components";
+import { componentMaturity } from "@/data/components";
 import type {
   IntegrationContext,
   IntegrationLanguage,
@@ -57,7 +58,7 @@ export function generateRustIntegration({
     ["Component", component.name],
     ["Slug", component.slug],
     ["Category", component.category],
-    ["Status", component.status],
+    ["Status", componentMaturity(component)],
     ["Package", packageName],
     ["Source", implementation.sourcePath],
     ["Build target", implementation.buildTarget],

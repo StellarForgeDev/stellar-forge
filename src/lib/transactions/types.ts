@@ -24,7 +24,7 @@ export interface TransactionRequest {
 export type TransactionValidationCode =
   | "network.unsupported"
   | "component.missing"
-  | "component.not-implemented"
+  | "component.not-deployed"
   | "component.no-interface"
   | "method.missing"
   | "method.constructor"

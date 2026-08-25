@@ -5,6 +5,7 @@ import { ComponentCard } from "@/components/catalog/ComponentCard";
 import {
   componentCategories,
   stellarComponents,
+  componentMaturity,
 } from "@/data/components";
 
 export default function ComponentsPage() {
@@ -110,7 +111,7 @@ export default function ComponentsPage() {
                 name={component.name}
                 description={component.description}
                 category={component.category}
-                status={component.status}
+                status={componentMaturity(component)}
                 href={`/components/${component.slug}`}
               />
             ))}

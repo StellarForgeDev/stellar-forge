@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ComponentCard } from "@/components/catalog/ComponentCard";
-import { stellarComponents } from "@/data/components";
+import { stellarComponents, componentMaturity } from "@/data/components";
 
 const ctaLink =
   "rounded-default border border-accent-stellar px-4 py-2 font-mono text-xs text-accent-stellar transition-colors hover:bg-accent-stellar/10";
@@ -38,7 +38,7 @@ function Step({
 
 export default function DocsPage() {
   const implemented = stellarComponents.filter(
-    (component) => component.status === "Implemented",
+    (component) => component.capabilities.implemented,
   );
   const concepts = stellarComponents.length - implemented.length;
 
@@ -191,7 +191,7 @@ export default function DocsPage() {
               name={component.name}
               description={component.shortDescription}
               category={component.category}
-              status={component.status}
+              status={componentMaturity(component)}
               href={`/docs/components/${component.slug}`}
               cta="View documentation"
             />

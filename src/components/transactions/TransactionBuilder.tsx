@@ -14,7 +14,7 @@ import {
   buildTransactionRequest,
   callableMethods,
   emptyParameters,
-  implementedComponents,
+  transactionComponents,
   initialBuilderState,
   validateBuilderState,
 } from "@/lib/transactions/builder";
@@ -39,7 +39,7 @@ const selectClass =
 const inputClass =
   "mt-2 w-full rounded-default border border-border bg-surface px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-stellar disabled:opacity-60";
 
-const implemented = implementedComponents(stellarComponents);
+const transactionComponentsList = transactionComponents(stellarComponents);
 
 type FundingState =
   | { status: "idle" }
@@ -76,8 +76,8 @@ export function TransactionBuilder() {
   const wallet = useWallet();
 
   const selectedComponent =
-    implemented.find((component) => component.slug === state.componentSlug) ??
-    implemented[0];
+    transactionComponentsList.find((component) => component.slug === state.componentSlug) ??
+    transactionComponentsList[0];
   const selectedMethod = callableMethods(selectedComponent).find(
     (fn) => fn.name === state.methodName,
   );
@@ -111,7 +111,7 @@ export function TransactionBuilder() {
   }
 
   function selectComponent(slug: string) {
-    const component = implemented.find(
+    const component = transactionComponentsList.find(
       (candidate) => candidate.slug === slug,
     );
     if (!component) return;
@@ -131,7 +131,7 @@ export function TransactionBuilder() {
   }
 
   function selectMethod(methodName: string) {
-    const component = implemented.find(
+    const component = transactionComponentsList.find(
       (candidate) => candidate.slug === state.componentSlug,
     );
     if (!component) return;
@@ -464,7 +464,7 @@ async function checkSubmissionStatus() {
 
           <div className="mt-5 space-y-5">
             <MethodSelector
-              components={implemented}
+              components={transactionComponentsList}
               selectedComponent={selectedComponent}
               selectedMethodName={state.methodName}
               onComponentChange={selectComponent}
