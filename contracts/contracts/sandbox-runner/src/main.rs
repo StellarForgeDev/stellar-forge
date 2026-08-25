@@ -98,6 +98,26 @@ fn execute(request: Value) -> Value {
 
     let env = Env::default();
 
+    // Provision declared dependencies first so the component (and its calls) can
+    // reference them by alias. This is fully data-driven: every dependency is
+    // treated identically, with no component-specific branching in the runner.
+    let mut deployed_dependencies: Vec<Value> = Vec::new();
+    if let Some(deps) = request.get("dependencies").and_then(Value::as_array) {
+        for dep in deps {
+            match deploy_dependency(&env, &mut identities, dep) {
+                Ok(address) => {
+                    let alias = dep
+                        .get("alias")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    deployed_dependencies.push(json!({ "alias": alias, "address": address }));
+                }
+                Err(e) => return runner_error(e),
+            }
+        }
+    }
+
     // Build the constructor values from the schema, positionally, so the deploy
     // works for any contract whose constructor only uses supported types.
     let mut ctor_vals = Vec::with_capacity(constructor_params.len());
@@ -139,8 +159,99 @@ fn execute(request: Value) -> Value {
     json!({
         "ok": true,
         "deployedContract": deployed_strkey,
+        "deployedDependencies": deployed_dependencies,
         "calls": results,
     })
+}
+
+/// Deploys a single dependency contract, records its alias -> address in the
+/// shared identity map (so later arguments can reference it), and runs any
+/// declared setup calls. Returns the deployed contract strkey.
+fn deploy_dependency(
+    env: &Env,
+    identities: &mut HashMap<String, String>,
+    dep: &Value,
+) -> Result<String, String> {
+    let alias = dep
+        .get("alias")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "dependency is missing the 'alias' field".to_string())?;
+    let wasm_path = dep
+        .get("wasmPath")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("dependency {alias:?} is missing the 'wasmPath' field"))?;
+    let wasm = std::fs::read(wasm_path)
+        .map_err(|e| format!("failed to read dependency wasm at {wasm_path:?}: {e}"))?;
+
+    let constructor_params = match dep.get("constructorParams") {
+        Some(v) => parse_param_specs(v)
+            .map_err(|e| format!("dependency {alias} constructorParams: {e}"))?,
+        None => return Err(format!("dependency {alias} is missing 'constructorParams'")),
+    };
+    let constructor = match dep.get("constructor") {
+        Some(c) => c,
+        None => return Err(format!("dependency {alias} is missing 'constructor'")),
+    };
+
+    let mut ctor_vals = Vec::with_capacity(constructor_params.len());
+    for param in &constructor_params {
+        let value = match constructor.get(&param.name) {
+            Some(value) => value,
+            None => {
+                return Err(format!(
+                    "dependency {alias} constructor.{} is required",
+                    param.name
+                ))
+            }
+        };
+        match build_arg(env, &param.type_name, value, identities) {
+            Ok(val) => ctor_vals.push(val),
+            Err(e) => {
+                return Err(format!(
+                    "dependency {alias} constructor.{}: {e}",
+                    param.name
+                ))
+            }
+        }
+    }
+
+    let deployer = Address::from_str(env, &identities["deployer"]);
+    env.mock_all_auths();
+    let wasm_bytes: Bytes = Bytes::from_slice(env, &wasm);
+    let wasm_hash = env.deployer().upload_contract_wasm(wasm_bytes);
+    let contract = env
+        .deployer()
+        .with_address(deployer, dependency_salt(alias))
+        .deploy_v2(wasm_hash, SdkVec::from_iter(env, ctor_vals));
+    env.set_auths(&[]);
+
+    let strkey = std::string::String::from_utf8(contract.to_string().to_bytes().to_alloc_vec())
+        .unwrap_or_else(|_| "INVALID_STRKEY".to_string());
+    identities.insert(alias.to_string(), strkey.clone());
+
+    if let Some(setup) = dep.get("setup").and_then(Value::as_array) {
+        for call in setup {
+            let outcome = execute_call(env, &contract, identities, call);
+            if outcome.get("ok").and_then(Value::as_bool) != Some(true) {
+                return Err(format!(
+                    "dependency {alias} setup failed: {}",
+                    outcome.to_string()
+                ));
+            }
+        }
+    }
+
+    Ok(strkey)
+}
+
+/// Derives a deterministic deploy salt from the dependency alias so repeated
+/// runs are reproducible and distinct aliases never collide.
+fn dependency_salt(alias: &str) -> [u8; 32] {
+    let mut salt = [0u8; 32];
+    let bytes = alias.as_bytes();
+    let n = bytes.len().min(32);
+    salt[..n].copy_from_slice(&bytes[..n]);
+    salt
 }
 
 fn execute_call(
@@ -529,5 +640,85 @@ mod tests {
         assert_eq!(val_to_json(&env, &1000i128.into_val(&env)), json!(1000));
         let vec = SdkVec::<Val>::from_slice(&env, &[10u32.into_val(&env), 20u32.into_val(&env)]);
         assert_eq!(val_to_json(&env, &vec.to_val()), json!([10, 20]));
+    }
+
+    #[test]
+    fn deploys_and_resolves_dependencies() {
+        // The dependency mechanism drives a real wasm deploy; skip when the
+        // artifact has not been built (CI's Rust job does not run the Stellar
+        // CLI, so the wasm is absent there).
+        let wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/token.wasm"
+        );
+        if !std::path::Path::new(wasm).exists() {
+            return;
+        }
+        let request = json!({
+            "wasmPath": wasm,
+            "constructorParams": [
+                { "name": "admin", "type": "Address" },
+                { "name": "decimal", "type": "u32" },
+                { "name": "name", "type": "String" },
+                { "name": "symbol", "type": "String" },
+            ],
+            "constructor": {
+                "admin": "admin",
+                "decimal": "7",
+                "name": "Main",
+                "symbol": "MAIN",
+            },
+            "dependencies": [{
+                "alias": "asset",
+                "wasmPath": wasm,
+                "constructorParams": [
+                    { "name": "admin", "type": "Address" },
+                    { "name": "decimal", "type": "u32" },
+                    { "name": "name", "type": "String" },
+                    { "name": "symbol", "type": "String" },
+                ],
+                "constructor": {
+                    "admin": "admin",
+                    "decimal": "7",
+                    "name": "Asset",
+                    "symbol": "AST",
+                },
+                "setup": [
+                    {
+                        "fn": "mint",
+                        "params": [
+                            { "name": "to", "type": "Address" },
+                            { "name": "amount", "type": "i128" },
+                        ],
+                        "args": ["admin", "1000000"],
+                        "signer": "admin",
+                    }
+                ],
+            }],
+            "calls": [{
+                "fn": "balance",
+                "params": [{ "name": "id", "type": "Address" }],
+                "args": ["asset"],
+            }],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let deps = response
+            .get("deployedDependencies")
+            .and_then(Value::as_array)
+            .expect("response includes deployedDependencies");
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].get("alias").and_then(Value::as_str), Some("asset"));
+        let address = deps[0].get("address").and_then(Value::as_str).unwrap_or("");
+        assert!(address.starts_with('C'), "unexpected dependency address: {address}");
+
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
     }
 }

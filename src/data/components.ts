@@ -54,6 +54,31 @@ export interface ComponentImplementation {
   buildTarget: string;
 }
 
+/// A single call invoked against a dependency contract after it is deployed.
+/// `args` may reference identity names or dependency aliases (both resolve to
+/// addresses) as well as raw literal values.
+export interface DependencyCall {
+  fn: string;
+  args: string[];
+  signer?: string;
+}
+
+/// Declares a contract that must be deployed alongside the component so the
+/// Playground can exercise it. This is generic: the sandbox-runner provisions
+/// whatever dependencies are listed here, with no component-specific branching.
+export interface ComponentDependency {
+  /// Stable name used to reference the deployed contract (e.g. as an argument).
+  alias: string;
+  /// Package (component implementation name) of the dependency contract.
+  package: string;
+  /// Values for the dependency constructor, keyed by parameter name. Values may
+  /// reference identity names (e.g. "admin") which resolve to addresses.
+  constructor?: Record<string, string>;
+  /// Calls to run after deployment (e.g. seeding balances) before the component
+  /// itself is exercised.
+  setup?: DependencyCall[];
+}
+
 export interface StellarComponent {
   slug: string;
   name: string;
@@ -66,6 +91,7 @@ export interface StellarComponent {
   implementation?: ComponentImplementation;
   interface?: FunctionSpec[];
   config?: ConfigField[];
+  dependencies?: ComponentDependency[];
 }
 
 const networkConfig: ConfigField = {
@@ -271,15 +297,42 @@ export const stellarComponents: StellarComponent[] = [
     slug: "payment",
     name: "Payment",
     description:
-      "A minimal pattern for building and submitting a Stellar payment.",
+      "A stateless payment primitive that moves a SEP-41 asset from one address to another on behalf of the sender.",
     category: "Payments",
-    shortDescription: "Stellar payment pattern",
+    shortDescription: "Stateless payment primitive",
     overview:
-      "A simple pattern for working with Stellar payments and understanding the structure behind a payment flow.",
+      "Payment is a thin, stateless Soroban contract. It holds no state of its own: a payment is a transfer of a SEP-41 compatible asset (asset) from a sender (from) to a recipient (to), authorized by the sender. The balance movement happens inside the asset contract, which Payment invokes through the standard token interface. The contract ships with a passing Rust test suite that exercises it against a minimal SEP-41 asset, and runs in the local Playground sandbox.",
     useCases: [
-      "Build a basic Stellar payment flow",
-      "Understand payment transaction structure",
-      "Adapt the pattern for application-specific payments",
+      "Move a SEP-41 asset from one address to another",
+      "Authorize a payment as the asset sender",
+      "Understand how a stateless contract delegates to an asset contract",
+    ],
+    implementation: {
+      language: "rust",
+      package: "payment",
+      sourcePath: "contracts/contracts/payment",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [],
+        authorization: "none",
+        description:
+          "Stateless init. Payment stores nothing, so the constructor takes no arguments.",
+      },
+      {
+        name: "pay",
+        params: [
+          { name: "from", type: "Address" },
+          { name: "to", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Transfers amount of asset from from to to, authorized by from. A negative amount is rejected; any failure from the underlying asset transfer propagates unchanged.",
+      },
     ],
     config: [
       {
@@ -288,11 +341,24 @@ export const stellarComponents: StellarComponent[] = [
         type: "text",
         default: "Payment",
       },
-      symbolConfig("XLM"),
-      decimalsConfig(),
       networkConfig,
     ],
-    capabilities: { implemented: false, sandbox: false, testnet: false },
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructor: {
+          admin: "admin",
+          decimal: "7",
+          name: "Payment Asset",
+          symbol: "PAY",
+        },
+        setup: [
+          { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+        ],
+      },
+    ],
+    capabilities: { implemented: true, sandbox: true, testnet: false },
   },
 
   {
@@ -422,6 +488,12 @@ export const componentCategories = [
 
 export function getComponentBySlug(slug: string) {
   return stellarComponents.find((component) => component.slug === slug);
+}
+
+export function getComponentByPackage(pkg: string) {
+  return stellarComponents.find(
+    (component) => component.implementation?.package === pkg,
+  );
 }
 
 export function getConfigDefaults(

@@ -4,6 +4,7 @@ import {
   resolveWasm,
 } from "@/lib/playground/artifacts";
 import {
+  getComponentByPackage,
   getComponentBySlug,
   type FunctionSpec,
   type ParameterSpec,
@@ -61,6 +62,22 @@ interface ValidatedRequest {
   constructorParams: { name: string; type: string }[];
   constructor: Record<string, unknown>;
   calls: Record<string, unknown>[];
+  dependencies: RunnerDependency[];
+}
+
+interface RunnerDependencySetup {
+  fn: string;
+  args: unknown[];
+  params: { name: string; type: string }[];
+  signer?: string;
+}
+
+interface RunnerDependency {
+  alias: string;
+  wasmPath: string;
+  constructorParams: { name: string; type: string }[];
+  constructor: Record<string, unknown>;
+  setup?: RunnerDependencySetup[];
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -116,6 +133,9 @@ export async function POST(request: Request): Promise<Response> {
     constructorParams: validated.value.constructorParams,
     constructor: validated.value.constructor,
     calls: validated.value.calls,
+    ...(validated.value.dependencies.length > 0
+      ? { dependencies: validated.value.dependencies }
+      : {}),
   };
 
   const result = await runRunner(JSON.stringify(runnerRequest));
@@ -201,6 +221,10 @@ function validateRequest(
   if (identities !== undefined) {
     for (const name of Object.keys(identities)) knownNames.add(name);
   }
+  // Dependency aliases resolve to addresses, so calls may reference them.
+  for (const alias of (component.dependencies ?? []).map((d) => d.alias)) {
+    knownNames.add(alias);
+  }
 
   const constructor = validateConstructor(
     request.constructor,
@@ -231,6 +255,9 @@ function validateRequest(
     });
   }
 
+  const dependencies = buildRunnerDependencies(component, knownNames);
+  if ("error" in dependencies) return dependencies;
+
   return {
     value: {
       component,
@@ -241,8 +268,87 @@ function validateRequest(
       })),
       constructor: constructor.value,
       calls: checkedCalls,
+      dependencies: dependencies.value,
     },
   };
+}
+
+function apiError(message: string): PlaygroundApiError {
+  return { kind: "api", message, status: 503 };
+}
+
+function buildRunnerDependencies(
+  component: StellarComponent,
+  knownNames: Set<string>,
+): { value: RunnerDependency[] } | { error: PlaygroundApiError } {
+  const deps = component.dependencies ?? [];
+  const out: RunnerDependency[] = [];
+  for (const dep of deps) {
+    if (dep.alias.length === 0 || dep.alias.length > 32) {
+      return { error: inputError(`dependency alias is invalid: ${dep.alias}`) };
+    }
+    const depComponent = getComponentByPackage(dep.package);
+    if (!depComponent || !depComponent.implementation) {
+      return { error: inputError(`unknown dependency package: ${dep.package}`) };
+    }
+    const wasm = resolveWasm(depComponent);
+    if (!wasm) {
+      return {
+        error: apiError(
+          `contract wasm artifact not found for dependency "${dep.alias}" (${dep.package}). Build it with \`pnpm sandbox:build\` (locally) or restore the prebuilt artifact in contracts/prebuilt/`,
+        ),
+      };
+    }
+    const ctorFn = (depComponent.interface ?? []).find(
+      (fn) => fn.name === "__constructor",
+    );
+    if (!ctorFn) {
+      return {
+        error: inputError(`dependency ${dep.package} has no constructor interface`),
+      };
+    }
+    const provided = dep.constructor ?? {};
+    const constructorValue: Record<string, unknown> = {};
+    for (const param of ctorFn.params) {
+      if (!(param.name in provided)) {
+        return {
+          error: inputError(
+            `dependency ${dep.alias} is missing constructor parameter ${param.name}`,
+          ),
+        };
+      }
+      constructorValue[param.name] = provided[param.name];
+    }
+    const checked = validateConstructor(constructorValue, ctorFn.params, knownNames);
+    if ("error" in checked) return checked;
+
+    const depInterface = new Map(
+      (depComponent.interface ?? [])
+        .filter((fn) => fn.name !== "__constructor")
+        .map((fn) => [fn.name, fn] as const),
+    );
+    const setup: RunnerDependencySetup[] = [];
+    for (const call of dep.setup ?? []) {
+      const checkedCall = validateCall(call, depInterface, knownNames);
+      if ("error" in checkedCall) return checkedCall;
+      const spec = depInterface.get(call.fn);
+      setup.push({
+        fn: call.fn,
+        args: call.args,
+        ...(call.signer !== undefined ? { signer: call.signer } : {}),
+        params: (spec?.params ?? []).map((p) => ({ name: p.name, type: p.type })),
+      });
+    }
+
+    out.push({
+      alias: dep.alias,
+      wasmPath: wasm.path,
+      constructorParams: ctorFn.params.map((p) => ({ name: p.name, type: p.type })),
+      constructor: checked.value,
+      ...(setup.length > 0 ? { setup } : {}),
+    });
+  }
+  return { value: out };
 }
 
 function validateIdentities(

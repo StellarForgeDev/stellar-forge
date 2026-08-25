@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   componentMaturity,
   componentWasmPath,
+  getComponentByPackage,
   getComponentBySlug,
   getConfigDefaults,
   stellarComponents,
 } from "@/data/components";
 
 const CONCEPT_SLUGS = [
-  "payment",
   "access-control",
   "escrow",
   "subscription",
@@ -27,8 +27,47 @@ describe("Component Standard v1 invariants", () => {
     });
   });
 
+  describe("Payment", () => {
+    const payment = getComponentBySlug("payment");
+
+    it("is implemented and sandbox-ready but not yet on Testnet", () => {
+      expect(payment).toBeDefined();
+      expect(payment?.capabilities.implemented).toBe(true);
+      expect(payment?.capabilities.sandbox).toBe(true);
+      expect(payment?.capabilities.testnet).toBe(false);
+    });
+
+    it("declares a dependency on a token aliased 'asset'", () => {
+      const dependencies = payment?.dependencies ?? [];
+      expect(dependencies).toHaveLength(1);
+      const asset = dependencies[0];
+      expect(asset.alias).toBe("asset");
+      expect(asset.package).toBe("token");
+      expect(asset.constructor).toMatchObject({ admin: "admin" });
+      expect(asset.setup).toEqual([
+        { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+      ]);
+    });
+
+    it("does not deploy to Testnet (no live address)", () => {
+      expect(payment?.capabilities.testnet).toBe(false);
+      expect(payment?.implementation?.package).toBe("payment");
+    });
+  });
+
+  describe("getComponentByPackage", () => {
+    it("resolves a component by its implementation package", () => {
+      expect(getComponentByPackage("token")?.slug).toBe("token");
+      expect(getComponentByPackage("payment")?.slug).toBe("payment");
+    });
+
+    it("returns undefined for an unknown package", () => {
+      expect(getComponentByPackage("nope")).toBeUndefined();
+    });
+  });
+
   describe("Concept components", () => {
-    it("keeps exactly the five current concepts", () => {
+    it("keeps exactly the four current concepts", () => {
       const conceptSlugs = stellarComponents
         .filter((c) => c.capabilities.implemented === false)
         .map((c) => c.slug);
@@ -49,8 +88,11 @@ describe("Component Standard v1 invariants", () => {
   });
 
   describe("componentMaturity", () => {
-    it("returns Implemented for the Token", () => {
+    it("returns Implemented for the Token and Payment", () => {
       expect(componentMaturity(getComponentBySlug("token")!)).toBe(
+        "Implemented",
+      );
+      expect(componentMaturity(getComponentBySlug("payment")!)).toBe(
         "Implemented",
       );
     });
@@ -109,7 +151,7 @@ describe("Component Standard v1 invariants", () => {
     });
 
     it("returns null when there is no implementation", () => {
-      const component = getComponentBySlug("payment")!;
+      const component = getComponentBySlug("escrow")!;
       expect(component.implementation).toBeUndefined();
       expect(componentWasmPath(component)).toBeNull();
     });

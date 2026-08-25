@@ -34,15 +34,36 @@ describe("integration generators", () => {
 
   describe("Concept component", () => {
     it("returns null because concepts have no implementation or interface", () => {
-      const payment = getComponentBySlug("payment")!;
-      expect(payment.implementation).toBeUndefined();
-      expect(payment.interface).toBeUndefined();
+      const concept = getComponentBySlug("escrow")!;
+      expect(concept.implementation).toBeUndefined();
+      expect(concept.interface).toBeUndefined();
       expect(
         generateRustIntegration({
-          component: payment,
-          configValues: getConfigDefaults(payment),
+          component: concept,
+          configValues: getConfigDefaults(concept),
         }),
       ).toBeNull();
+    });
+  });
+
+  describe("Payment (implemented with a dependency)", () => {
+    const payment = getComponentBySlug("payment")!;
+    const configValues = getConfigDefaults(payment);
+
+    it("produces a meaningful Rust integration example", () => {
+      const code = generateRustIntegration({ component: payment, configValues });
+      expect(code).not.toBeNull();
+      const output = code as string;
+      expect(output).toContain("Stellar-Forge");
+      expect(output).toContain("use soroban_sdk::");
+      expect(output).toContain("include_bytes!");
+      expect(output).toContain("fn integration_example");
+    });
+
+    it("references the deployed asset dependency in the example", () => {
+      const code = generateRustIntegration({ component: payment, configValues });
+      const output = code as string;
+      expect(output).toContain("asset");
     });
   });
 });

@@ -65,6 +65,7 @@ export interface CallOutcome {
 export interface PlaygroundResponse {
   ok: boolean;
   deployedContract?: string;
+  deployedDependencies?: { alias: string; address: string }[];
   calls?: CallOutcome[];
   error?: PlaygroundError;
 }

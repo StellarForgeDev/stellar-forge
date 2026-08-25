@@ -95,13 +95,15 @@ export function SandboxPanel({
   const ops = (component.interface ?? []).filter(
     (fn) => fn.name !== "__constructor",
   );
+  const dependencyAliases = (component.dependencies ?? []).map((d) => d.alias);
+  const addressOptions = [...IDENTITY_OPTIONS, ...dependencyAliases];
   const [steps, setSteps] = useState<ExecutionStep[]>([]);
   const [opName, setOpName] = useState(() => ops[0]?.name ?? "");
   const [argValues, setArgValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       (ops[0]?.params ?? []).map((param, index) => [
         param.name,
-        defaultArgValue(param, index),
+        defaultArgValue(param, index, addressOptions),
       ]),
     ),
   );
@@ -134,7 +136,7 @@ export function SandboxPanel({
       Object.fromEntries(
         fn.params.map((param, index) => [
           param.name,
-          defaultArgValue(param, index),
+          defaultArgValue(param, index, addressOptions),
         ]),
       ),
     );
@@ -219,7 +221,7 @@ export function SandboxPanel({
           disabled={busy}
           className={inputStyles}
         >
-          {IDENTITY_OPTIONS.map((identity) => (
+          {addressOptions.map((identity) => (
             <option key={identity} value={identity}>
               {identity}
             </option>

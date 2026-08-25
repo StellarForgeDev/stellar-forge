@@ -15,8 +15,10 @@ export const ADDRESS_TYPES = new Set(["Address", "MuxedAddress"]);
 export function defaultArgValue(
   param: FunctionSpec["params"][number],
   index: number,
+  addressOptions: readonly string[] = IDENTITY_OPTIONS,
 ): string {
   if (ADDRESS_TYPES.has(param.type)) {
+    if (addressOptions.includes(param.name)) return param.name;
     return index === 0 ? ADMIN_IDENTITY : "user1";
   }
   if (param.type === "i128") return "1000";
