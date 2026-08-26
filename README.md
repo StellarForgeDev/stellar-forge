@@ -176,6 +176,17 @@ No features beyond the above are implied or promised.
 
 Contribution guidance will be expanded as the project matures. For now, the repository follows the development principles in `AGENTS.md` and `CLAUDE.md`.
 
+### Adding a component
+
+Adding a new reusable building block requires **no component-specific application code** — the catalog, identity resolution, dependency provisioning, authorization, configuration, transaction, and integration-code paths are all generic over the six supported parameter types (`Address`, `MuxedAddress`, `i128`, `u32`, `String`, `Symbol`). The registration steps are:
+
+1. **Contract crate** — add a Soroban contract under `contracts/contracts/<slug>/`. The workspace (`contracts/Cargo.toml`) uses a `contracts/*` glob and the build script (`scripts/sandbox-build.mjs`) discovers contract directories automatically, so no build-list edit is required.
+2. **Catalog entry** — add an entry to `src/data/components.ts` describing the component, its `interface`, `constructorArgs`, `dependencies`, `config`, `category`, and `testnet` flag. This single metadata object drives every part of the UI, sandbox, and generator.
+3. **Prebuilt WASM** — run `pnpm sandbox:build` (or `scripts/sandbox-build.mjs --prebuilt`) and commit the refreshed `contracts/prebuilt/<slug>.wasm` so the Playground works where WASM cannot be rebuilt. The native `sandbox-runner` is built locally and is not committed.
+4. **(Optional) Category** — if the component introduces a new `category`, add it to the `componentCategories` array in `src/data/components.ts` so it appears in the catalog filter.
+
+No edits to `src/app`, the API routes, the transaction builder, or the integration generator are needed.
+
 ## License
 
 Licensing has not yet been finalized. No `LICENSE` file is present in the repository.

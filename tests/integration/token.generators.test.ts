@@ -17,4 +17,14 @@ describe("Token integration generator (generic machinery)", () => {
     expect(output).toContain('String::from_str(env, "Forge Token")');
     expect(output).not.toContain("configure me");
   });
+
+  it("emits a compilable MuxedAddress literal for method arguments", () => {
+    const code = generateRustIntegration({ component: token, configValues });
+    const output = code as string;
+    // `transfer(to: MuxedAddress, ...)` must import and construct a MuxedAddress,
+    // not leak an Address literal (which would not compile).
+    expect(output).toContain("MuxedAddress");
+    expect(output).toContain('MuxedAddress::from_str(env, "<muxed address>")');
+    expect(output).not.toContain("/* to: MuxedAddress — configure me */");
+  });
 });

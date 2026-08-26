@@ -46,6 +46,7 @@ export function generateRustIntegration({
     "Env",
     ...(paramTypes.has("String") ? ["String"] : []),
     ...(paramTypes.has("Symbol") ? ["Symbol"] : []),
+    ...(paramTypes.has("MuxedAddress") ? ["MuxedAddress"] : []),
   ];
 
   const lines: string[] = [];
@@ -245,6 +246,9 @@ function constructorArg(
   if (param.type === "Symbol") {
     return `Symbol::new(env, "${value}")`;
   }
+  if (param.type === "MuxedAddress") {
+    return `MuxedAddress::from_str(env, "<muxed address>")`;
+  }
   return `/* ${param.name}: ${param.type} — configure me */`;
 }
 
@@ -267,6 +271,10 @@ function placeholderArg(
   param: ParameterSpec,
   dependencyAliases: Set<string> = new Set(),
 ): string {
+  if (dependencyAliases.has(param.name)) return `&${param.name}_address`;
+  if (param.type === "MuxedAddress") {
+    return '&MuxedAddress::from_str(env, "<muxed address>")';
+  }
   if (param.type === "i128") return "&1_000_000";
   if (param.type === "u32") return "&200";
   if (param.type === "String") {
@@ -274,7 +282,6 @@ function placeholderArg(
   }
   if (param.type === "Symbol") return '&Symbol::new(env, "value")';
   const name = param.name.toLowerCase();
-  if (dependencyAliases.has(param.name)) return `&${param.name}_address`;
   if (name.includes("admin") || name === "new_admin") return "&admin";
   if (name === "to" || name.startsWith("to_")) return "&bob";
   if (name.includes("spender")) return "&alice";
