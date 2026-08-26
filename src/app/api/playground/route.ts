@@ -14,6 +14,10 @@ import {
   type StellarComponent,
 } from "@/data/components";
 import type { PlaygroundApiError, PlaygroundResponse } from "@/lib/playground/types";
+import {
+  isSupportedParameterType,
+  type SupportedParameterType,
+} from "@/lib/transactions/parameter-types";
 
 export const runtime = "nodejs";
 
@@ -40,23 +44,21 @@ const U32_MAX = BigInt("4294967295");
 
 type ArgKind = "address" | "muxed" | "i128" | "u32" | "string" | "symbol";
 
-function argKindForType(type: string): ArgKind | null {
-  switch (type) {
-    case "Address":
-      return "address";
-    case "MuxedAddress":
-      return "muxed";
-    case "i128":
-      return "i128";
-    case "u32":
-      return "u32";
-    case "String":
-      return "string";
-    case "Symbol":
-      return "symbol";
-    default:
-      return null;
-  }
+// Behavioral mapping from a canonical supported type to its Playground API
+// argument category. The keys are the canonical SupportedParameterType union,
+// so this mapping cannot list a type the canonical registry does not support.
+const ARG_KIND_BY_TYPE: Record<SupportedParameterType, ArgKind> = {
+  Address: "address",
+  MuxedAddress: "muxed",
+  i128: "i128",
+  u32: "u32",
+  String: "string",
+  Symbol: "symbol",
+};
+
+export function argKindForType(type: string): ArgKind | null {
+  if (!isSupportedParameterType(type)) return null;
+  return ARG_KIND_BY_TYPE[type];
 }
 
 interface ValidatedRequest {
@@ -431,7 +433,7 @@ function validateIdentities(
   return { value: result };
 }
 
-function validateConstructor(
+export function validateConstructor(
   value: unknown,
   params: ParameterSpec[],
   knownNames: Set<string>,
@@ -460,7 +462,7 @@ function validateConstructor(
   return { value: ctor };
 }
 
-function validateCall(
+export function validateCall(
   value: unknown,
   interfaceByName: ReadonlyMap<string, FunctionSpec>,
   knownNames: Set<string>,
