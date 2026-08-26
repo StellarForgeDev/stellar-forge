@@ -10,7 +10,6 @@ import {
 
 const CONCEPT_SLUGS = [
   "subscription",
-  "multi-signature",
 ];
 
 describe("Component Standard v1 invariants", () => {
@@ -208,6 +207,75 @@ describe("Component Standard v1 invariants", () => {
 
     it("declares only name and network configuration", () => {
       const keys = (accessControl?.config ?? []).map((f) => f.key);
+      expect(keys).toEqual(["name", "network"]);
+    });
+  });
+
+  describe("Multi-signature (fifth implemented component)", () => {
+    const multiSig = getComponentBySlug("multi-signature")!;
+
+    it("is implemented, sandbox-ready, and not on Testnet", () => {
+      expect(multiSig?.capabilities).toEqual({
+        implemented: true,
+        sandbox: true,
+        testnet: false,
+      });
+    });
+
+    it("declares three novel signer identities as constructor defaults", () => {
+      const constructor = multiSig?.constructorArgs ?? {};
+      expect(constructor.signer1).toBe("signer1");
+      expect(constructor.signer2).toBe("signer2");
+      expect(constructor.signer3).toBe("signer3");
+      expect(constructor.threshold).toBe("2");
+    });
+
+    it("exposes an interface matching the contract", () => {
+      const names = (multiSig?.interface ?? []).map((fn) => fn.name);
+      expect(names).toEqual([
+        "__constructor",
+        "approve",
+        "execute",
+        "is_approved",
+      ]);
+      const ctor = multiSig?.interface?.find(
+        (fn) => fn.name === "__constructor",
+      );
+      expect(ctor?.params.map((p) => p.name)).toEqual([
+        "signer1",
+        "signer2",
+        "signer3",
+        "threshold",
+      ]);
+      expect(ctor?.params.map((p) => p.type)).toEqual([
+        "Address",
+        "Address",
+        "Address",
+        "u32",
+      ]);
+      const approve = multiSig?.interface?.find(
+        (fn) => fn.name === "approve",
+      );
+      expect(approve?.params.map((p) => p.name)).toEqual([
+        "signer",
+        "proposal_id",
+      ]);
+      expect(approve?.params.map((p) => p.type)).toEqual([
+        "Address",
+        "Symbol",
+      ]);
+      expect(approve?.authorization).toBe("first-address");
+      const isApproved = multiSig?.interface?.find(
+        (fn) => fn.name === "is_approved",
+      );
+      expect(isApproved?.returns).toBe("bool");
+      expect(isApproved?.authorization).toBe("none");
+      const execute = multiSig?.interface?.find((fn) => fn.name === "execute");
+      expect(execute?.authorization).toBe("none");
+    });
+
+    it("declares only name and network configuration", () => {
+      const keys = (multiSig?.config ?? []).map((f) => f.key);
       expect(keys).toEqual(["name", "network"]);
     });
   });

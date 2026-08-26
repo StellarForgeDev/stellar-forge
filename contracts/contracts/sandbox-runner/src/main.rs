@@ -1141,4 +1141,121 @@ mod tests {
             calls[1]
         );
     }
+
+    #[test]
+    fn multi_signature_executes_generically() {
+        // End-to-end boundary for the Multi-signature component's generic
+        // support: three NOVEL identities (signer1/2/3, not admin/user1/user2)
+        // are supplied by the request, resolved generically by the runner, and
+        // drive an M-of-N threshold. Demonstrates the catalog → identity
+        // discovery → API → deterministic identities → constructor →
+        // sandbox-runner → real wasm → bool-return pipeline with no
+        // component-specific branching in the runner.
+        // Skips when the wasm artifact is not built (CI's Rust job does not run
+        // the Stellar CLI).
+        let multi_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/multi_signature.wasm"
+        );
+        if !std::path::Path::new(multi_wasm).exists() {
+            return;
+        }
+        let env = Env::default();
+        use soroban_sdk::testutils::Address as _;
+        let s1 = Address::generate(&env);
+        let s2 = Address::generate(&env);
+        let s3 = Address::generate(&env);
+        let strkey = |a: &Address| -> std::string::String {
+            std::string::String::from_utf8(a.to_string().to_bytes().to_alloc_vec())
+                .unwrap()
+        };
+        let request = json!({
+            "wasmPath": multi_wasm,
+            "constructorParams": [
+                { "name": "signer1", "type": "Address" },
+                { "name": "signer2", "type": "Address" },
+                { "name": "signer3", "type": "Address" },
+                { "name": "threshold", "type": "u32" },
+            ],
+            "constructor": {
+                "signer1": "signer1",
+                "signer2": "signer2",
+                "signer3": "signer3",
+                "threshold": "2",
+            },
+            "identities": {
+                "signer1": strkey(&s1),
+                "signer2": strkey(&s2),
+                "signer3": strkey(&s3),
+            },
+            "calls": [
+                {
+                    "fn": "approve",
+                    "params": [
+                        { "name": "signer", "type": "Address" },
+                        { "name": "proposal_id", "type": "Symbol" },
+                    ],
+                    "args": ["signer1", "prop1"],
+                    "signer": "signer1",
+                },
+                {
+                    "fn": "approve",
+                    "params": [
+                        { "name": "signer", "type": "Address" },
+                        { "name": "proposal_id", "type": "Symbol" },
+                    ],
+                    "args": ["signer2", "prop1"],
+                    "signer": "signer2",
+                },
+                {
+                    "fn": "is_approved",
+                    "params": [{ "name": "proposal_id", "type": "Symbol" }],
+                    "args": ["prop1"],
+                },
+                {
+                    "fn": "execute",
+                    "params": [{ "name": "proposal_id", "type": "Symbol" }],
+                    "args": ["prop1"],
+                },
+                {
+                    "fn": "approve",
+                    "params": [
+                        { "name": "signer", "type": "Address" },
+                        { "name": "proposal_id", "type": "Symbol" },
+                    ],
+                    "args": ["signer1", "prop1"],
+                    "signer": "signer1",
+                },
+                {
+                    "fn": "is_approved",
+                    "params": [{ "name": "proposal_id", "type": "Symbol" }],
+                    "args": ["prop2"],
+                },
+            ],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 6);
+        // approve signer1 (ok)
+        assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
+        // approve signer2 (ok)
+        assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
+        // is_approved prop1 -> true (threshold reached)
+        assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[2].get("result").and_then(Value::as_bool), Some(true));
+        // execute prop1 -> true
+        assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[3].get("result").and_then(Value::as_bool), Some(true));
+        // duplicate approve signer1 (ok, idempotent)
+        assert_eq!(calls[4].get("ok").and_then(Value::as_bool), Some(true));
+        // is_approved prop2 (no approvals) -> false
+        assert_eq!(calls[5].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[5].get("result").and_then(Value::as_bool), Some(false));
+    }
 }

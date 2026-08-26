@@ -551,6 +551,83 @@ export const stellarComponents: StellarComponent[] = [
   },
 
   {
+    slug: "multi-signature",
+    name: "Multi-signature",
+    description:
+      "Requires multiple approving signers before a proposal executes.",
+    category: "Security",
+    shortDescription: "Multiple signer approval",
+    overview:
+      "Multi-signature is a minimal M-of-N approval component. Three signers are configured at construction together with a threshold. Each signer may approve a proposal (by its Symbol id) once; approvals are idempotent per signer. A proposal may be executed once its distinct approval count reaches the threshold. The contract ships with a passing Rust test suite and runs in the local Playground sandbox.",
+    useCases: [
+      "Require multiple approvals before an action",
+      "Model shared-control workflows",
+      "Explore multi-party transaction authorization",
+    ],
+    implementation: {
+      language: "rust",
+      package: "multi-signature",
+      sourcePath: "contracts/contracts/multi-signature",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [
+          { name: "signer1", type: "Address" },
+          { name: "signer2", type: "Address" },
+          { name: "signer3", type: "Address" },
+          { name: "threshold", type: "u32" },
+        ],
+        authorization: "none",
+        description:
+          "Configures the three authorized signers and the M-of-N threshold. Called automatically on deploy.",
+      },
+      {
+        name: "approve",
+        params: [
+          { name: "signer", type: "Address" },
+          { name: "proposal_id", type: "Symbol" },
+        ],
+        authorization: "first-address",
+        description:
+          "Records an approval from `signer` for `proposal_id`. Idempotent per signer. Only authorized signers may approve.",
+      },
+      {
+        name: "execute",
+        params: [{ name: "proposal_id", type: "Symbol" }],
+        authorization: "none",
+        description:
+          "Executes `proposal_id` once its approvals meet the threshold. Returns whether execution occurred.",
+      },
+      {
+        name: "is_approved",
+        params: [{ name: "proposal_id", type: "Symbol" }],
+        returns: "bool",
+        authorization: "none",
+        description:
+          "Returns whether `proposal_id` has reached the approval threshold.",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Multi-signature name",
+        type: "text",
+        default: "Multi-Signature",
+      },
+      networkConfig,
+    ],
+    constructorArgs: {
+      signer1: "signer1",
+      signer2: "signer2",
+      signer3: "signer3",
+      threshold: "2",
+    },
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+  },
+
+  {
     slug: "subscription",
     name: "Subscription",
     description:
@@ -573,39 +650,6 @@ export const stellarComponents: StellarComponent[] = [
       },
       symbolConfig("XLM"),
       decimalsConfig(),
-      networkConfig,
-    ],
-    capabilities: { implemented: false, sandbox: false, testnet: false },
-  },
-
-  {
-    slug: "multi-signature",
-    name: "Multi-signature",
-    description:
-      "Requires multiple approving signers before a transaction executes.",
-    category: "Security",
-    shortDescription: "Multiple signer approval",
-    overview:
-      "A security pattern that requires multiple authorized parties to approve an operation before it can execute.",
-    useCases: [
-      "Require multiple approvals",
-      "Build shared-control workflows",
-      "Explore multi-party transaction authorization",
-    ],
-    config: [
-      {
-        key: "name",
-        label: "Configuration name",
-        type: "text",
-        default: "Multi-Signature",
-      },
-      {
-        key: "symbol",
-        label: "Required signers",
-        type: "text",
-        default: "XLM",
-      },
-      decimalsConfig({ decimals: "7", disabled: true }),
       networkConfig,
     ],
     capabilities: { implemented: false, sandbox: false, testnet: false },
