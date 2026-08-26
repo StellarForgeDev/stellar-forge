@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getComponentBySlug, getConfigDefaults } from "@/data/components";
+import {
+  getComponentBySlug,
+  getConfigDefaults,
+  type StellarComponent,
+} from "@/data/components";
 import {
   generateIntegrationCode,
   generateRustIntegration,
@@ -32,9 +36,14 @@ describe("integration generators", () => {
     });
   });
 
-  describe("Concept component", () => {
+  describe("Component without implementation", () => {
     it("returns null because concepts have no implementation or interface", () => {
-      const concept = getComponentBySlug("subscription")!;
+      const base = getComponentBySlug("token")!;
+      const concept = {
+        ...base,
+        implementation: undefined,
+        interface: undefined,
+      } as unknown as StellarComponent;
       expect(concept.implementation).toBeUndefined();
       expect(concept.interface).toBeUndefined();
       expect(

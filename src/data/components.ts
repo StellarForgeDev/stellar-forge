@@ -631,28 +631,91 @@ export const stellarComponents: StellarComponent[] = [
     slug: "subscription",
     name: "Subscription",
     description:
-      "A recurring-payment pattern for periodic, agreed-upon transfers.",
+      "A recurring-payment agreement that charges a subscriber on a fixed interval.",
     category: "Payments",
-    shortDescription: "Recurring payment pattern",
+    shortDescription: "Recurring payment agreement",
     overview:
-      "A reusable pattern for representing recurring payments between an authorized payer and a service or recipient.",
+      "Subscription is a minimal recurring-payment component. A subscriber, a merchant, the subscribed asset, a fixed amount, and a charge interval (in seconds) are configured at construction. Each charge transfers the amount from the subscriber to the merchant once the ledger time reaches the contract's internal next-charge Timepoint, then advances the schedule. Time stays internal contract state, so the component fits the generic catalog pipeline with no time-specific parameter type. It ships with a passing Rust test suite and runs in the local Playground sandbox.",
     useCases: [
       "Model recurring payments",
-      "Define payment intervals",
-      "Explore automated payment workflows",
+      "Require the subscriber's authorization to charge",
+      "Explore time-driven state without a time parameter type",
+    ],
+    implementation: {
+      language: "rust",
+      package: "subscription",
+      sourcePath: "contracts/contracts/subscription",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [
+          { name: "subscriber", type: "Address" },
+          { name: "merchant", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "amount", type: "i128" },
+          { name: "interval", type: "u32" },
+        ],
+        authorization: "none",
+        description:
+          "Configures the subscriber, merchant, subscribed asset, payment amount, and charge interval in seconds. Called automatically on deploy.",
+      },
+      {
+        name: "charge",
+        params: [{ name: "subscriber", type: "Address" }],
+        authorization: "first-address",
+        description:
+          "Transfers `amount` of `asset` from the subscriber to the merchant if the subscription is active and the next charge time has been reached. Returns whether a charge occurred.",
+      },
+      {
+        name: "cancel",
+        params: [{ name: "subscriber", type: "Address" }],
+        authorization: "first-address",
+        description:
+          "Cancels the subscription. Only the subscriber may cancel. Returns whether cancellation occurred.",
+      },
+      {
+        name: "is_active",
+        params: [],
+        returns: "bool",
+        authorization: "none",
+        description:
+          "Returns whether the subscription is still active.",
+      },
+    ],
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Subscription Asset",
+          symbol: "SUB",
+        },
+        setup: [
+          { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+        ],
+      },
     ],
     config: [
       {
         key: "name",
-        label: "Plan name",
+        label: "Subscription name",
         type: "text",
         default: "Subscription",
       },
-      symbolConfig("XLM"),
-      decimalsConfig(),
       networkConfig,
     ],
-    capabilities: { implemented: false, sandbox: false, testnet: false },
+    constructorArgs: {
+      subscriber: "subscriber",
+      merchant: "merchant",
+      asset: "asset",
+      amount: "1000",
+      interval: "3600",
+    },
+    capabilities: { implemented: true, sandbox: true, testnet: false },
   },
 ];
 

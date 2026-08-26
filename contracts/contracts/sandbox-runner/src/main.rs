@@ -1258,4 +1258,148 @@ mod tests {
         assert_eq!(calls[5].get("ok").and_then(Value::as_bool), Some(true));
         assert_eq!(calls[5].get("result").and_then(Value::as_bool), Some(false));
     }
+
+    #[test]
+    fn subscription_executes_generically() {
+        // End-to-end boundary for the Subscription component's generic support:
+        // a subscriber and merchant are supplied by the request, resolved
+        // generically by the runner, and drive a time-gated recurring payment.
+        // `next_charge` is internal Timepoint state, so no time-specific
+        // parameter type is required. The runner cannot advance ledger time, so
+        // the time gate is demonstrated by a clean pre-interval failure; the
+        // full charge-after-interval success path is covered by the contract's
+        // own Rust test suite where ledger time is controllable. Skips when the
+        // wasm artifacts are not built (CI's Rust job does not run the Stellar
+        // CLI).
+        let sub_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/subscription.wasm"
+        );
+        if !std::path::Path::new(sub_wasm).exists() {
+            return;
+        }
+        let token_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/token.wasm"
+        );
+        if !std::path::Path::new(token_wasm).exists() {
+            return;
+        }
+        let env = Env::default();
+        use soroban_sdk::testutils::Address as _;
+        let subscriber = Address::generate(&env);
+        let merchant = Address::generate(&env);
+        let strkey = |a: &Address| -> std::string::String {
+            std::string::String::from_utf8(a.to_string().to_bytes().to_alloc_vec())
+                .unwrap()
+        };
+        let request = json!({
+            "wasmPath": sub_wasm,
+            "constructorParams": [
+                { "name": "subscriber", "type": "Address" },
+                { "name": "merchant", "type": "Address" },
+                { "name": "asset", "type": "Address" },
+                { "name": "amount", "type": "i128" },
+                { "name": "interval", "type": "u32" },
+            ],
+            "constructor": {
+                "subscriber": "subscriber",
+                "merchant": "merchant",
+                "asset": "asset",
+                "amount": "1000",
+                "interval": "3600",
+            },
+            "identities": {
+                "subscriber": strkey(&subscriber),
+                "merchant": strkey(&merchant),
+            },
+            "dependencies": [
+                {
+                    "alias": "asset",
+                    "wasmPath": token_wasm,
+                    "constructorParams": [
+                        { "name": "admin", "type": "Address" },
+                        { "name": "decimal", "type": "u32" },
+                        { "name": "name", "type": "String" },
+                        { "name": "symbol", "type": "String" },
+                    ],
+                    "constructor": {
+                        "admin": "admin",
+                        "decimal": "7",
+                        "name": "Subscription Asset",
+                        "symbol": "SUB",
+                    },
+                    "setup": [
+                        {
+                            "fn": "mint",
+                            "params": [
+                                { "name": "to", "type": "Address" },
+                                { "name": "amount", "type": "i128" },
+                            ],
+                            "args": ["admin", "1000000"],
+                            "signer": "admin",
+                        }
+                    ],
+                }
+            ],
+            "calls": [
+                {
+                    "fn": "charge",
+                    "params": [{ "name": "subscriber", "type": "Address" }],
+                    "args": ["subscriber"],
+                    "signer": "subscriber",
+                },
+                {
+                    "fn": "cancel",
+                    "params": [{ "name": "subscriber", "type": "Address" }],
+                    "args": ["subscriber"],
+                    "signer": "subscriber",
+                },
+                {
+                    "fn": "is_active",
+                    "params": [],
+                    "args": [],
+                },
+                {
+                    "fn": "charge",
+                    "params": [{ "name": "subscriber", "type": "Address" }],
+                    "args": ["subscriber"],
+                    "signer": "subscriber",
+                },
+            ],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 4);
+        // charge before interval: time gate not reached -> ok, but result false
+        assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[0].get("result").and_then(Value::as_bool),
+            Some(false)
+        );
+        // cancel: succeeds
+        assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[1].get("result").and_then(Value::as_bool),
+            Some(true)
+        );
+        // is_active after cancel: false
+        assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[2].get("result").and_then(Value::as_bool),
+            Some(false)
+        );
+        // charge after cancel: inactive -> false
+        assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[3].get("result").and_then(Value::as_bool),
+            Some(false)
+        );
+    }
 }

@@ -8,9 +8,7 @@ import {
   stellarComponents,
 } from "@/data/components";
 
-const CONCEPT_SLUGS = [
-  "subscription",
-];
+const CONCEPT_SLUGS: string[] = [];
 
 describe("Component Standard v1 invariants", () => {
   describe("Token", () => {
@@ -102,7 +100,7 @@ describe("Component Standard v1 invariants", () => {
 
     it("only reports the two supported maturity states", () => {
       const states = stellarComponents.map(componentMaturity);
-      expect(new Set(states)).toEqual(new Set(["Concept", "Implemented"]));
+      expect(new Set(states)).toEqual(new Set(["Implemented"]));
     });
   });
 
@@ -280,6 +278,100 @@ describe("Component Standard v1 invariants", () => {
     });
   });
 
+  describe("Subscription (sixth implemented component)", () => {
+    const subscription = getComponentBySlug("subscription")!;
+
+    it("is implemented, sandbox-ready, and not on Testnet", () => {
+      expect(subscription?.capabilities).toEqual({
+        implemented: true,
+        sandbox: true,
+        testnet: false,
+      });
+    });
+
+    it("declares a token asset dependency aliased 'asset'", () => {
+      const dependencies = subscription?.dependencies ?? [];
+      expect(dependencies).toHaveLength(1);
+      const asset = dependencies[0];
+      expect(asset.alias).toBe("asset");
+      expect(asset.package).toBe("token");
+      expect(asset.constructorArgs).toMatchObject({ admin: "admin" });
+      expect(asset.setup).toEqual([
+        { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+      ]);
+    });
+
+    it("declares novel subscriber/merchant identities as constructor defaults", () => {
+      const constructor = subscription?.constructorArgs ?? {};
+      expect(constructor.subscriber).toBe("subscriber");
+      expect(constructor.merchant).toBe("merchant");
+      expect(constructor.asset).toBe("asset");
+      expect(constructor.amount).toBe("1000");
+      expect(constructor.interval).toBe("3600");
+    });
+
+    it("exposes an interface matching the contract", () => {
+      const names = (subscription?.interface ?? []).map((fn) => fn.name);
+      expect(names).toEqual([
+        "__constructor",
+        "charge",
+        "cancel",
+        "is_active",
+      ]);
+      const ctor = subscription?.interface?.find(
+        (fn) => fn.name === "__constructor",
+      );
+      expect(ctor?.params.map((p) => p.name)).toEqual([
+        "subscriber",
+        "merchant",
+        "asset",
+        "amount",
+        "interval",
+      ]);
+      expect(ctor?.params.map((p) => p.type)).toEqual([
+        "Address",
+        "Address",
+        "Address",
+        "i128",
+        "u32",
+      ]);
+      const charge = subscription?.interface?.find(
+        (fn) => fn.name === "charge",
+      );
+      expect(charge?.params.map((p) => p.name)).toEqual(["subscriber"]);
+      expect(charge?.params.map((p) => p.type)).toEqual(["Address"]);
+      expect(charge?.authorization).toBe("first-address");
+      const isActive = subscription?.interface?.find(
+        (fn) => fn.name === "is_active",
+      );
+      expect(isActive?.returns).toBe("bool");
+      expect(isActive?.authorization).toBe("none");
+      const cancel = subscription?.interface?.find((fn) => fn.name === "cancel");
+      expect(cancel?.authorization).toBe("first-address");
+    });
+
+    it("uses only supported parameter types", () => {
+      const types = (subscription?.interface ?? [])
+        .flatMap((fn) => fn.params.map((p) => p.type))
+        .filter((type): type is string => typeof type === "string");
+      for (const type of types) {
+        expect([
+          "Address",
+          "MuxedAddress",
+          "i128",
+          "u32",
+          "String",
+          "Symbol",
+        ]).toContain(type);
+      }
+    });
+
+    it("declares only name and network configuration", () => {
+      const keys = (subscription?.config ?? []).map((f) => f.key);
+      expect(keys).toEqual(["name", "network"]);
+    });
+  });
+
   describe("getConfigDefaults", () => {
     it("maps each config field key to its default value", () => {
       const token = getComponentBySlug("token")!;
@@ -309,10 +401,12 @@ describe("Component Standard v1 invariants", () => {
       );
     });
 
-    it("returns null when there is no implementation", () => {
+    it("builds the wasm path for the implemented subscription", () => {
       const component = getComponentBySlug("subscription")!;
-      expect(component.implementation).toBeUndefined();
-      expect(componentWasmPath(component)).toBeNull();
+      expect(component.implementation?.package).toBe("subscription");
+      expect(componentWasmPath(component)).toBe(
+        "contracts/target/wasm32v1-none/release/subscription.wasm",
+      );
     });
   });
 });
