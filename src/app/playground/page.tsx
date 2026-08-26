@@ -180,7 +180,7 @@ export default function PlaygroundPage() {
           </Link>
         </div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="mt-10 grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
           <Card>
             <div>
               <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
