@@ -31,6 +31,7 @@ export function generateRustIntegration({
   const callableFns = interfaceFns.filter((fn) => fn.name !== "__constructor");
   const dependencies = component.dependencies ?? [];
   const dependencyAliases = new Set(dependencies.map((dependency) => dependency.alias));
+  const constructorArgs = component.constructorArgs ?? {};
   const packageName = implementation.package;
   const packageIdentifier = snakeCase(packageName);
   const clientName = `${pascalCase(packageName)}Client`;
@@ -132,9 +133,9 @@ export function generateRustIntegration({
   lines.push("            (");
   if (constructor) {
     for (const param of constructor.params) {
-      lines.push(
-        `                ${constructorArg(param, configValues, dependencyAliases)}, // ${param.name}`,
-      );
+          lines.push(
+            `                ${constructorArg(param, configValues, dependencyAliases, constructorArgs)}, // ${param.name}`,
+          );
     }
   }
   lines.push("            ),");
@@ -211,6 +212,7 @@ function constructorArg(
   param: ParameterSpec,
   configValues: Record<string, string>,
   dependencyAliases: Set<string> = new Set(),
+  constructorArgs: Record<string, string> = {},
 ): string {
   if (param.type === "Address") {
     // A constructor parameter that is a dependency alias resolves to the
@@ -227,8 +229,13 @@ function constructorArg(
     param.name.replace(/s$/, ""),
     `${param.name}s`,
   ];
+  // Prefer a config-backed value; otherwise fall back to the component's
+  // catalog constructorArgs (e.g. numeric defaults such as amount, interval,
+  // or threshold). The value is always read from catalog metadata, so the
+  // generated example stays compilable with no component-specific branch.
   const value =
     candidates.map((key) => configValues[key]).find((v) => v !== undefined) ??
+    constructorArgs[param.name] ??
     "";
   if (param.type === "u32" && value.length > 0) return `${value}_u32`;
   if (param.type === "i128" && value.length > 0) return `${value}_i128`;

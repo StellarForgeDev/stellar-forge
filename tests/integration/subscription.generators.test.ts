@@ -36,10 +36,12 @@ describe("Subscription integration generator (generic machinery)", () => {
     expect(output).toContain("&asset_address");
     // Each non-alias Address constructor param resolves to admin.clone().
     expect(output).toContain("admin.clone()");
-    // Numeric constructor params that are not backed by catalog config values
-    // fall through to the generic `configure me` placeholder rather than any
-    // Subscription-specific branch.
-    expect(output).toContain("configure me");
+    // Numeric constructor params are resolved from the component's catalog
+    // constructorArgs (amount -> 1000, interval -> 3600) rather than a
+    // Subscription-specific branch, so the generated Rust is compilable.
+    expect(output).toContain("1000_i128");
+    expect(output).toContain("3600_u32");
+    expect(output).not.toContain("configure me");
     expect(output).not.toContain("MultiSignatureClient");
   });
 });

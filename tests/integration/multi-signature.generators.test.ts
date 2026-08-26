@@ -41,4 +41,14 @@ describe("Multi-signature integration generator (generic machinery)", () => {
     expect(output).toContain("Symbol");
     expect(output).toContain('Symbol::new(env, "value")');
   });
+
+  it("uses catalog constructorArgs for the numeric threshold", () => {
+    const output = generateRustIntegration({
+      component: multiSig,
+      configValues,
+    }) as string;
+    // threshold is a u32 constructor param sourced from catalog constructorArgs.
+    expect(output).toContain("2_u32");
+    expect(output).not.toContain("configure me");
+  });
 });
