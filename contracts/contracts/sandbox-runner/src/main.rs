@@ -1555,4 +1555,193 @@ mod tests {
         // claim by an intruder: rejected by the stored-beneficiary check.
         assert_eq!(calls[4].get("ok").and_then(Value::as_bool), Some(false));
     }
+
+    #[test]
+    fn staking_executes_generically() {
+        // End-to-end boundary for the Staking component's generic support:
+        //   Staking -> asset dependency (alias "asset") -> dependency
+        //   provisioning -> Staking deployment (asset passed into the
+        //   constructor) -> fund_rewards (admin) -> stake/unstake/claim
+        //   (first-address). Exercises the reward-per-token accounting end to
+        //   end: staking moves the asset in and tracks balances, and the
+        //   contract is driven with no Staking-specific branching in the runner.
+        // The runner cannot advance ledger time, so reward accrual is
+        // demonstrated by a clean zero-earned pre-time state (the full timeline
+        // is covered by the contract's own Rust test suite). Skips when the wasm
+        // artifacts are not built (CI's Rust job does not run the Stellar CLI).
+        let staking_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/staking.wasm"
+        );
+        if !std::path::Path::new(staking_wasm).exists() {
+            return;
+        }
+        let token_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/token.wasm"
+        );
+        if !std::path::Path::new(token_wasm).exists() {
+            return;
+        }
+        let env = Env::default();
+        use soroban_sdk::testutils::Address as _;
+        let admin = Address::generate(&env);
+        let user1 = Address::generate(&env);
+        let strkey = |a: &Address| -> std::string::String {
+            std::string::String::from_utf8(a.to_string().to_bytes().to_alloc_vec()).unwrap()
+        };
+        let request = json!({
+            "wasmPath": staking_wasm,
+            "constructorParams": [
+                { "name": "asset", "type": "Address" },
+                { "name": "duration", "type": "u32" },
+            ],
+            "constructor": {
+                "asset": "asset",
+                "duration": "86400",
+            },
+            "identities": {
+                "admin": strkey(&admin),
+                "user1": strkey(&user1),
+            },
+            "dependencies": [
+                {
+                    "alias": "asset",
+                    "wasmPath": token_wasm,
+                    "constructorParams": [
+                        { "name": "admin", "type": "Address" },
+                        { "name": "decimal", "type": "u32" },
+                        { "name": "name", "type": "String" },
+                        { "name": "symbol", "type": "String" },
+                    ],
+                    "constructor": {
+                        "admin": "admin",
+                        "decimal": "7",
+                        "name": "Staking Asset",
+                        "symbol": "STK",
+                    },
+                    "setup": [
+                        {
+                            "fn": "mint",
+                            "params": [
+                                { "name": "to", "type": "Address" },
+                                { "name": "amount", "type": "i128" },
+                            ],
+                            "args": ["admin", "1000000"],
+                            "signer": "admin",
+                        },
+                        {
+                            "fn": "mint",
+                            "params": [
+                                { "name": "to", "type": "Address" },
+                                { "name": "amount", "type": "i128" },
+                            ],
+                            "args": ["user1", "1000000"],
+                            "signer": "admin",
+                        }
+                    ],
+                }
+            ],
+            "calls": [
+                {
+                    "fn": "fund_rewards",
+                    "params": [
+                        { "name": "from", "type": "Address" },
+                        { "name": "amount", "type": "i128" },
+                    ],
+                    "args": ["admin", "500000"],
+                    "signer": "admin",
+                },
+                {
+                    "fn": "stake",
+                    "params": [
+                        { "name": "from", "type": "Address" },
+                        { "name": "amount", "type": "i128" },
+                    ],
+                    "args": ["user1", "100000"],
+                    "signer": "user1",
+                },
+                {
+                    "fn": "staked_balance",
+                    "params": [{ "name": "of", "type": "Address" }],
+                    "args": ["user1"],
+                },
+                {
+                    "fn": "total_staked",
+                    "params": [],
+                    "args": [],
+                },
+                {
+                    "fn": "earned",
+                    "params": [{ "name": "of", "type": "Address" }],
+                    "args": ["user1"],
+                },
+                {
+                    "fn": "unstake",
+                    "params": [
+                        { "name": "from", "type": "Address" },
+                        { "name": "amount", "type": "i128" },
+                    ],
+                    "args": ["user1", "50000"],
+                    "signer": "user1",
+                },
+                {
+                    "fn": "staked_balance",
+                    "params": [{ "name": "of", "type": "Address" }],
+                    "args": ["user1"],
+                },
+                {
+                    "fn": "claim",
+                    "params": [{ "name": "from", "type": "Address" }],
+                    "args": ["user1"],
+                    "signer": "user1",
+                },
+            ],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let deps = response
+            .get("deployedDependencies")
+            .and_then(Value::as_array)
+            .expect("response includes deployedDependencies");
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].get("alias").and_then(Value::as_str), Some("asset"));
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 8);
+        // fund_rewards: succeeded.
+        assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
+        // stake: succeeded.
+        assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
+        // staked_balance(user1): 100000 after staking.
+        assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[2].get("result").and_then(Value::as_i64),
+            Some(100000)
+        );
+        // total_staked: 100000.
+        assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[3].get("result").and_then(Value::as_i64),
+            Some(100000)
+        );
+        // earned(user1): 0 before any ledger time advances.
+        assert_eq!(calls[4].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[4].get("result").and_then(Value::as_i64), Some(0));
+        // unstake(user1, 50000): succeeded.
+        assert_eq!(calls[5].get("ok").and_then(Value::as_bool), Some(true));
+        // staked_balance(user1): 50000 after partial unstake.
+        assert_eq!(calls[6].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[6].get("result").and_then(Value::as_i64),
+            Some(50000)
+        );
+        // claim(user1): 0 rewards before any time passes.
+        assert_eq!(calls[7].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[7].get("result").and_then(Value::as_i64), Some(0));
+    }
 }

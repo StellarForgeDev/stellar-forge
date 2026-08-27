@@ -26,10 +26,10 @@ const PLATFORM_SOURCES = [
 ];
 
 const FORBIDDEN = [
-  /slug\s*===?\s*["'](token|payment|escrow|access-control|multi-signature|subscription)["']/,
-  /["'](token|payment|escrow|access-control|multi-signature|subscription)["']\s*===?\s*slug/,
+  /slug\s*===?\s*["'](token|payment|escrow|access-control|multi-signature|subscription|staking)["']/,
+  /["'](token|payment|escrow|access-control|multi-signature|subscription|staking)["']\s*===?\s*slug/,
   /switch\s*\(\s*slug\s*\)/,
-  /case\s+["'](token|payment|escrow|access-control|multi-signature|subscription)["']\s*:/,
+  /case\s+["'](token|payment|escrow|access-control|multi-signature|subscription|staking)["']\s*:/,
 ];
 
 describe("platform source remains component-agnostic", () => {

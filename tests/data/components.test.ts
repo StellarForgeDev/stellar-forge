@@ -7,6 +7,7 @@ import {
   getConfigDefaults,
   stellarComponents,
 } from "@/data/components";
+import { SUPPORTED_PARAMETER_TYPES } from "@/lib/transactions/parameter-types";
 
 const CONCEPT_SLUGS: string[] = [];
 
@@ -468,6 +469,105 @@ describe("Component Standard v1 invariants", () => {
     it("declares only name and network configuration", () => {
       const keys = (vesting?.config ?? []).map((f) => f.key);
       expect(keys).toEqual(["name", "network"]);
+    });
+  });
+
+  describe("Staking (eighth implemented component)", () => {
+    const staking = getComponentBySlug("staking")!;
+
+    it("is implemented, sandbox-ready, and not on Testnet", () => {
+      expect(staking?.capabilities).toEqual({
+        implemented: true,
+        sandbox: true,
+        testnet: false,
+      });
+    });
+
+    it("declares a token asset dependency aliased 'asset'", () => {
+      const dependencies = staking?.dependencies ?? [];
+      expect(dependencies).toHaveLength(1);
+      const asset = dependencies[0];
+      expect(asset.alias).toBe("asset");
+      expect(asset.package).toBe("token");
+      expect(asset.constructorArgs).toMatchObject({ admin: "admin" });
+      expect(asset.setup).toEqual([
+        { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+      ]);
+    });
+
+    it("declares catalog-driven constructor defaults", () => {
+      const constructor = staking?.constructorArgs ?? {};
+      expect(constructor.asset).toBe("asset");
+      expect(constructor.duration).toBe("86400");
+    });
+
+    it("exposes an interface matching the contract", () => {
+      const names = (staking?.interface ?? []).map((fn) => fn.name);
+      expect(names).toEqual([
+        "__constructor",
+        "fund_rewards",
+        "stake",
+        "unstake",
+        "claim",
+        "staked_balance",
+        "earned",
+        "total_staked",
+        "reward_rate",
+      ]);
+      const ctor = staking?.interface?.find(
+        (fn) => fn.name === "__constructor",
+      );
+      expect(ctor?.params.map((p) => p.name)).toEqual([
+        "asset",
+        "duration",
+      ]);
+      expect(ctor?.params.map((p) => p.type)).toEqual([
+        "Address",
+        "u32",
+      ]);
+      const fund = staking?.interface?.find((fn) => fn.name === "fund_rewards");
+      expect(fund?.authorization).toBe("admin");
+      const stake = staking?.interface?.find((fn) => fn.name === "stake");
+      expect(stake?.authorization).toBe("first-address");
+      const claim = staking?.interface?.find((fn) => fn.name === "claim");
+      expect(claim?.returns).toBe("i128");
+      expect(claim?.authorization).toBe("first-address");
+      const earned = staking?.interface?.find((fn) => fn.name === "earned");
+      expect(earned?.returns).toBe("i128");
+      expect(earned?.authorization).toBe("none");
+    });
+
+    it("uses only supported parameter types", () => {
+      const types = (staking?.interface ?? [])
+        .flatMap((fn) => fn.params.map((p) => p.type))
+        .filter((type): type is string => typeof type === "string");
+      for (const type of types) {
+        expect([
+          "Address",
+          "MuxedAddress",
+          "i128",
+          "u32",
+          "String",
+          "Symbol",
+        ]).toContain(type);
+      }
+    });
+
+    it("declares only name and network configuration", () => {
+      const keys = (staking?.config ?? []).map((f) => f.key);
+      expect(keys).toEqual(["name", "network"]);
+    });
+  });
+
+  describe("Catalog parameter-type invariant", () => {
+    it("every interface parameter type is a supported parameter type", () => {
+      for (const component of stellarComponents) {
+        for (const fn of component.interface ?? []) {
+          for (const param of fn.params) {
+            expect(SUPPORTED_PARAMETER_TYPES).toContain(param.type);
+          }
+        }
+      }
     });
   });
 

@@ -822,6 +822,138 @@ export const stellarComponents: StellarComponent[] = [
       cliff: "3600",
     },
   },
+
+  {
+    slug: "staking",
+    name: "Staking",
+    category: "Tokens",
+    description:
+      "A minimal single-asset staking contract: stakers deposit a SEP-41 asset, accrue rewards over time at a fixed rate funded by an admin, and claim them. Rewards are proportional to each staker's share of the pool and to the time staked.",
+    shortDescription: "Single-asset staking with time-based rewards",
+    overview:
+      "Staking is a small, stateful Soroban contract built around a single SEP-41 asset that is both staked and rewarded. An admin funds a reward pool through `fund_rewards`; from then on every staker accrues rewards continuously at a fixed rate (funded amount / duration) using the standard reward-per-token accounting, so earnings are proportional to stake size and to the time staked. Stakers `stake` and `unstake` the asset and `claim` accrued rewards; the contract holds the staked balances and the reward reserve and delegates all balance movement to the asset contract. It ships with a passing Rust test suite and runs in the local Playground sandbox.",
+    useCases: [
+      "Stake a token to earn a time-based reward yield",
+      "Fund a reward pool and let stakers accrue proportionally",
+      "Unstake partially or fully while keeping accrued rewards",
+      "Claim rewards independently of unstaking",
+    ],
+    implementation: {
+      language: "rust",
+      package: "staking",
+      sourcePath: "contracts/contracts/staking",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [
+          { name: "asset", type: "Address" },
+          { name: "duration", type: "u32" },
+        ],
+        authorization: "none",
+        description:
+          "Configures the staking pool with the SEP-41 `asset` and a reward-window `duration` in seconds. Called automatically on deploy.",
+      },
+      {
+        name: "fund_rewards",
+        params: [
+          { name: "from", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "admin",
+        description:
+          "Transfers `amount` of the asset from `from` into the reward pool and (re)starts a reward period of `duration` seconds. Admin-only.",
+      },
+      {
+        name: "stake",
+        params: [
+          { name: "from", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Stakes `amount` of the asset from `from`. Authorized by `from`. Increases the staker's balance and the pool total.",
+      },
+      {
+        name: "unstake",
+        params: [
+          { name: "from", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Claims any pending rewards for `from`, then returns up to `amount` of the staked asset to `from`. Authorized by `from`.",
+      },
+      {
+        name: "claim",
+        params: [{ name: "from", type: "Address" }],
+        returns: "i128",
+        authorization: "first-address",
+        description:
+          "Claims and transfers the rewards accrued to `from`. Authorized by `from`. Returns the amount transferred.",
+      },
+      {
+        name: "staked_balance",
+        params: [{ name: "of", type: "Address" }],
+        returns: "i128",
+        authorization: "none",
+        description: "Returns the staked balance of `of`.",
+      },
+      {
+        name: "earned",
+        params: [{ name: "of", type: "Address" }],
+        returns: "i128",
+        authorization: "none",
+        description:
+          "Returns the rewards accrued to `of` but not yet claimed.",
+      },
+      {
+        name: "total_staked",
+        params: [],
+        returns: "i128",
+        authorization: "none",
+        description: "Returns the total amount currently staked in the pool.",
+      },
+      {
+        name: "reward_rate",
+        params: [],
+        returns: "i128",
+        authorization: "none",
+        description:
+          "Returns the current reward rate (reward tokens per second).",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Staking name",
+        type: "text",
+        default: "Staking",
+      },
+      networkConfig,
+    ],
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Staking Asset",
+          symbol: "STAKE",
+        },
+        setup: [
+          { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+        ],
+      },
+    ],
+    constructorArgs: {
+      asset: "asset",
+      duration: "86400",
+    },
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+  },
 ];
 
 export const componentCategories = [
