@@ -168,9 +168,15 @@ export default function DocsPage() {
               {index < implemented.length - 1 ? ", " : ""}
             </span>
           ))}
-          . The remaining {concepts}{" "}
-          {concepts === 1 ? "entry is" : "entries are"} documented as catalog
-          concepts until their contract implementation lands.
+          {concepts > 0 ? (
+            <>
+              . The remaining {concepts}{" "}
+              {concepts === 1 ? "entry is" : "entries are"} documented as
+              catalog concepts until their contract implementation lands.
+            </>
+          ) : (
+            ". All components are implemented and executable in the local sandbox."
+          )}
         </p>
       </section>
 
@@ -237,8 +243,7 @@ export default function DocsPage() {
           section of the Playground generates a Rust example that ties the
           component&apos;s interface together with your configuration: SDK
           imports, deployment, and callable examples for every function.
-          Rust is available today; concept components show a placeholder until
-          their contract implementation lands.
+          Rust integration code is generated for every implemented component.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">

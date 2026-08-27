@@ -227,6 +227,120 @@ export default async function ComponentDetailPage({
           </section>
         )}
 
+        {component.dependencies && component.dependencies.length > 0 && (
+          <section className="mt-6">
+            <Card>
+              <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+                Dependencies
+              </h2>
+
+              <p className="mt-3 font-sans text-sm leading-relaxed text-text-secondary">
+                Contracts the sandbox provisions alongside this component so it
+                can be exercised end to end, deployed from their own catalog
+                records.
+              </p>
+
+              <ul className="mt-4 space-y-4">
+                {component.dependencies.map((dependency) => (
+                  <li
+                    key={dependency.alias}
+                    className="border-b border-border pb-4 last:border-0 last:pb-0"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <code className="font-mono text-xs text-text-primary">
+                        {dependency.alias}
+                      </code>
+
+                      <span className="font-sans text-xs text-text-secondary">
+                        &rarr; {dependency.package}
+                      </span>
+                    </div>
+
+                    {dependency.constructorArgs && (
+                      <p className="mt-2 font-mono text-xs text-text-secondary">
+                        constructor:{" "}
+                        {Object.entries(dependency.constructorArgs)
+                          .map(([key, value]) => `${key}: ${value}`)
+                          .join(", ")}
+                      </p>
+                    )}
+
+                    {dependency.setup && (
+                      <p className="mt-1 font-mono text-xs text-text-secondary">
+                        setup:{" "}
+                        {dependency.setup
+                          .map((call) => `${call.fn}(${call.args.join(", ")})`)
+                          .join(", ")}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </section>
+        )}
+
+        {component.constructorArgs &&
+          Object.keys(component.constructorArgs).length > 0 && (
+            <section className="mt-6">
+              <Card>
+                <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+                  Constructor arguments
+                </h2>
+
+                <p className="mt-3 font-sans text-sm leading-relaxed text-text-secondary">
+                  The primary constructor is seeded from the configuration above.
+                  Values may reference a configuration field, an identity name, a
+                  dependency alias, or a literal.
+                </p>
+
+                <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                  {Object.entries(component.constructorArgs).map(([key, value]) => (
+                    <div key={key}>
+                      <dt className="font-sans text-sm text-text-primary">
+                        {key}
+                      </dt>
+
+                      <dd className="mt-1 font-mono text-xs text-accent-stellar">
+                        {value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </Card>
+            </section>
+          )}
+
+        <section className="mt-6">
+          <Card>
+            <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+              Availability
+            </h2>
+
+            <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="font-sans text-sm text-text-primary">
+                  Local sandbox
+                </dt>
+
+                <dd className="mt-1 font-mono text-xs text-text-secondary">
+                  {component.capabilities.sandbox ? "Available" : "Not available"}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="font-sans text-sm text-text-primary">
+                  Stellar Testnet
+                </dt>
+
+                <dd className="mt-1 font-mono text-xs text-text-secondary">
+                  {component.capabilities.testnet ? "Available" : "Not deployed"}
+                </dd>
+              </div>
+            </dl>
+          </Card>
+        </section>
+
         <section className="mt-6">
           <Card>
             <div className="flex flex-wrap items-center justify-between gap-4">

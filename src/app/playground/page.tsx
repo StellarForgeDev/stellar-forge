@@ -11,7 +11,6 @@ import {
   stellarComponents,
   componentMaturity,
   type ConfigField,
-  type StellarComponent,
 } from "@/data/components";
 
 function subscribeToUrl(callback: () => void): () => void {
@@ -24,47 +23,6 @@ function getUrlComponentSlug(): string | null {
 }
 
 const getServerUrlComponentSlug = () => null;
-
-function buildGeneratedCode(
-  component: StellarComponent,
-  values: Record<string, string>,
-): string {
-  const header = (component.config ?? [])
-    .map((field) => `// ${field.label}: ${values[field.key]}`)
-    .join("\n");
-
-  if (!component.implementation || !component.interface) {
-    return [
-      header,
-      "",
-      "// No implemented interface spec yet.",
-      "// This component is currently a catalog concept.",
-      "// Its real interface will be defined when the contract lands.",
-    ].join("\n");
-  }
-
-  const signatures = component.interface
-    .map((fn) => {
-      const params = fn.params.map((p) => `${p.name}: ${p.type}`).join(", ");
-      const returns = fn.returns ? ` -> ${fn.returns}` : "";
-      return `    pub fn ${fn.name}(${params})${returns};`;
-    })
-    .join("\n");
-
-  return [
-    header,
-    "",
-    `// Source: ${component.implementation.sourcePath}`,
-    "",
-    `#[contract]`,
-    `pub struct ${component.name};`,
-    "",
-    "#[contractimpl]",
-    `impl ${component.name} {`,
-    signatures,
-    "}",
-  ].join("\n");
-}
 
 export default function PlaygroundPage() {
   const urlSlug = useSyncExternalStore(
@@ -82,15 +40,11 @@ export default function PlaygroundPage() {
   const [configValues, setConfigValues] = useState<Record<string, string>>(
     () => getConfigDefaults(selectedComponent),
   );
-  const [generatedCode, setGeneratedCode] = useState(() =>
-    buildGeneratedCode(selectedComponent, getConfigDefaults(selectedComponent)),
-  );
 
   if (previousSlug !== selectedSlug) {
     setPreviousSlug(selectedSlug);
     const defaults = getConfigDefaults(selectedComponent);
     setConfigValues(defaults);
-    setGeneratedCode(buildGeneratedCode(selectedComponent, defaults));
   }
 
   function selectComponent(slug: string) {
@@ -109,14 +63,8 @@ export default function PlaygroundPage() {
     setConfigValues((previous) => ({ ...previous, [key]: value }));
   }
 
-  function generatePattern() {
-    setGeneratedCode(buildGeneratedCode(selectedComponent, configValues));
-  }
-
   function resetConfiguration() {
-    const defaults = getConfigDefaults(selectedComponent);
-    setConfigValues(defaults);
-    setGeneratedCode(buildGeneratedCode(selectedComponent, defaults));
+    setConfigValues(getConfigDefaults(selectedComponent));
   }
 
   function renderConfigField(field: ConfigField) {
@@ -253,12 +201,8 @@ export default function PlaygroundPage() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button variant="primary" onClick={generatePattern}>
-                  Generate Pattern
-                </Button>
-
                 <Button variant="secondary" onClick={resetConfiguration}>
-                  Reset
+                  Reset configuration
                 </Button>
               </div>
             </Card>
@@ -271,20 +215,6 @@ export default function PlaygroundPage() {
                 configValues={configValues}
               />
             ) : null}
-
-            <Card className="font-mono text-xs">
-              <div className="flex items-center justify-between gap-4 border-b border-border pb-3">
-                <span className="text-text-secondary">
-                  Generated structure
-                </span>
-
-                <span className="text-accent-forge">Ready</span>
-              </div>
-
-              <pre className="mt-4 min-w-0 overflow-x-auto leading-relaxed text-text-secondary">
-                <code>{generatedCode}</code>
-              </pre>
-            </Card>
 
             <IntegrationPanel
               component={selectedComponent}

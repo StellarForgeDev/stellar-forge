@@ -5,10 +5,6 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import type { StellarComponent } from "@/data/components";
 import { generateIntegrationCode } from "@/lib/integration/generators";
-import {
-  INTEGRATION_LANGUAGES,
-  type IntegrationLanguage,
-} from "@/lib/integration/types";
 
 export function IntegrationPanel({
   component,
@@ -17,13 +13,12 @@ export function IntegrationPanel({
   component: StellarComponent;
   configValues: Record<string, string>;
 }) {
-  const [language, setLanguage] = useState<IntegrationLanguage>("rust");
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef<number | null>(null);
 
   const code = useMemo(
-    () => generateIntegrationCode({ component, configValues }, language),
-    [component, configValues, language],
+    () => generateIntegrationCode({ component, configValues }, "rust"),
+    [component, configValues],
   );
 
   async function copyCode() {
@@ -86,19 +81,9 @@ export function IntegrationPanel({
         <label className="block min-w-40">
           <span className="font-sans text-sm text-text-primary">Language</span>
 
-          <select
-            value={language}
-            onChange={(event) =>
-              setLanguage(event.target.value as IntegrationLanguage)
-            }
-            className="mt-2 w-full rounded-default border border-border bg-surface px-3 py-2 font-mono text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-stellar"
-          >
-            {INTEGRATION_LANGUAGES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <span className="mt-2 block w-full rounded-default border border-border bg-surface px-3 py-2 font-mono text-sm text-text-primary">
+            Rust
+          </span>
         </label>
 
         <Button variant="secondary" onClick={copyCode}>

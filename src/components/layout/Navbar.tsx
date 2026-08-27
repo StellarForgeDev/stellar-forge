@@ -30,7 +30,7 @@ export function Navbar() {
           ))}
 
           <a
-            href="https://github.com/Marvelg256/stellar-forge"
+            href="https://github.com/StellarForgeDev/stellar-forge"
             target="_blank"
             rel="noreferrer"
             className="rounded-default font-sans text-sm text-text-secondary transition-colors duration-150 ease-out hover:text-accent-stellar focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-stellar motion-reduce:transition-none"

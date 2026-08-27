@@ -44,10 +44,9 @@ export default function ComponentsPage() {
 
         <p className="mt-4 max-w-2xl font-sans text-base leading-relaxed text-text-secondary">
           Each entry below outlines a common Soroban pattern: what it does
-          and why you&apos;d reach for it. Components marked Implemented ship
-          with a real, tested Soroban contract in the contracts workspace;
-          the rest are catalog descriptions with code, docs, and playground
-          support coming in later steps.
+          and why you&apos;d reach for it. Every component ships with a real,
+          tested Soroban contract in the contracts workspace and is executable
+          in the local sandbox.
         </p>
 
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

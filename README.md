@@ -10,7 +10,7 @@ A developer platform for discovering, understanding, experimenting with, and reu
   - All eight implemented components run in the local sandbox; only `Token` and `Payment` are also deployed to Stellar Testnet.
 - Transaction flows run against real Testnet RPC, but the project is **not production/mainnet ready**.
 
-The distinction between implemented functionality and catalog concepts is maintained throughout this document and in the [Component Catalog Status](#component-catalog-status) section.
+All components in the catalog are fully implemented contracts, documented throughout this document and in the [Component Catalog Status](#component-catalog-status) section.
 
 ## Features
 

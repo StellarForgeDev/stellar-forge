@@ -571,6 +571,39 @@ describe("Component Standard v1 invariants", () => {
     });
   });
 
+  describe("Interface authorization metadata", () => {
+    const ALLOWED = ["none", "admin", "first-address"] as const;
+
+    it("declares an authorization level for every interface function", () => {
+      for (const component of stellarComponents) {
+        for (const fn of component.interface ?? []) {
+          expect(fn.authorization, `${component.slug}.${fn.name}`).toBeDefined();
+          expect(ALLOWED, `${component.slug}.${fn.name}`).toContain(
+            fn.authorization,
+          );
+        }
+      }
+    });
+
+    it("marks at least one function as admin-only across the catalog", () => {
+      const adminFns = stellarComponents.flatMap((component) =>
+        (component.interface ?? []).filter(
+          (fn) => fn.authorization === "admin",
+        ),
+      );
+      expect(adminFns.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Catalog completeness", () => {
+    it("has zero concept components (all are implemented)", () => {
+      const concepts = stellarComponents.filter(
+        (component) => component.capabilities.implemented === false,
+      );
+      expect(concepts).toHaveLength(0);
+    });
+  });
+
   describe("getConfigDefaults", () => {
     it("maps each config field key to its default value", () => {
       const token = getComponentBySlug("token")!;
