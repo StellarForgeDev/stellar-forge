@@ -6,8 +6,8 @@ A developer platform for discovering, understanding, experimenting with, and reu
 
 - **Release Candidate.**
 - Focused on **Stellar Testnet** (a Testnet + Futurenet configuration exists; no mainnet support).
-  - **Six implemented components**: the `Token` contract (deployed on Stellar Testnet), the `Payment` contract (deployed on Stellar Testnet; also sandbox-ready), the `Access Control` contract (sandbox-ready; not yet deployed to Testnet), the `Escrow` contract (sandbox-ready; not yet deployed to Testnet), the `Multi-signature` contract (sandbox-ready; not yet deployed to Testnet), and the `Subscription` contract (sandbox-ready; not yet deployed to Testnet).
-  - All six implemented components run in the local sandbox; only `Token` and `Payment` are also deployed to Stellar Testnet.
+  - **Seven implemented components**: the `Token` contract (deployed on Stellar Testnet), the `Payment` contract (deployed on Stellar Testnet; also sandbox-ready), the `Access Control` contract (sandbox-ready; not yet deployed to Testnet), the `Escrow` contract (sandbox-ready; not yet deployed to Testnet), the `Multi-signature` contract (sandbox-ready; not yet deployed to Testnet), the `Subscription` contract (sandbox-ready; not yet deployed to Testnet), and the `Vesting` contract (sandbox-ready; not yet deployed to Testnet).
+  - All seven implemented components run in the local sandbox; only `Token` and `Payment` are also deployed to Stellar Testnet.
 - Transaction flows run against real Testnet RPC, but the project is **not production/mainnet ready**.
 
 The distinction between implemented functionality and catalog concepts is maintained throughout this document and in the [Component Catalog Status](#component-catalog-status) section.
@@ -28,7 +28,7 @@ Functionality that currently exists in the repository:
 - **Integration code generator** — produces a Rust example from a component's interface and the current configuration.
 - **Documentation hub** — `src/app/docs` covering getting started, the component library, the Playground, and Integration.
 
-All six components (Token, Payment, Access Control, Escrow, Multi-signature, Subscription) are implemented contracts with a live local sandbox; only Token and Payment additionally expose a Testnet transaction flow.
+All seven components (Token, Payment, Access Control, Escrow, Multi-signature, Subscription, Vesting) are implemented contracts with a live local sandbox; only Token and Payment additionally expose a Testnet transaction flow.
 
 ## Tech Stack
 
@@ -77,6 +77,7 @@ stellar-forge/
 │   ├── contracts/
 │   │   ├── token/              SEP-41 token contract (implemented)
 │   │   ├── access-control/     Role-based authorization contract (implemented)
+│   │   ├── vesting/            Vesting/timelock contract (implemented)
 │   │   ├── greeter/            Example contract used by the generic sandbox
 │   │   └── sandbox-runner/     Native runner that executes contract WASM
 │   └── prebuilt/               Committed contract WASM (e.g. token.wasm, access-control.wasm)
@@ -134,7 +135,7 @@ This setup is **not** a statement of production/mainnet readiness.
 
 ## Component Catalog Status
 
-- **Token**, **Payment**, **Access Control**, **Escrow**, **Multi-signature**, and **Subscription** are the implemented components. `Token` is a standard SEP-41 fungible token contract **deployed on Stellar Testnet** (address registered in `src/lib/transactions/deployments.ts`); it supports local sandbox execution and real Testnet simulation/submission. `Payment` is a stateless `pay` primitive **deployed on Stellar Testnet** via the generic dependency mechanism; it also runs in the local sandbox. `Access Control`, `Escrow`, `Multi-signature`, and `Subscription` run in the local sandbox but are **not** yet deployed to Testnet (`testnet` is `false`).
+- **Token**, **Payment**, **Access Control**, **Escrow**, **Multi-signature**, **Subscription**, and **Vesting** are the implemented components. `Token` is a standard SEP-41 fungible token contract **deployed on Stellar Testnet** (address registered in `src/lib/transactions/deployments.ts`); it supports local sandbox execution and real Testnet simulation/submission. `Payment` is a stateless `pay` primitive **deployed on Stellar Testnet** via the generic dependency mechanism; it also runs in the local sandbox. `Access Control`, `Escrow`, `Multi-signature`, `Subscription`, and `Vesting` run in the local sandbox but are **not** yet deployed to Testnet (`testnet` is `false`).
   - Every catalog entry is an implemented contract; the catalog also documents each component's patterns, use cases, and configuration.
 
 ## Roadmap
@@ -166,7 +167,7 @@ No features beyond the above are implied or promised.
 ## Known Limitations
 
 - **Testnet-focused.** The configuration targets Stellar Testnet (and Futurenet); mainnet is not supported.
-  - **Six implemented components.** `Token` and `Payment` are deployed on Stellar Testnet; `Access Control`, `Escrow`, `Multi-signature`, and `Subscription` are sandbox-ready but not yet deployed to Testnet (`testnet` is `false`).
+  - **Seven implemented components.** `Token` and `Payment` are deployed on Stellar Testnet; `Access Control`, `Escrow`, `Multi-signature`, `Subscription`, and `Vesting` are sandbox-ready but not yet deployed to Testnet (`testnet` is `false`).
 - **Transactions documentation is incomplete.** There is no dedicated Transactions documentation page yet.
   - **Web application test suite is growing.** A Vitest suite covers the catalog, identity, parameter, dependency, authorization, and integration-generation machinery; Rust contract unit tests also exist.
 - **Vercel sandbox execution path requires end-to-end verification.**

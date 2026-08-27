@@ -717,6 +717,111 @@ export const stellarComponents: StellarComponent[] = [
     },
     capabilities: { implemented: true, sandbox: true, testnet: false },
   },
+  {
+    slug: "vesting",
+    name: "Vesting",
+    category: "Tokens",
+    description:
+      "Custodies a SEP-41 token on behalf of a single beneficiary and releases it linearly over a time window that begins a configurable offset after deployment, after an initial cliff, across a total duration. Useful for token grants, founder unlocks, and scheduled payouts. Fits the generic pipeline: time stays internal contract state, the asset is a flat token dependency, and the beneficiary is the first Address constructor argument, so no component-specific code is required. The contract is funded via a `deposit` call (authorized by the sender) before claims begin.",
+    shortDescription: "Time-locked token vesting",
+    overview:
+      "Vesting is a small, stateful Soroban contract. It custodies a SEP-41 asset on behalf of a single beneficiary and releases the balance linearly over a schedule defined by a start offset, a cliff, and a duration — all relative to deployment time. The asset lives in a separate SEP-41 contract; Vesting delegates balance movement to it, exactly like the Escrow and Payment components. It ships with a passing Rust test suite and runs in the local Playground sandbox.",
+    useCases: [
+      "Release tokens to a beneficiary on a linear vesting schedule",
+      "Enforce a cliff before any amount becomes claimable",
+      "Model token grants, founder unlocks, or scheduled payouts",
+      "Query the currently claimable and already-released amounts",
+    ],
+    implementation: {
+      language: "rust",
+      package: "vesting",
+      sourcePath: "contracts/contracts/vesting",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [
+          { name: "beneficiary", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "total", type: "i128" },
+          { name: "start", type: "u32" },
+          { name: "duration", type: "u32" },
+          { name: "cliff", type: "u32" },
+        ],
+        authorization: "none",
+        description:
+          "Configures the vesting schedule. `start`, `duration`, and `cliff` are seconds; `start` is relative to deployment, while `cliff` and `duration` are relative to `start`.",
+      },
+      {
+        name: "deposit",
+        params: [
+          { name: "from", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Funds the contract by moving `amount` of the held asset from `from` into the contract. Authorized by `from`.",
+      },
+      {
+        name: "claim",
+        params: [{ name: "beneficiary", type: "Address" }],
+        authorization: "first-address",
+        returns: "i128",
+        description:
+          "Releases the currently vested (and unclaimed) amount to the beneficiary. Authorized by the beneficiary. Returns the amount transferred; returns 0 before the cliff or when nothing is vested.",
+      },
+      {
+        name: "claimable",
+        params: [],
+        authorization: "none",
+        returns: "i128",
+        description:
+          "Reports the amount currently vested and not yet claimed, based on the ledger time.",
+      },
+      {
+        name: "released",
+        params: [],
+        authorization: "none",
+        returns: "i128",
+        description:
+          "Reports the total amount already claimed by the beneficiary.",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Vesting name",
+        type: "text",
+        default: "Vesting",
+      },
+      networkConfig,
+    ],
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Vesting Asset",
+          symbol: "VEST",
+        },
+        setup: [
+          { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+        ],
+      },
+    ],
+    constructorArgs: {
+      beneficiary: "beneficiary",
+      asset: "asset",
+      total: "1000000",
+      start: "0",
+      duration: "86400",
+      cliff: "3600",
+    },
+  },
 ];
 
 export const componentCategories = [

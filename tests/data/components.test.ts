@@ -372,6 +372,105 @@ describe("Component Standard v1 invariants", () => {
     });
   });
 
+  describe("Vesting (seventh implemented component)", () => {
+    const vesting = getComponentBySlug("vesting")!;
+
+    it("is implemented, sandbox-ready, and not on Testnet", () => {
+      expect(vesting?.capabilities).toEqual({
+        implemented: true,
+        sandbox: true,
+        testnet: false,
+      });
+    });
+
+    it("declares a token asset dependency aliased 'asset'", () => {
+      const dependencies = vesting?.dependencies ?? [];
+      expect(dependencies).toHaveLength(1);
+      const asset = dependencies[0];
+      expect(asset.alias).toBe("asset");
+      expect(asset.package).toBe("token");
+      expect(asset.constructorArgs).toMatchObject({ admin: "admin" });
+      expect(asset.setup).toEqual([
+        { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+      ]);
+    });
+
+    it("declares a novel beneficiary identity as a constructor default", () => {
+      const constructor = vesting?.constructorArgs ?? {};
+      expect(constructor.beneficiary).toBe("beneficiary");
+      expect(constructor.asset).toBe("asset");
+      expect(constructor.total).toBe("1000000");
+      expect(constructor.start).toBe("0");
+      expect(constructor.duration).toBe("86400");
+      expect(constructor.cliff).toBe("3600");
+    });
+
+    it("exposes an interface matching the contract", () => {
+      const names = (vesting?.interface ?? []).map((fn) => fn.name);
+      expect(names).toEqual([
+        "__constructor",
+        "deposit",
+        "claim",
+        "claimable",
+        "released",
+      ]);
+      const ctor = vesting?.interface?.find(
+        (fn) => fn.name === "__constructor",
+      );
+      expect(ctor?.params.map((p) => p.name)).toEqual([
+        "beneficiary",
+        "asset",
+        "total",
+        "start",
+        "duration",
+        "cliff",
+      ]);
+      expect(ctor?.params.map((p) => p.type)).toEqual([
+        "Address",
+        "Address",
+        "i128",
+        "u32",
+        "u32",
+        "u32",
+      ]);
+      const claim = vesting?.interface?.find((fn) => fn.name === "claim");
+      expect(claim?.params.map((p) => p.name)).toEqual(["beneficiary"]);
+      expect(claim?.params.map((p) => p.type)).toEqual(["Address"]);
+      expect(claim?.authorization).toBe("first-address");
+      const claimable = vesting?.interface?.find(
+        (fn) => fn.name === "claimable",
+      );
+      expect(claimable?.returns).toBe("i128");
+      expect(claimable?.authorization).toBe("none");
+      const released = vesting?.interface?.find(
+        (fn) => fn.name === "released",
+      );
+      expect(released?.returns).toBe("i128");
+      expect(released?.authorization).toBe("none");
+    });
+
+    it("uses only supported parameter types", () => {
+      const types = (vesting?.interface ?? [])
+        .flatMap((fn) => fn.params.map((p) => p.type))
+        .filter((type): type is string => typeof type === "string");
+      for (const type of types) {
+        expect([
+          "Address",
+          "MuxedAddress",
+          "i128",
+          "u32",
+          "String",
+          "Symbol",
+        ]).toContain(type);
+      }
+    });
+
+    it("declares only name and network configuration", () => {
+      const keys = (vesting?.config ?? []).map((f) => f.key);
+      expect(keys).toEqual(["name", "network"]);
+    });
+  });
+
   describe("getConfigDefaults", () => {
     it("maps each config field key to its default value", () => {
       const token = getComponentBySlug("token")!;

@@ -1402,4 +1402,157 @@ mod tests {
             Some(false)
         );
     }
+
+    #[test]
+    fn vesting_executes_generically() {
+        // End-to-end boundary for the Vesting component's generic support:
+        //   Vesting -> asset dependency (alias "asset") -> dependency
+        //   provisioning -> Vesting deployment (asset passed into the
+        //   constructor) -> deposit (first-address funding) -> time-gated claim.
+        // The contract custodies the asset and releases it linearly from an
+        // internal Timepoint schedule; no Vesting-specific runner code exists.
+        // The runner cannot advance ledger time, so the pre-cliff state is
+        // demonstrated (claim returns 0); the full timeline is covered by the
+        // contract's own Rust test suite. Skips when the wasm artifacts are not
+        // built (CI's Rust job does not run the Stellar CLI).
+        let vesting_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/vesting.wasm"
+        );
+        if !std::path::Path::new(vesting_wasm).exists() {
+            return;
+        }
+        let token_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/token.wasm"
+        );
+        if !std::path::Path::new(token_wasm).exists() {
+            return;
+        }
+        let env = Env::default();
+        use soroban_sdk::testutils::Address as _;
+        let admin = Address::generate(&env);
+        let beneficiary = Address::generate(&env);
+        let intruder = Address::generate(&env);
+        let strkey = |a: &Address| -> std::string::String {
+            std::string::String::from_utf8(a.to_string().to_bytes().to_alloc_vec()).unwrap()
+        };
+        let request = json!({
+            "wasmPath": vesting_wasm,
+            "constructorParams": [
+                { "name": "beneficiary", "type": "Address" },
+                { "name": "asset", "type": "Address" },
+                { "name": "total", "type": "i128" },
+                { "name": "start", "type": "u32" },
+                { "name": "duration", "type": "u32" },
+                { "name": "cliff", "type": "u32" },
+            ],
+            "constructor": {
+                "beneficiary": "beneficiary",
+                "asset": "asset",
+                "total": "1000000",
+                "start": "0",
+                "duration": "86400",
+                "cliff": "3600",
+            },
+            "identities": {
+                "admin": strkey(&admin),
+                "beneficiary": strkey(&beneficiary),
+                "intruder": strkey(&intruder),
+            },
+            "dependencies": [
+                {
+                    "alias": "asset",
+                    "wasmPath": token_wasm,
+                    "constructorParams": [
+                        { "name": "admin", "type": "Address" },
+                        { "name": "decimal", "type": "u32" },
+                        { "name": "name", "type": "String" },
+                        { "name": "symbol", "type": "String" },
+                    ],
+                    "constructor": {
+                        "admin": "admin",
+                        "decimal": "7",
+                        "name": "Vesting Asset",
+                        "symbol": "VEST",
+                    },
+                    "setup": [
+                        {
+                            "fn": "mint",
+                            "params": [
+                                { "name": "to", "type": "Address" },
+                                { "name": "amount", "type": "i128" },
+                            ],
+                            "args": ["admin", "1000000"],
+                            "signer": "admin",
+                        }
+                    ],
+                }
+            ],
+            "calls": [
+                {
+                    "fn": "deposit",
+                    "params": [
+                        { "name": "from", "type": "Address" },
+                        { "name": "amount", "type": "i128" },
+                    ],
+                    "args": ["admin", "1000000"],
+                    "signer": "admin",
+                },
+                {
+                    "fn": "claimable",
+                    "params": [],
+                    "args": [],
+                },
+                {
+                    "fn": "released",
+                    "params": [],
+                    "args": [],
+                },
+                {
+                    "fn": "claim",
+                    "params": [{ "name": "beneficiary", "type": "Address" }],
+                    "args": ["beneficiary"],
+                    "signer": "beneficiary",
+                },
+                {
+                    "fn": "claim",
+                    "params": [{ "name": "beneficiary", "type": "Address" }],
+                    "args": ["intruder"],
+                    "signer": "intruder",
+                },
+            ],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 5);
+        // deposit: funded the contract.
+        assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
+        // claimable before cliff: 0.
+        assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[1].get("result").and_then(Value::as_i64),
+            Some(0)
+        );
+        // released before any claim: 0.
+        assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[2].get("result").and_then(Value::as_i64),
+            Some(0)
+        );
+        // claim by the beneficiary before cliff: returns 0 (no transfer).
+        assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            calls[3].get("result").and_then(Value::as_i64),
+            Some(0)
+        );
+        // claim by an intruder: rejected by the stored-beneficiary check.
+        assert_eq!(calls[4].get("ok").and_then(Value::as_bool), Some(false));
+    }
 }
