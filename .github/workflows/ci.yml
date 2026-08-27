@@ -52,7 +52,7 @@ jobs:
           targets: wasm32v1-none
 
       - name: Install Stellar CLI
-        run: curl -sSf https://stellar.tools/install-stellar-cli.sh | sh -s -- -b "$HOME/.local/bin"
+        run: curl -sSf https://stellar.tools/install-stellar-cli.sh | bash -s -- -b "$HOME/.local/bin"
 
       - name: Add Stellar CLI to PATH
         run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
