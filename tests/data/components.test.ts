@@ -7,6 +7,8 @@ import {
   getConfigDefaults,
   stellarComponents,
 } from "@/data/components";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { SUPPORTED_PARAMETER_TYPES } from "@/lib/transactions/parameter-types";
 
 const CONCEPT_SLUGS: string[] = [];
@@ -601,6 +603,38 @@ describe("Component Standard v1 invariants", () => {
         (component) => component.capabilities.implemented === false,
       );
       expect(concepts).toHaveLength(0);
+    });
+  });
+
+  describe("Prebuilt WASM artifact integrity", () => {
+    it("exposes a committed prebuilt wasm for every implemented component", () => {
+      const missing: string[] = [];
+
+      for (const component of stellarComponents) {
+        if (!component.capabilities.implemented) continue;
+
+        const pkg = component.implementation?.package;
+        expect(
+          pkg,
+          `component ${component.slug} should declare implementation.package`,
+        ).toBeDefined();
+
+        const wasmPath = path.resolve(
+          process.cwd(),
+          "contracts",
+          "prebuilt",
+          `${pkg}.wasm`,
+        );
+
+        if (!existsSync(wasmPath)) {
+          missing.push(`${component.slug} -> ${pkg}.wasm`);
+        }
+      }
+
+      expect(
+        missing,
+        `missing committed prebuilt wasm: ${missing.join(", ")}`,
+      ).toEqual([]);
     });
   });
 

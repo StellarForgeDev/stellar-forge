@@ -40,17 +40,26 @@ jobs:
         run: pnpm build
 
   rust:
-    name: Rust (contract tests)
+    name: Rust (contract tests + sandbox build)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: contracts
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none
+
+      - name: Install Stellar CLI
+        run: curl -sSf https://stellar.tools/install-stellar-cli.sh | sh -s -- -b "$HOME/.local/bin"
+
+      - name: Add Stellar CLI to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run contract tests
-        run: cargo test -p token -p sandbox-runner
+        working-directory: contracts
+        run: cargo test
+
+      - name: Build sandbox runner + contract wasm
+        run: node scripts/sandbox-build.mjs
