@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { InterfaceReference } from "@/components/docs/InterfaceReference";
 import { Card } from "@/components/ui/Card";
+import { StateBadge } from "@/components/ui/StateBadge";
+import { LinkButton } from "@/components/ui/LinkButton";
 import {
   getComponentBySlug,
   stellarComponents,
@@ -55,21 +57,29 @@ export default async function ComponentDetailPage({
         </div>
 
         <div className="mt-8">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
-              {component.category}
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+                {component.category}
+              </span>
 
-            <span
-              className={`rounded-default border px-2 py-1 font-mono text-xs ${
-                component.capabilities.implemented
-                  ? "border-accent-stellar/60 text-accent-stellar"
-                  : "border-border text-text-secondary"
-              }`}
-            >
-              {componentMaturity(component)}
-            </span>
-          </div>
+              <div className="flex flex-wrap gap-1.5">
+                <StateBadge
+                  tone={component.capabilities.sandbox ? "local" : "neutral"}
+                >
+                  Sandbox
+                </StateBadge>
+                <StateBadge
+                  tone={component.capabilities.testnet ? "testnet" : "neutral"}
+                >
+                  Testnet
+                </StateBadge>
+                {component.interface?.length ? (
+                  <StateBadge tone="neutral">
+                    {component.interface.length} fns
+                  </StateBadge>
+                ) : null}
+              </div>
+            </div>
 
           <h1 className="mt-4 font-display text-4xl font-medium leading-tight text-text-primary sm:text-5xl">
             {component.name}
@@ -154,7 +164,11 @@ export default async function ComponentDetailPage({
                   function is a callable operation.
                 </p>
 
-                <InterfaceReference functions={interfaceFns} />
+                <InterfaceReference
+                  functions={interfaceFns}
+                  componentSlug={component.slug}
+                  methodAction
+                />
               </Card>
             )}
 
@@ -360,12 +374,12 @@ export default async function ComponentDetailPage({
                 </p>
               </div>
 
-              <Link
+              <LinkButton
                 href={`/playground?component=${encodeURIComponent(component.slug)}`}
-                className="rounded-default border border-accent-stellar px-4 py-2 font-mono text-xs text-accent-stellar transition-colors hover:bg-accent-stellar/10"
+                variant="secondary"
               >
                 Open Playground →
-              </Link>
+              </LinkButton>
             </div>
           </Card>
         </section>

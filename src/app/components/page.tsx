@@ -8,17 +8,26 @@ import {
   componentMaturity,
 } from "@/data/components";
 
+const capabilityFilters = ["All", "Sandbox", "Testnet"] as const;
+type CapabilityFilter = (typeof capabilityFilters)[number];
+
 export default function ComponentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCapability, setSelectedCapability] =
+    useState<CapabilityFilter>("All");
 
   const filteredComponents = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
     return stellarComponents.filter((component) => {
       const matchesCategory =
-        selectedCategory === "All" ||
-        component.category === selectedCategory;
+        selectedCategory === "All" || component.category === selectedCategory;
+
+      const matchesCapability =
+        selectedCapability === "All" ||
+        (selectedCapability === "Sandbox" && component.capabilities.sandbox) ||
+        (selectedCapability === "Testnet" && component.capabilities.testnet);
 
       const matchesSearch =
         query.length === 0 ||
@@ -27,9 +36,9 @@ export default function ComponentsPage() {
         component.description.toLowerCase().includes(query) ||
         component.category.toLowerCase().includes(query);
 
-      return matchesCategory && matchesSearch;
+      return matchesCategory && matchesCapability && matchesSearch;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, selectedCapability]);
 
   return (
     <main className="flex-1">
@@ -39,14 +48,11 @@ export default function ComponentsPage() {
         </p>
 
         <h1 className="font-display text-3xl font-medium text-text-primary sm:text-4xl">
-          Reusable Stellar &amp; Soroban building blocks
+          Soroban Components
         </h1>
 
         <p className="mt-4 max-w-2xl font-sans text-base leading-relaxed text-text-secondary">
-          Each entry below outlines a common Soroban pattern: what it does
-          and why you&apos;d reach for it. Every component ships with a real,
-          tested Soroban contract in the contracts workspace and is executable
-          in the local sandbox.
+          Reusable building blocks you can inspect, run locally, and integrate.
         </p>
 
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -82,18 +88,47 @@ export default function ComponentsPage() {
           </div>
         </div>
 
+        <div className="mt-4 flex flex-wrap gap-2">
+          {capabilityFilters.map((capability) => {
+            const isSelected = selectedCapability === capability;
+
+            return (
+              <button
+                key={capability}
+                type="button"
+                onClick={() => setSelectedCapability(capability)}
+                aria-pressed={isSelected}
+                className={`rounded-default border px-3 py-1 font-mono text-xs transition-colors duration-200 motion-reduce:transition-none ${
+                  isSelected
+                    ? "border-accent-stellar text-accent-stellar"
+                    : "border-border text-text-secondary hover:border-accent-stellar/60 hover:text-accent-stellar"
+                }`}
+              >
+                {capability === "Sandbox"
+                  ? "Sandbox-ready"
+                  : capability === "Testnet"
+                    ? "Testnet-deployed"
+                    : "All"}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="mt-6 flex items-center justify-between">
           <p className="font-mono text-xs text-text-secondary">
             {filteredComponents.length}{" "}
             {filteredComponents.length === 1 ? "component" : "components"}
           </p>
 
-          {(searchQuery || selectedCategory !== "All") && (
+          {(searchQuery ||
+            selectedCategory !== "All" ||
+            selectedCapability !== "All") && (
             <button
               type="button"
               onClick={() => {
                 setSearchQuery("");
                 setSelectedCategory("All");
+                setSelectedCapability("All");
               }}
               className="font-mono text-xs text-text-secondary transition-colors hover:text-accent-stellar"
             >
@@ -108,21 +143,26 @@ export default function ComponentsPage() {
               <ComponentCard
                 key={component.slug}
                 name={component.name}
-                description={component.description}
+                description={component.shortDescription}
                 category={component.category}
                 status={componentMaturity(component)}
                 href={`/components/${component.slug}`}
+                capabilities={component.capabilities}
+                functionCount={component.interface?.length ?? 0}
+                functions={component.interface}
+                expandable
+                playgroundSlug={component.slug}
               />
             ))}
           </div>
         ) : (
           <div className="mt-6 rounded-default border border-border bg-surface p-8 text-center">
             <p className="font-display text-lg font-medium text-text-primary">
-              No components found.
+              No components match this filter.
             </p>
 
             <p className="mt-2 font-sans text-sm text-text-secondary">
-              Try a different search term or category.
+              Try another capability or category.
             </p>
 
             <button
@@ -130,6 +170,7 @@ export default function ComponentsPage() {
               onClick={() => {
                 setSearchQuery("");
                 setSelectedCategory("All");
+                setSelectedCapability("All");
               }}
               className="mt-5 font-mono text-xs text-accent-stellar hover:underline"
             >

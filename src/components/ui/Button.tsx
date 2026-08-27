@@ -1,9 +1,10 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-type ButtonVariant = "primary" | "secondary" | "ghost";
+export type ButtonVariant = "primary" | "secondary" | "ghost";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  loading?: boolean;
   children: ReactNode;
 }
 
@@ -32,19 +33,57 @@ const variantStyles: Record<ButtonVariant, string> = {
     "bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface active:bg-surface/80",
 };
 
+/** Shared class builder so `LinkButton` and `Button` stay in lockstep. */
+export function buttonClasses(
+  variant: ButtonVariant = "primary",
+  className = "",
+): string {
+  return [baseStyles, variantStyles[variant], className].filter(Boolean).join(" ");
+}
+
+function Spinner() {
+  return (
+    <svg
+      className="h-4 w-4 animate-spin motion-reduce:animate-none"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
+      />
+    </svg>
+  );
+}
+
 export function Button({
   variant = "primary",
+  loading = false,
   className = "",
   children,
+  disabled,
   ...props
 }: ButtonProps) {
+  const isDisabled = disabled || loading;
+
   return (
     <button
-      className={[baseStyles, variantStyles[variant], className]
-        .filter(Boolean)
-        .join(" ")}
+      className={buttonClasses(variant, className)}
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
       {...props}
     >
+      {loading && <Spinner />}
       {children}
     </button>
   );

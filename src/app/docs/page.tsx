@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { ComponentCard } from "@/components/catalog/ComponentCard";
-import { stellarComponents, componentMaturity } from "@/data/components";
-
-const ctaLink =
-  "rounded-default border border-accent-stellar px-4 py-2 font-mono text-xs text-accent-stellar transition-colors hover:bg-accent-stellar/10";
+import { LinkButton } from "@/components/ui/LinkButton";
+import { stellarComponents } from "@/data/components";
 
 const textLink =
   "inline-flex font-mono text-xs text-accent-stellar hover:underline";
@@ -60,13 +58,13 @@ export default function DocsPage() {
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/components" className={ctaLink}>
+          <LinkButton href="/components" variant="secondary">
             Browse components →
-          </Link>
+          </LinkButton>
 
-          <Link href="/playground" className={ctaLink}>
+          <LinkButton href="/playground" variant="secondary">
             Open the playground →
-          </Link>
+          </LinkButton>
         </div>
       </header>
 
@@ -143,14 +141,27 @@ export default function DocsPage() {
 
           <Step number="06" title="Generate an integration example">
             <p>
-              The Playground&apos;s Integration section generates a Rust
-              example from the selected component&apos;s interface and your
-              configuration, an honest starting point to adapt, not an
+              The Playground&apos;s Integration section generates a Rust or
+              TypeScript example from the selected component&apos;s interface
+              and your configuration, an honest starting point to adapt, not an
               opaque abstraction.
             </p>
 
             <Link href="/docs#integration" className={textLink}>
               Jump to the Integration section ↓
+            </Link>
+          </Step>
+
+          <Step number="07" title="Go on-chain with the Transaction Builder">
+            <p>
+              When you are ready to execute, the Transaction Builder takes a
+              component from simulation to a real Stellar Testnet transaction:
+              build and simulate, sign with Freighter, then submit. It covers
+              funding, signing, fees, authorization, and common failures.
+            </p>
+
+            <Link href="/docs/transactions" className={textLink}>
+              Read the Transactions guide →
             </Link>
           </Step>
         </ol>
@@ -197,9 +208,10 @@ export default function DocsPage() {
               name={component.name}
               description={component.shortDescription}
               category={component.category}
-              status={componentMaturity(component)}
               href={`/docs/components/${component.slug}`}
               cta="View documentation"
+              capabilities={component.capabilities}
+              functionCount={component.interface?.length ?? 0}
             />
           ))}
         </div>
@@ -223,13 +235,13 @@ export default function DocsPage() {
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/playground" className={ctaLink}>
+          <LinkButton href="/playground" variant="secondary">
             Open the Playground →
-          </Link>
+          </LinkButton>
 
-          <Link href="/playground?component=token" className={ctaLink}>
+          <LinkButton href="/playground?component=token" variant="secondary">
             Start with Token →
-          </Link>
+          </LinkButton>
         </div>
       </section>
 
@@ -240,20 +252,45 @@ export default function DocsPage() {
 
         <p className="mt-3 max-w-2xl font-sans text-sm leading-7 text-text-secondary">
           When a component makes sense for your project, the Integration
-          section of the Playground generates a Rust example that ties the
-          component&apos;s interface together with your configuration: SDK
-          imports, deployment, and callable examples for every function.
-          Rust integration code is generated for every implemented component.
+          section of the Playground generates a Rust or TypeScript example that
+          ties the component&apos;s interface together with your configuration:
+          SDK imports, deployment, and callable examples for every function.
+          Integration code is generated for every implemented component, in both
+          languages.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/playground?component=token" className={ctaLink}>
+          <LinkButton href="/playground?component=token" variant="secondary">
             Try it with Token →
-          </Link>
+          </LinkButton>
 
-          <Link href="/playground" className={ctaLink}>
+          <LinkButton href="/playground" variant="secondary">
             Open the Playground →
-          </Link>
+          </LinkButton>
+        </div>
+      </section>
+
+      <section id="on-chain" className="mt-16">
+        <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+          05 / On-chain transactions
+        </h2>
+
+        <p className="mt-3 max-w-2xl font-sans text-sm leading-7 text-text-secondary">
+          Once you understand a component, the Transaction Builder takes it the
+          rest of the way: build and simulate against Stellar Testnet, sign with
+          Freighter, and submit. It documents the full lifecycle — funding with
+          Friendbot, read-only vs state-changing calls, authorization, fees,
+          expiration, and common failures.
+        </p>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <LinkButton href="/docs/transactions" variant="secondary">
+            Read the Transactions guide →
+          </LinkButton>
+
+          <LinkButton href="/transactions" variant="secondary">
+            Open the Transaction Builder →
+          </LinkButton>
         </div>
       </section>
     </main>

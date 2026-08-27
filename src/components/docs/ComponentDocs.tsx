@@ -2,19 +2,10 @@ import Link from "next/link";
 import { CodeBlock } from "@/components/docs/CodeBlock";
 import { InterfaceReference } from "@/components/docs/InterfaceReference";
 import { Card } from "@/components/ui/Card";
+import { StateBadge } from "@/components/ui/StateBadge";
+import { LinkButton } from "@/components/ui/LinkButton";
 import type { StellarComponent } from "@/data/components";
-import { componentMaturity } from "@/data/components";
 import { buildConfigSnippet } from "@/lib/docs/snippets";
-
-const ctaLink =
-  "rounded-default border border-accent-stellar px-4 py-2 font-mono text-xs text-accent-stellar transition-colors hover:bg-accent-stellar/10";
-
-const statusBadge = (implemented: boolean) =>
-  `rounded-default border px-2 py-1 font-mono text-xs ${
-    implemented
-      ? "border-accent-stellar/60 text-accent-stellar"
-      : "border-border text-text-secondary"
-  }`;
 
 export function ComponentDocs({
   component,
@@ -52,9 +43,23 @@ export function ComponentDocs({
             {component.category}
           </span>
 
-          <span className={statusBadge(component.capabilities.implemented)}>
-            {componentMaturity(component)}
-          </span>
+          <div className="flex flex-wrap gap-1.5">
+            <StateBadge
+              tone={component.capabilities.sandbox ? "local" : "neutral"}
+            >
+              Sandbox
+            </StateBadge>
+            <StateBadge
+              tone={component.capabilities.testnet ? "testnet" : "neutral"}
+            >
+              Testnet
+            </StateBadge>
+            {component.interface?.length ? (
+              <StateBadge tone="neutral">
+                {component.interface.length} fns
+              </StateBadge>
+            ) : null}
+          </div>
         </div>
 
         <h1 className="mt-4 font-display text-4xl font-medium leading-tight text-text-primary sm:text-5xl">
@@ -66,7 +71,59 @@ export function ComponentDocs({
         </p>
       </div>
 
-      <section className="mt-12">
+      {(() => {
+        const sections = [
+          { id: "overview", label: "Overview", show: true },
+          {
+            id: "use-cases",
+            label: "Use cases",
+            show: component.useCases.length > 0,
+          },
+          { id: "implementation", label: "Implementation", show: hasImplementation },
+          { id: "contract-interface", label: "Contract interface", show: hasInterface },
+          {
+            id: "dependencies",
+            label: "Dependencies",
+            show: (component.dependencies?.length ?? 0) > 0,
+          },
+          {
+            id: "constructor-arguments",
+            label: "Constructor arguments",
+            show:
+              component.constructorArgs != null &&
+              Object.keys(component.constructorArgs).length > 0,
+          },
+          { id: "availability", label: "Availability", show: true },
+          { id: "configuration", label: "Configuration", show: config.length > 0 },
+        ].filter((section) => section.show);
+
+        if (sections.length < 2) return null;
+
+        return (
+          <nav aria-label="On this page" className="mt-10">
+            <Card>
+              <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
+                On this page
+              </p>
+
+              <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+                {sections.map((section) => (
+                  <li key={section.id}>
+                    <a
+                      href={`#${section.id}`}
+                      className="font-sans text-sm text-text-secondary transition-colors hover:text-accent-stellar"
+                    >
+                      {section.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </nav>
+        );
+      })()}
+
+      <section id="overview" className="mt-12">
         <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
           Overview
         </h2>
@@ -77,10 +134,10 @@ export function ComponentDocs({
       </section>
 
       {component.useCases.length > 0 && (
-        <section className="mt-10">
-          <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
-            Use cases
-          </h2>
+          <section id="use-cases" className="mt-10">
+            <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+              Use cases
+            </h2>
 
           <ol className="mt-4 space-y-2">
             {component.useCases.map((useCase, index) => (
@@ -101,10 +158,10 @@ export function ComponentDocs({
       {isImplemented ? (
         <>
           {hasImplementation && (
-            <section className="mt-10">
-              <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
-                Implementation
-              </h2>
+              <section id="implementation" className="mt-10">
+                <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+                  Implementation
+                </h2>
 
               <Card className="mt-4">
                 <dl className="grid gap-4 sm:grid-cols-2">
@@ -148,10 +205,10 @@ export function ComponentDocs({
           )}
 
           {hasInterface && (
-            <section className="mt-10">
-              <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
-                Contract interface
-              </h2>
+              <section id="contract-interface" className="mt-10">
+                <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+                  Contract interface
+                </h2>
 
               <p className="mt-3 max-w-2xl font-sans text-sm leading-relaxed text-text-secondary">
                 The interface exposed by the implementation.{" "}
@@ -161,7 +218,11 @@ export function ComponentDocs({
               </p>
 
               <Card className="mt-4">
-                <InterfaceReference functions={interfaceFns} />
+                <InterfaceReference
+                  functions={interfaceFns}
+                  componentSlug={component.slug}
+                  methodAction
+                />
               </Card>
             </section>
           )}
@@ -187,10 +248,10 @@ export function ComponentDocs({
       )}
 
       {component.dependencies && component.dependencies.length > 0 && (
-        <section className="mt-10">
-          <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
-            Dependencies
-          </h2>
+          <section id="dependencies" className="mt-10">
+            <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+              Dependencies
+            </h2>
 
           <p className="mt-3 max-w-2xl font-sans text-sm leading-relaxed text-text-secondary">
             Contracts the sandbox provisions alongside this component so it can
@@ -242,7 +303,7 @@ export function ComponentDocs({
 
       {component.constructorArgs &&
         Object.keys(component.constructorArgs).length > 0 && (
-          <section className="mt-10">
+          <section id="constructor-arguments" className="mt-10">
             <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
               Constructor arguments
             </h2>
@@ -273,7 +334,7 @@ export function ComponentDocs({
           </section>
         )}
 
-      <section className="mt-10">
+      <section id="availability" className="mt-10">
         <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
           Availability
         </h2>
@@ -308,10 +369,10 @@ export function ComponentDocs({
       </section>
 
       {config.length > 0 && (
-        <section className="mt-10">
-          <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
-            Configuration
-          </h2>
+          <section id="configuration" className="mt-10">
+            <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+              Configuration
+            </h2>
 
           <p className="mt-3 max-w-2xl font-sans text-sm leading-relaxed text-text-secondary">
             The configuration fields this component accepts, with their default
@@ -371,12 +432,12 @@ export function ComponentDocs({
               </p>
             </div>
 
-            <Link
+            <LinkButton
               href={`/playground?component=${encodeURIComponent(component.slug)}`}
-              className={ctaLink}
+              variant="secondary"
             >
               Open in Playground →
-            </Link>
+            </LinkButton>
           </div>
         </Card>
       </section>

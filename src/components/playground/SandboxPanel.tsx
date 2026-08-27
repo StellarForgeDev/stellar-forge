@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { StateBadge } from "@/components/ui/StateBadge";
+import { ExecutionTimeline } from "@/components/playground/ExecutionTimeline";
 import type { FunctionSpec, StellarComponent } from "@/data/components";
 import { postPlaygroundRequest } from "@/lib/playground/client";
 import {
@@ -15,7 +17,7 @@ import {
   playgroundIdentityOptions,
   signerFor,
 } from "@/lib/playground/execution";
-import type { ExecutionStep } from "@/lib/playground/types";
+import type { ExecutionStep, PlaygroundResult } from "@/lib/playground/types";
 
 const INTEGER_PATTERN = /^-?\d+$/;
 const DECIMAL_PATTERN = /^\d+$/;
@@ -23,48 +25,10 @@ const I128_MIN = BigInt("-170141183460469231731687303715884105728");
 const I128_MAX = BigInt("170141183460469231731687303715884105727");
 const U32_MAX = BigInt("4294967295");
 
-const STATUS_STYLES: Record<ExecutionStep["status"], string> = {
-  pending: "border-border text-text-secondary",
-  ok: "border-accent-stellar/40 text-accent-stellar",
-  "contract-error": "border-accent-forge/60 text-accent-forge",
-  "runner-error": "border-accent-forge/60 text-accent-forge",
-  "api-error": "border-accent-forge/60 text-accent-forge",
-};
-
-const STATUS_LABELS: Record<ExecutionStep["status"], string> = {
-  pending: "pending",
-  ok: "ok",
-  "contract-error": "contract error",
-  "runner-error": "runner error",
-  "api-error": "api error",
-};
-
 let nextStepId = 1;
 
 function stepLabel(fn: FunctionSpec, args: string[]): string {
   return `${fn.name}(${args.join(", ")})`;
-}
-
-function formatResult(result: unknown): string {
-  if (
-    typeof result === "string" ||
-    typeof result === "number" ||
-    result === null
-  ) {
-    return String(result);
-  }
-  return JSON.stringify(result);
-}
-
-function formatError(error: ExecutionStep["error"]): string {
-  if (!error) return "no details";
-  if (error.kind === "contract") {
-    const details = error.code
-      ? `${error.type ?? "Contract"}/${error.code}`
-      : error.type ?? "contract error";
-    return `contract error: ${details}`;
-  }
-  return `${error.kind} error: ${error.message ?? "no details"}`;
 }
 
 function validateParamValue(
@@ -89,9 +53,11 @@ function validateParamValue(
 export function SandboxPanel({
   component,
   configValues,
+  method,
 }: {
   component: StellarComponent;
   configValues: Record<string, string>;
+  method?: string;
 }) {
   const ops = (component.interface ?? []).filter(
     (fn) => fn.name !== "__constructor",
@@ -101,19 +67,30 @@ export function SandboxPanel({
   const identityOptionsOnly = addressOptions.filter(
     (option) => !dependencyAliases.includes(option),
   );
+  const initialOpName =
+    method && ops.some((op) => op.name === method)
+      ? method
+      : ops[0]?.name ?? "";
+
   const [steps, setSteps] = useState<ExecutionStep[]>([]);
-  const [opName, setOpName] = useState(() => ops[0]?.name ?? "");
+  const [opName, setOpName] = useState(initialOpName);
   const [argValues, setArgValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      (ops[0]?.params ?? []).map((param, index) => [
-        param.name,
-        defaultArgValue(param, index, addressOptions),
-      ]),
+      (ops.find((op) => op.name === initialOpName)?.params ?? []).map(
+        (param, index) => [
+          param.name,
+          defaultArgValue(param, index, addressOptions),
+        ],
+      ),
     ),
   );
   const [initializing, setInitializing] = useState(false);
   const [running, setRunning] = useState(false);
   const [deployedContract, setDeployedContract] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<PlaygroundResult | null>(null);
+  const [lastAction, setLastAction] = useState<"init" | "execute" | null>(
+    null,
+  );
 
   if (ops.length === 0) return null;
 
@@ -149,6 +126,7 @@ export function SandboxPanel({
   async function initialize() {
     if (busy) return;
     setInitializing(true);
+    setLastAction("init");
     const constructorParams =
       (component.interface ?? []).find((fn) => fn.name === "__constructor")
         ?.params ?? [];
@@ -170,6 +148,7 @@ export function SandboxPanel({
         constructor: initArgs,
         calls: [],
       });
+      setLastResult(result);
       if (result.ok) {
         setDeployedContract(result.response.deployedContract ?? null);
       }
@@ -179,9 +158,15 @@ export function SandboxPanel({
     }
   }
 
+  function retry() {
+    if (lastAction === "init") void initialize();
+    else if (lastAction === "execute") void execute();
+  }
+
   async function execute() {
     if (busy || hasEmptyArgs || hasInvalidArgs) return;
     setRunning(true);
+    setLastAction("execute");
     const step: ExecutionStep = {
       id: nextStepId++,
       fn: selectedOp.name,
@@ -197,6 +182,7 @@ export function SandboxPanel({
         constructor: buildConstructorRequest(component, configValues),
         calls: callsForSteps(submitted, ops),
       });
+      setLastResult(result);
       if (result.ok) {
         setDeployedContract(result.response.deployedContract ?? null);
       }
@@ -273,7 +259,7 @@ export function SandboxPanel({
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
             Sandbox — local simulated ledger
           </p>
@@ -284,11 +270,14 @@ export function SandboxPanel({
             history in a fresh simulated ledger on every run. The selected
             network does not apply to local execution.
           </p>
-        </div>
 
-        <span className="rounded-default border border-border px-2 py-1 font-mono text-xs text-text-secondary">
-          local
-        </span>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <StateBadge tone="local">Local sandbox</StateBadge>
+            <StateBadge tone="local">Fresh ledger</StateBadge>
+            <StateBadge tone="neutral">No Testnet</StateBadge>
+            <StateBadge tone="neutral">No wallet</StateBadge>
+          </div>
+        </div>
       </div>
 
       <div className="mt-5 rounded-default border border-border bg-canvas/60 px-3 py-2 font-mono text-xs">
@@ -323,6 +312,11 @@ export function SandboxPanel({
       <div className="mt-6 border-t border-border pt-5">
         <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
           Execute operation
+        </p>
+
+        <p className="mt-2 break-words font-mono text-sm text-text-primary">
+          {selectedOp.name}(
+          {selectedOp.params.map((param) => param.name).join(", ")})
         </p>
 
         <div className="mt-3 flex flex-wrap items-end gap-3">
@@ -384,61 +378,11 @@ export function SandboxPanel({
         </p>
       </div>
 
-      <div className="mt-6 border-t border-border pt-5">
-        <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
-          Execution history
-        </p>
-
-        {steps.length === 0 ? (
-          <p className="mt-3 font-sans text-sm text-text-secondary">
-            No operations executed yet. Initialize the contract to begin.
-          </p>
-        ) : (
-          <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-            {steps.map((step, index) => {
-              const isNewest = index === steps.length - 1;
-
-              return (
-                <li
-                  key={step.id}
-                  className={`rounded-default border px-3 py-2 ${
-                    isNewest ? "border-accent-stellar/60" : "border-border"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-xs text-text-primary">
-                      {step.label}
-                    </span>
-
-                    <span
-                      className={`rounded-default border px-2 py-0.5 font-mono text-xs ${STATUS_STYLES[step.status]} ${
-                        step.status === "pending" ? "animate-pulse" : ""
-                      }`}
-                    >
-                      {STATUS_LABELS[step.status]}
-                    </span>
-                  </div>
-
-                  {step.status === "ok" && step.result !== undefined && (
-                    <p className="mt-1 font-mono text-xs text-text-secondary">
-                      {step.fn === "__constructor" ? "deployed at" : "returned"}{" "}
-                      <span className="text-text-primary">
-                        {formatResult(step.result)}
-                      </span>
-                    </p>
-                  )}
-
-                  {step.error && (
-                    <p className="mt-1 font-mono text-xs text-accent-forge">
-                      {formatError(step.error)}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+      <ExecutionTimeline
+        steps={steps}
+        lastResponse={lastResult}
+        onRetry={retry}
+      />
     </Card>
   );
 }

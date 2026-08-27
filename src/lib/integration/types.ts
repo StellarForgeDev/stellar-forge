@@ -1,6 +1,6 @@
 import type { StellarComponent } from "@/data/components";
 
-export type IntegrationLanguage = "rust";
+export type IntegrationLanguage = "rust" | "typescript";
 
 export interface IntegrationLanguageOption {
   value: IntegrationLanguage;
@@ -9,6 +9,7 @@ export interface IntegrationLanguageOption {
 
 export const INTEGRATION_LANGUAGES: IntegrationLanguageOption[] = [
   { value: "rust", label: "Rust" },
+  { value: "typescript", label: "TypeScript" },
 ];
 
 export interface IntegrationContext {

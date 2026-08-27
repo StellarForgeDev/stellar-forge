@@ -9,6 +9,21 @@ Everything in the *Current implementation* sections is verified against the
 repository at the time of writing. Do not treat proposed architecture as if it
 already exists.
 
+> **Status note (Phase 20, 2026-08-27):** This document was largely written when
+> four components were implemented. As of Phase 20, **all eight** catalog
+> components are implemented and sandbox-executable (Token, Payment, Access
+> Control, Escrow, Multi-signature, Subscription, Vesting, Staking), and Token +
+> Payment are deployed to Stellar Testnet. Component lists below that name only
+> the first four are examples, not the full set; the Component Standard and
+> pipeline descriptions remain accurate.
+
+> **Status note (Stage 2B, 2026-08-28):** the product surface (global nav,
+> homepage, catalog, Playground, detail/docs, transactions) was made cohesive and
+> hardened for responsive + accessibility in Stage 2B. This changed no
+> architectural boundaries, contracts, catalog data, or transaction/integration
+> logic; the architecture remains catalog-driven with no component-specific
+> branching.
+
 ## Overview
 
 Stellar-Forge is a developer platform for discovering, understanding, testing,
@@ -99,6 +114,14 @@ and a `config` (form fields).
   `has_role`, `transfer_admin`) with a single admin and `(role, account)` grants.
   Ships with a Rust unit test suite
   (`contracts/contracts/access-control/src/test.rs`).
+- `subscription/` — an **implemented** component: recurring subscription /
+  billing logic (sandbox-ready; not yet deployed to Testnet).
+- `vesting/` — an **implemented** component: token vesting / unlock schedules
+  (sandbox-ready; not yet deployed to Testnet).
+- `staking/` — an **implemented** component: staking and rewards
+  (sandbox-ready; not yet deployed to Testnet).
+- `multi-signature/` — an **implemented** component: threshold multisig
+  approvals (sandbox-ready; not yet deployed to Testnet).
 - `sandbox-runner/` — a **native** (non-contract) Rust binary that loads a
   contract WASM into an in-process Soroban `Env`, deploys it, and invokes the
   requested functions. It is the execution engine behind the Playground.
@@ -218,14 +241,18 @@ src/
  contracts/              Rust/Soroban workspace
    Cargo.toml            Workspace manifest (members: contracts/*)
    contracts/
-      token/              SEP-41 token contract (implemented)
-      payment/            Stateless payment primitive (implemented)
+      token/              SEP-41 token contract (implemented, Testnet-deployed)
+      payment/            Stateless payment primitive (implemented, Testnet-deployed)
        escrow/             Stateful holding contract (implemented)
        access-control/     Role-based authorization contract (implemented)
+       subscription/       Recurring subscription contract (implemented)
+       vesting/            Token vesting / unlock schedules (implemented)
+       staking/            Staking and rewards contract (implemented)
+       multi-signature/    Threshold multisig approvals (implemented)
        test-asset/         Minimal SEP-41 fixture for payment tests
       greeter/            Example/sandbox test fixture (not a catalog component)
       sandbox-runner/     Native runner that executes contract WASM
-     prebuilt/             Committed contract WASM (e.g. token.wasm, payment.wasm, escrow.wasm, access-control.wasm)
+     prebuilt/             Committed contract WASM: token.wasm, payment.wasm, escrow.wasm, access-control.wasm, subscription.wasm, vesting.wasm, staking.wasm, multi-signature.wasm
 
 scripts/
   sandbox-build.mjs     Local sandbox-runner + WASM build
@@ -366,8 +393,10 @@ Community-ready
 
 Meaning of each level:
 
-- **Concept** — a documented pattern with no contract. Today these are
-  Subscription and Multi-signature (Escrow and Access Control are now implemented).
+- **Concept** — a documented pattern with no contract. (As of Phase 20, all
+  eight catalog components are implemented; this level is no longer occupied by
+  any current component — Escrow, Access Control, Subscription, Multi-signature,
+  Vesting, and Staking are all implemented alongside Token and Payment.)
 - **Specified** — the interface, configuration, and expected behavior are
   written down (in the catalog record and docs), even before the contract
   exists.
@@ -492,9 +521,10 @@ runner.
   without it the Playground API returns `503`.
 - The deployed contract address in the sandbox is deterministic (fixed salt), so
   all sandbox runs share the same address space.
-- Only components with `implementation` + `interface` can run in the sandbox
-  (today `token`, `payment`, `escrow`, and `access-control`); the two concept
-  components (Subscription, Multi-signature) are documentation-only.
+- Only components with `implementation` + `interface` can run in the sandbox.
+  As of Phase 20 all eight catalog components (`token`, `payment`, `escrow`,
+  `access-control`, `subscription`, `vesting`, `staking`, `multi-signature`)
+  satisfy this and run locally; none are documentation-only.
 - Admin-only methods (`mint`, `set_admin`) cannot be exercised by a visitor
   because the deployed token's admin key is held outside the repository; the
   sandbox is the only place a visitor can observe state changes.
@@ -539,17 +569,22 @@ the sandbox does not.
 
 ## Integration Architecture
 
-`src/lib/integration/generators.ts` (`generateRustIntegration`) produces a Rust
-example from a component's `interface` and the current `config` values. The
-output includes SDK imports, a deploy step (uploading the contract WASM and
-running the constructor), and callable examples for every function.
+`src/lib/integration/generators.ts` produces a language-specific example from a
+component's `interface` and the current `config` values, routed by
+`generateIntegrationCode({ component, configValues }, language)`. The Rust
+generator (`generateRustIntegration`) and the TypeScript generator
+(`generateTypescriptIntegration`) both follow the same data-driven pattern:
+SDK imports, a deploy step (the Rust generator uploads the contract WASM and
+runs the constructor; the TypeScript generator points to the Stellar CLI for
+deployment), and callable examples for every function. Both honor
+`dependencies`, `constructorArgs`, and per-function `authorization`.
 
 Its role is to take a developer from **experimentation** to **project
 integration**: it is a copy-paste starting point, explicitly commented as "not a
 complete SDK" and "verify before shipping." There is **no** published SDK,
 package, or client library today. Concept components (no `interface`) render a
-placeholder instead of generated code. The only supported language is `rust`
-(`IntegrationLanguage = "rust"`).
+placeholder instead of generated code. The supported languages are `rust` and
+`typescript` (`IntegrationLanguage = "rust" | "typescript"`).
 
 ## Deployment Architecture
 

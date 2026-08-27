@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MethodSelector } from "@/components/transactions/MethodSelector";
@@ -450,9 +451,18 @@ async function checkSubmissionStatus() {
     <div className="mt-10 grid items-start gap-6 lg:grid-cols-[1.2fr_0.8fr]">
       <div className="space-y-6">
         <Card>
-          <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
-            Builder
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
+              Builder
+            </p>
+
+            <Link
+              href="/docs/transactions"
+              className="font-mono text-xs text-accent-stellar hover:underline"
+            >
+              Learn about transactions →
+            </Link>
+          </div>
 
           <WalletConnection
             wallet={wallet.state}

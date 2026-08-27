@@ -3,11 +3,21 @@
 > This document records the **Phase 7 full product audit** of Stellar-Forge. It
 > is a **historical snapshot** of the project state at that point in time.
 >
-> Subsequent work (Phases 8–13, through the current release candidate) has
+> Subsequent work (Phases 8–20, through the current release candidate) has
 > addressed, changed, or superseded a number of the findings below — for
-> example, the transaction system was completed, the `Token` contract was
-> deployed to Stellar Testnet, the Playground/Vercel build path was added, and
-> several reported bugs were remediated.
+> example, the transaction system was completed, the `Token` and `Payment`
+> contracts were deployed to Stellar Testnet, all eight catalog components are
+> now implemented and sandbox-executable, a web test suite and CI were added, the
+> Playground/Vercel build path was added, and several reported bugs were
+> remediated.
+>
+> **Status as of Phase 20 (2026-08-27):** eight components are implemented
+> (Token, Payment, Access Control, Escrow, Multi-signature, Subscription,
+> Vesting, Staking); Token and Payment are deployed to Testnet; a web test
+> suite (`pnpm test`) and CI exist. Sections below that describe "1 of N
+> components", "no app tests", or "no CI" reflect the Phase 7 state and no
+> longer apply. The original findings, bug IDs, and reasoning are retained
+> below as historical context.
 >
 > **Do not treat this report as the current release status.** For the current
 > project state, capabilities, and limitations, consult `README.md` and the
@@ -86,6 +96,11 @@ Fix: add an i128 min/max range check in validation and/or wrap the conversion in
 ---
 
 ## 5. MVP gaps
+
+> **Phase 20 update:** This section describes the Phase 7 state. As of Phase 20,
+> all eight catalog components are implemented and sandbox-executable, web tests
+> and CI exist, and Token + Payment are deployed to Testnet. See the historical
+> notice at the top of this file.
 
 - Only **1 of 6** catalog components is implemented (Token); Payment, Access Control, Escrow, Subscription, Multi-signature are concepts with no interface — the MVP goal of "5–10 reusable components" is unmet.
 - **No app tests** (no test runner/script in `package.json`; only Rust unit tests) and **no CI**.

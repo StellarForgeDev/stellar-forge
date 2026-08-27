@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { TransactionBuilder } from "@/components/transactions/TransactionBuilder";
+import { StateBadge } from "@/components/ui/StateBadge";
 
 const lifecycleSteps = [
   {
@@ -42,6 +44,24 @@ export default function TransactionsPage() {
             implemented component, choose a contract method, fill its
             parameters, and build a typed transaction request.
           </p>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3 rounded-default border border-tone-onchain/40 bg-tone-onchain/5 p-4">
+            <StateBadge tone="testnet">Testnet · on-chain</StateBadge>
+
+            <p className="font-sans text-sm text-text-secondary">
+              This builder talks to the real Stellar Testnet RPC. It needs a
+              funded account and Freighter signing, and it mutates real ledger
+              state. For local, wallet-free experimentation, use the Playground
+              sandbox.
+            </p>
+
+            <Link
+              href="/playground"
+              className="font-mono text-xs text-accent-stellar hover:underline"
+            >
+              Open the Playground →
+            </Link>
+          </div>
         </div>
 
         <ol className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

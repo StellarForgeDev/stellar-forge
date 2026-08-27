@@ -14,6 +14,8 @@ export function generateIntegrationCode(
   switch (language) {
     case "rust":
       return generateRustIntegration(context);
+    case "typescript":
+      return generateTypescriptIntegration(context);
   }
 }
 
@@ -207,6 +209,276 @@ export function generateRustIntegration({
   lines.push("}");
 
   return lines.join("\n");
+}
+
+export function generateTypescriptIntegration({
+  component,
+  configValues,
+}: IntegrationContext): string | null {
+  const interfaceFns = component.interface ?? [];
+  const implementation = component.implementation;
+  if (!implementation || interfaceFns.length === 0) {
+    return null;
+  }
+
+  const constructor = interfaceFns.find((fn) => fn.name === "__constructor");
+  const callableFns = interfaceFns.filter((fn) => fn.name !== "__constructor");
+  const dependencies = component.dependencies ?? [];
+  const dependencyAliases = new Set(dependencies.map((dep) => dep.alias));
+  const constructorArgs = component.constructorArgs ?? {};
+  const packageName = implementation.package;
+
+  const lines: string[] = [];
+  const rule = "=".repeat(76);
+  lines.push(`// ${rule}`);
+  lines.push(
+    `// Stellar-Forge · integration example · ${component.name} · TypeScript`,
+  );
+  lines.push(`// ${rule}`);
+
+  const metadata: Array<[string, string]> = [
+    ["Component", component.name],
+    ["Slug", component.slug],
+    ["Category", component.category],
+    ["Status", componentMaturity(component)],
+    ["Package", packageName],
+    ["Source", implementation.sourcePath],
+    ["Build target", implementation.buildTarget],
+  ];
+  const labelWidth = Math.max(...metadata.map(([label]) => label.length));
+  for (const [label, value] of metadata) {
+    lines.push(`// ${label.padEnd(labelWidth)} : ${value}`);
+  }
+
+  lines.push("//");
+  lines.push("// Configuration:");
+  for (const field of component.config ?? []) {
+    const value = configValues[field.key] ?? field.default;
+    lines.push(
+      `//   ${field.key.padEnd(12)} = ${value}    // ${field.label}`,
+    );
+  }
+
+  lines.push("//");
+  lines.push(
+    "// Generated from the catalog interface — a starting point for integration",
+    "// work, not a complete SDK. It invokes the contract's real interface using",
+    "// @stellar/stellar-sdk. Deployment is performed separately (see the note",
+    "// below). Verify this example against your project before shipping.",
+  );
+  lines.push(`// ${rule}`);
+
+  lines.push("");
+  lines.push(
+    'import {',
+    '  Address,',
+    '  Contract,',
+    '  Keypair,',
+    '  TransactionBuilder,',
+    '  nativeToScVal,',
+    '  rpc,',
+    '  scValToNative,',
+    '  xdr,',
+    '} from "@stellar/stellar-sdk";',
+  );
+
+  lines.push("");
+  lines.push("// ---- Configuration (edit these) ---------------------------------------");
+  lines.push(
+    'const RPC_URL = "https://soroban-testnet.stellar.org"; // Stellar Testnet RPC',
+  );
+  lines.push(
+    'const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";',
+  );
+  lines.push(
+    'const CONTRACT_ID = "<CONTRACT_ID>"; // deployed contract address (C...); replace with your deployment',
+  );
+  lines.push(
+    'const SOURCE_SECRET = "<YOUR_SECRET_KEY>"; // signer secret (S...); keep safe, never commit',
+  );
+
+  lines.push("");
+  lines.push(
+    "// Example identities — replace with real addresses (G... accounts or C... contracts).",
+  );
+  lines.push('const admin = new Address("<ADMIN_ADDRESS>");');
+  lines.push('const alice = new Address("<ALICE_ADDRESS>");');
+  lines.push('const bob = new Address("<BOB_ADDRESS>");');
+  for (const dependency of dependencies) {
+    lines.push(
+      `const ${dependency.alias}Address = new Address("<DEPLOYED_${dependency.alias.toUpperCase()}_ADDRESS>"); // alias: ${dependency.alias} → ${dependency.package}`,
+    );
+  }
+
+  lines.push("");
+  lines.push("async function main() {");
+  lines.push("  const server = new rpc.Server(RPC_URL);");
+  lines.push("  const sourceKeypair = Keypair.fromSecret(SOURCE_SECRET);");
+  lines.push("  const contract = new Contract(CONTRACT_ID);");
+  lines.push("");
+  lines.push(
+    "  // Deployment of this contract is performed separately (for example via the",
+  );
+  if (constructor) {
+    const ctorSig = constructor.params
+      .map((param) => `${param.name}: ${param.type}`)
+      .join(", ");
+    lines.push(
+      "  // Stellar CLI: stellar contract deploy --wasm",
+      `  //   target/wasm32v1-none/release/${packageName}.wasm \\`,
+      "  //   --source <signer> --network testnet --",
+      `  //   ${constructor.params
+        .map((param) =>
+          cliLiteral(param, configValues, dependencyAliases, constructorArgs),
+        )
+        .join(" ")}`,
+      `  // Constructor: ${constructor.name}(${ctorSig})`,
+    );
+  } else {
+    lines.push(
+      `  // Stellar CLI: stellar contract deploy --wasm target/wasm32v1-none/release/${packageName}.wasm --source <signer> --network testnet`,
+    );
+  }
+  lines.push("");
+
+  lines.push("  async function invoke(");
+  lines.push("    method: string,");
+  lines.push("    args: xdr.ScVal[],");
+  lines.push("  ): Promise<rpc.Api.SendTransactionResponse> {");
+  lines.push(
+    "    const sourceAccount = await server.getAccount(sourceKeypair.publicKey());",
+  );
+  lines.push("    const tx = new TransactionBuilder(sourceAccount, {");
+  lines.push('      fee: "100",');
+  lines.push("      networkPassphrase: NETWORK_PASSPHRASE,");
+  lines.push("    })");
+  lines.push("      .addOperation(contract.call(method, ...args))");
+  lines.push("      .setTimeout(30)");
+  lines.push("      .build();");
+  lines.push("    const prepared = await server.prepareTransaction(tx);");
+  lines.push("    prepared.sign(sourceKeypair);");
+  lines.push("    return server.sendTransaction(prepared);");
+  lines.push("  }");
+  lines.push("");
+
+  for (const fn of callableFns) {
+    const signature = fn.params.map((param) => `${param.name}: ${param.type}`).join(", ");
+    const returns = fn.returns ? ` -> ${fn.returns}` : "";
+    lines.push(`  // ${fn.name}(${signature})${returns}`);
+    if (fn.description) {
+      lines.push(`  // ${fn.description}`);
+    }
+    if (fn.authorization === "admin") {
+      lines.push(
+        "  // Requires the contract administrator's authorization (the admin set at deploy time).",
+      );
+    } else if (fn.authorization === "first-address") {
+      const firstAddress = fn.params.find(
+        (param) => param.type === "Address" || param.type === "MuxedAddress",
+      );
+      lines.push(
+        `  // Requires authorization from the first address argument${
+          firstAddress ? ` (${firstAddress.name})` : ""
+        }. The signing wallet must own that address.`,
+      );
+    }
+    const args = fn.params.map((param) =>
+      tsMethodArgValue(param, dependencyAliases),
+    );
+    lines.push(`  const ${fn.name}Args: xdr.ScVal[] = [`);
+    for (const arg of args) {
+      lines.push(`    ${arg},`);
+    }
+    lines.push("  ];");
+    lines.push(
+      `  const ${fn.name}Result = await invoke("${fn.name}", ${fn.name}Args);`,
+    );
+    lines.push(
+      `  // Decode the return value (if any): scValToNative(${fn.name}Result.returnValue)`,
+    );
+    lines.push("");
+  }
+
+  lines.push("}");
+  lines.push("");
+  lines.push(
+    'main().catch((err) => { console.error(err); process.exitCode = 1; });',
+  );
+
+  return lines.join("\n");
+}
+
+// Builds a CLI-style literal for a constructor argument (used only in the
+// deploy comment). These are placeholder tokens, not SDK expressions.
+function cliLiteral(
+  param: ParameterSpec,
+  configValues: Record<string, string>,
+  dependencyAliases: Set<string>,
+  constructorArgs: Record<string, string>,
+): string {
+  if (dependencyAliases.has(param.name)) {
+    return `<${param.name.toUpperCase()}_ADDRESS>`;
+  }
+  const candidates = [
+    param.name,
+    param.name.toLowerCase(),
+    param.name.replace(/s$/, ""),
+    `${param.name}s`,
+  ];
+  const value =
+    candidates.map((key) => configValues[key]).find((v) => v !== undefined) ??
+    constructorArgs[param.name] ??
+    "";
+  switch (param.type) {
+    case "Address":
+    case "MuxedAddress":
+      return `<${param.name.toUpperCase()}_ADDRESS>`;
+    case "i128":
+      return value.length > 0 ? value : "1000000";
+    case "u32":
+      return value.length > 0 ? value : "200";
+    case "String":
+    case "Symbol":
+      return value.length > 0
+        ? `"${value}"`
+        : `"${param.type === "Symbol" ? "symbol" : "value"}"`;
+    default:
+      return `<${param.name}>`;
+  }
+}
+
+// Maps a method parameter to a TypeScript expression that produces the
+// corresponding ScVal via @stellar/stellar-sdk's nativeToScVal / Address.
+function tsMethodArgValue(
+  param: ParameterSpec,
+  dependencyAliases: Set<string> = new Set(),
+): string {
+  if (dependencyAliases.has(param.name)) {
+    return `${param.name}Address.toScVal()`;
+  }
+  if (param.type === "MuxedAddress") {
+    return 'new Address("<MUXED_ADDRESS>").toScVal() /* muxed (M...) */';
+  }
+  if (param.type === "Address") {
+    const name = param.name.toLowerCase();
+    if (name.includes("admin") || name === "new_admin") return "admin.toScVal()";
+    if (name === "to" || name.startsWith("to_")) return "bob.toScVal()";
+    if (name.includes("spender")) return "alice.toScVal()";
+    return "alice.toScVal()";
+  }
+  if (param.type === "i128") {
+    return 'nativeToScVal(BigInt(1000000), { type: "i128" })';
+  }
+  if (param.type === "u32") {
+    return 'nativeToScVal(200, { type: "u32" })';
+  }
+  if (param.type === "String") {
+    return 'nativeToScVal("value", { type: "string" })';
+  }
+  if (param.type === "Symbol") {
+    return 'nativeToScVal("symbol", { type: "symbol" })';
+  }
+  return `nativeToScVal(null) /* ${param.name}: ${param.type} — configure me */`;
 }
 
 function constructorArg(

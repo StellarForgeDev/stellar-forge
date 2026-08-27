@@ -22,13 +22,23 @@ function getUrlComponentSlug(): string | null {
   return new URLSearchParams(window.location.search).get("component");
 }
 
+function getUrlMethod(): string | null {
+  return new URLSearchParams(window.location.search).get("method");
+}
+
 const getServerUrlComponentSlug = () => null;
+const getServerUrlMethod = () => null;
 
 export default function PlaygroundPage() {
   const urlSlug = useSyncExternalStore(
     subscribeToUrl,
     getUrlComponentSlug,
     getServerUrlComponentSlug,
+  );
+  const urlMethod = useSyncExternalStore(
+    subscribeToUrl,
+    getUrlMethod,
+    getServerUrlMethod,
   );
 
   const selectedComponent =
@@ -210,9 +220,10 @@ export default function PlaygroundPage() {
             {selectedComponent.capabilities.sandbox &&
             (selectedComponent.interface?.length ?? 0) > 0 ? (
               <SandboxPanel
-                key={selectedSlug}
+                key={`${selectedSlug}:${urlMethod ?? ""}`}
                 component={selectedComponent}
                 configValues={configValues}
+                method={urlMethod ?? undefined}
               />
             ) : null}
 

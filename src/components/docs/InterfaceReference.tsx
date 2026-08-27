@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { FunctionAuthorization, FunctionSpec } from "@/data/components";
 
 function authorizationBadge(auth: FunctionAuthorization | undefined) {
@@ -26,13 +28,66 @@ function authorizationBadge(auth: FunctionAuthorization | undefined) {
 
 export function InterfaceReference({
   functions,
+  compact = false,
+  componentSlug,
+  methodAction = false,
 }: {
   functions: FunctionSpec[];
+  compact?: boolean;
+  componentSlug?: string;
+  methodAction?: boolean;
 }) {
+  function tryMethodHref(name: string) {
+    return `/playground?component=${encodeURIComponent(componentSlug ?? "")}&method=${encodeURIComponent(name)}`;
+  }
+
+  if (compact) {
+    return (
+      <ul className="mt-1 space-y-1 font-mono text-xs leading-relaxed">
+        {functions.map((fn) => {
+          const signature = fn.params
+            .map((param) => `${param.name}: ${param.type}`)
+            .join(", ");
+
+          const isOp = fn.name !== "__constructor";
+
+          return (
+            <li
+              key={fn.name}
+              className="flex flex-wrap items-center gap-x-1 gap-y-1 break-words text-text-secondary"
+            >
+              <span
+                className={
+                  isOp ? "text-text-primary" : "text-accent-forge"
+                }
+              >
+                {fn.name}
+              </span>
+              <span>({signature})</span>
+              {fn.returns ? (
+                <span className="text-accent-stellar"> → {fn.returns}</span>
+              ) : null}
+              {methodAction && componentSlug && isOp ? (
+                <Link
+                  href={tryMethodHref(fn.name)}
+                  aria-label={`Try ${fn.name} in the playground`}
+                  className="ml-1 font-sans text-accent-stellar hover:underline"
+                >
+                  Try →
+                </Link>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
   return (
     <ul className="mt-5 space-y-4">
       {functions.map((fn) => {
         const isConstructor = fn.name === "__constructor";
+        const isOp = !isConstructor;
 
         return (
           <li
@@ -58,6 +113,16 @@ export function InterfaceReference({
                 </span>
               )}
             </div>
+
+            {methodAction && componentSlug && isOp ? (
+              <Link
+                href={tryMethodHref(fn.name)}
+                aria-label={`Try ${fn.name} in the playground`}
+                className="mt-2 inline-flex font-mono text-xs text-accent-stellar hover:underline"
+              >
+                Try {fn.name} →
+              </Link>
+            ) : null}
 
             <div className="mt-3 space-y-1">
               {fn.params.map((param) => (

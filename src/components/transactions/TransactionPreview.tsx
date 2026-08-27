@@ -3,15 +3,17 @@ import type {
   TransactionPreviewData,
 } from "@/lib/transactions/types";
 import { Card } from "@/components/ui/Card";
+import { CopyButton } from "@/components/ui/CopyButton";
+import { StateBadge, type StateTone } from "@/components/ui/StateBadge";
 
-const statusClasses: Record<TransactionPreparationPhase, string> = {
-  draft: "text-accent-stellar",
-  built: "text-accent-stellar",
-  preparing: "text-accent-forge",
-  prepared: "text-accent-stellar",
-  signed: "text-accent-stellar",
-  failed: "text-accent-forge",
-  blocked: "text-accent-forge",
+const statusTone: Record<TransactionPreparationPhase, StateTone> = {
+  draft: "pending",
+  built: "pending",
+  preparing: "pending",
+  prepared: "success",
+  signed: "success",
+  failed: "error",
+  blocked: "error",
 };
 
 export interface TransactionPreviewProps {
@@ -26,11 +28,9 @@ export function TransactionPreview({ preview }: TransactionPreviewProps) {
           Transaction Preview
         </h2>
 
-        <span
-          className={`rounded-default border border-border px-2 py-0.5 font-mono text-[11px] ${statusClasses[preview.phase]}`}
-        >
+        <StateBadge tone={statusTone[preview.phase]}>
           {preview.statusLabel}
-        </span>
+        </StateBadge>
       </div>
 
       <dl className="mt-5 space-y-3">
@@ -90,7 +90,7 @@ export function TransactionPreview({ preview }: TransactionPreviewProps) {
                   <span className="text-text-secondary/70"> ({argument.type})</span>
                 </span>
 
-                <span className="max-w-[55%] truncate font-mono text-xs text-text-primary">
+                <span className="max-w-[55%] break-all font-mono text-xs text-text-primary">
                   {argument.value || "—"}
                 </span>
               </li>
@@ -208,11 +208,11 @@ export function TransactionPreview({ preview }: TransactionPreviewProps) {
               <dt className="font-sans text-xs text-text-secondary">
                 Return value
               </dt>
-              <dd className="max-w-[55%] truncate font-mono text-xs text-text-primary">
-                {preview.simulation.result
-                  ? `${preview.simulation.result.type}: ${preview.simulation.result.value}`
-                  : "None"}
-              </dd>
+                <dd className="max-w-[55%] break-all font-mono text-xs text-text-primary">
+                  {preview.simulation.result
+                    ? `${preview.simulation.result.type}: ${preview.simulation.result.value}`
+                    : "None"}
+                </dd>
             </div>
 
             <div className="flex items-baseline justify-between gap-4">
@@ -263,9 +263,16 @@ export function TransactionPreview({ preview }: TransactionPreviewProps) {
 
           {preview.simulation.transactionData && (
             <div className="mt-3">
-              <p className="font-sans text-xs text-text-secondary">
-                Prepared transaction XDR
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-sans text-xs text-text-secondary">
+                  Prepared transaction XDR
+                </p>
+
+                <CopyButton
+                  value={preview.simulation.transactionData}
+                  label="Copy XDR"
+                />
+              </div>
 
               <pre className="mt-2 overflow-x-auto rounded-default border border-border bg-canvas/60 p-3 font-mono text-[11px] leading-relaxed text-text-secondary">
                 <code>{preview.simulation.transactionData}</code>
@@ -358,9 +365,13 @@ export function TransactionPreview({ preview }: TransactionPreviewProps) {
 
               {preview.signedXdr && (
                 <div className="mt-3">
-                  <p className="font-sans text-xs text-text-secondary">
-                    Signed transaction XDR
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-sans text-xs text-text-secondary">
+                      Signed transaction XDR
+                    </p>
+
+                    <CopyButton value={preview.signedXdr} label="Copy XDR" />
+                  </div>
 
                   <pre className="mt-2 overflow-x-auto rounded-default border border-border bg-canvas/60 p-3 font-mono text-[11px] leading-relaxed text-text-secondary">
                     <code>{preview.signedXdr}</code>
@@ -464,12 +475,9 @@ export function TransactionPreview({ preview }: TransactionPreviewProps) {
       <div className="mt-5 border-t border-border pt-4">
         <p className="font-sans text-sm text-text-secondary">Status</p>
 
-        <p
-          aria-live="polite"
-          className={`mt-1 font-mono text-xs ${statusClasses[preview.phase]}`}
-        >
+        <StateBadge tone={statusTone[preview.phase]} className="mt-1">
           {preview.statusLabel}
-        </p>
+        </StateBadge>
 
         {preview.phase === "prepared" && (
           <>

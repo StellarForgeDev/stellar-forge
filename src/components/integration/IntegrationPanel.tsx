@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
+import { CopyButton } from "@/components/ui/CopyButton";
+import { StateBadge } from "@/components/ui/StateBadge";
 import type { StellarComponent } from "@/data/components";
 import { generateIntegrationCode } from "@/lib/integration/generators";
+import {
+  INTEGRATION_LANGUAGES,
+  type IntegrationLanguage,
+} from "@/lib/integration/types";
 
 export function IntegrationPanel({
   component,
@@ -13,31 +18,21 @@ export function IntegrationPanel({
   component: StellarComponent;
   configValues: Record<string, string>;
 }) {
-  const [copied, setCopied] = useState(false);
-  const copiedTimer = useRef<number | null>(null);
+  const [language, setLanguage] = useState<IntegrationLanguage>("rust");
 
   const code = useMemo(
-    () => generateIntegrationCode({ component, configValues }, "rust"),
-    [component, configValues],
+    () =>
+      generateIntegrationCode({ component, configValues }, language),
+    [component, configValues, language],
   );
 
-  async function copyCode() {
-    if (code === null) return;
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      if (copiedTimer.current !== null) {
-        window.clearTimeout(copiedTimer.current);
-      }
-      copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard unavailable — leave feedback untouched.
-    }
-  }
+  const languageLabel =
+    INTEGRATION_LANGUAGES.find((option) => option.value === language)?.label ??
+    "Rust";
 
   if (code === null) {
     return (
-      <Card>
+      <Card id="integration">
         <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
           Integration
         </p>
@@ -57,22 +52,26 @@ export function IntegrationPanel({
   }
 
   return (
-    <Card>
+    <Card id="integration">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
-            Integration
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+              Integration
+            </p>
+
+            <StateBadge tone="testnet">Stellar / Soroban</StateBadge>
+          </div>
 
           <h2 className="mt-3 font-display text-xl font-medium text-text-primary">
             Use this component in your project
           </h2>
 
           <p className="mt-3 max-w-2xl font-sans text-sm leading-relaxed text-text-secondary">
-            A Rust integration example generated from the catalog interface and
-            your configuration above, a starting point for real integration
-            work, not a complete SDK. Verify the output against your project
-            before shipping.
+            A {languageLabel} integration example generated from the catalog
+            interface and your configuration above, a starting point for real
+            integration work, not a complete SDK. Verify the output against your
+            project before shipping.
           </p>
         </div>
       </div>
@@ -81,19 +80,23 @@ export function IntegrationPanel({
         <label className="block min-w-40">
           <span className="font-sans text-sm text-text-primary">Language</span>
 
-          <span className="mt-2 block w-full rounded-default border border-border bg-surface px-3 py-2 font-mono text-sm text-text-primary">
-            Rust
-          </span>
+          <select
+            value={language}
+            onChange={(event) =>
+              setLanguage(event.target.value as IntegrationLanguage)
+            }
+            className="mt-2 w-full rounded-default border border-border bg-surface px-3 py-2 font-mono text-sm text-text-primary"
+          >
+            {INTEGRATION_LANGUAGES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
 
-        <Button variant="secondary" onClick={copyCode}>
-          {copied ? "Copied" : "Copy code"}
-        </Button>
+        <CopyButton value={code} label="Copy code" variant="secondary" />
       </div>
-
-      <span className="sr-only" aria-live="polite">
-        {copied ? "Integration code copied to clipboard" : ""}
-      </span>
 
       <pre className="mt-4 max-h-96 min-w-0 overflow-auto rounded-default border border-border bg-canvas/60 p-4 font-mono text-xs leading-relaxed text-text-secondary">
         <code>{code}</code>

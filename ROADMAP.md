@@ -10,16 +10,29 @@ repository before being marked done.
 
 ## Current State
 
+> **Status note (Phase 20, 2026-08-27):** all eight catalog components are now
+> implemented and sandbox-executable; Token and Payment are deployed to Testnet.
+> The Completed list below records when each major capability landed and remains
+> accurate as history.
+
+> **Status note (Stage 2B, 2026-08-28):** the product surface is now cohesive and
+> hardened. Stage 2B added a shared interaction layer (`Button` / `LinkButton` /
+> `CopyButton` / `StateBadge` + reduced-motion support), a global nav with active-
+> route highlighting and an accessible mobile menu, a rebuilt homepage with a live
+> local-sandbox demo, catalog capability filtering, method-level deep links from
+> docs/detail into the Playground, a structured execution timeline in the Sandbox,
+> and a responsive + accessibility hardening pass (keyboard focus, aria, contrast,
+> no horizontal overflow at 375 / 768 / 1280 px). No contracts, catalog records,
+> or transaction/integration logic changed; the architecture stays catalog-driven
+> with no component-specific branching.
+
 Stellar-Forge is at **release-candidate** maturity. It is Testnet-focused; there
-is no mainnet support. Four components are implemented: `token` (deployed to
-Testnet), `payment` (deployed to Testnet via the generic dependency mechanism),
-`escrow` (sandbox-ready; not yet deployed to Testnet), and `access-control`
-(sandbox-ready; not yet deployed to Testnet, and the first to exercise a
-`Symbol`-typed argument and the `admin` authorization model through the generic
-pipeline). `escrow` is the first *stateful, constructor-driven,
-dependency-composing, multi-role* component and was added to validate that the
-platform is generic. The other two catalog entries are concepts/documentation
-only.
+is no mainnet support. All eight catalog components are implemented and
+sandbox-executable: `token` and `payment` are deployed to Stellar Testnet, while
+`escrow`, `access-control`, `subscription`, `multi-signature`, `vesting`, and
+`staking` are sandbox-ready but not yet deployed to a public network. The generic
+pipeline (catalog → docs → sandbox → transactions) was validated across every
+component without component-specific branching.
 
 ### Completed (verified)
 
@@ -160,7 +173,9 @@ See [Subsequent Milestones](#production-readiness).
 
 ### Component Ecosystem
 
-Potential future components (currently **concepts** unless/until implemented):
+All catalog components are implemented and sandbox-executable as of Phase 20.
+Two are deployed to Testnet (Token, Payment); the rest are sandbox-ready and
+await a public-network deployment:
 
 - **Escrow** — *implemented (v1)*: stateful, constructor-driven, dependency-
   composing, multi-role; sandbox-ready, not Testnet-deployed. Added to validate
@@ -169,8 +184,14 @@ Potential future components (currently **concepts** unless/until implemented):
   single admin and `(role, account)` grants; sandbox-ready, not Testnet-deployed.
   Added to validate that the `Symbol` argument type and `admin` authorization
   model are generic (see Completed above).
-- **Subscription**
-- **Multi-signature**
+- **Subscription** — *implemented (v1)*: recurring subscription / billing
+  contract; sandbox-ready, not Testnet-deployed.
+- **Multi-signature** — *implemented (v1)*: threshold multisig approvals;
+  sandbox-ready, not Testnet-deployed.
+- **Vesting** — *implemented (v1)*: token vesting / unlock schedules;
+  sandbox-ready, not Testnet-deployed.
+- **Staking** — *implemented (v1)*: staking and rewards; sandbox-ready, not
+  Testnet-deployed.
 
 Treat these as planned work. Each should follow the same Component Standard
 pipeline rather than bespoke wiring.
@@ -178,7 +199,8 @@ pipeline rather than bespoke wiring.
 ### Developer Integration
 
 - Stronger integration generation (more languages, more accurate generated
-  code).
+  code). TypeScript generation was added in Phase 21; Rust remains the default
+  and is behaviorally unchanged.
 - Reusable client libraries.
 - **SDK/package extraction** — only if justified by reuse needs (no SDK exists
   today).
@@ -204,7 +226,9 @@ Eventually consider, but do not promise dates for:
 - Stable versioning and compatibility guarantees.
 - Mainnet strategy (currently unsupported).
 - Production deployment beyond Testnet.
-- Testnet deployment of additional components (e.g. `payment`) beyond `token`.
+- Testnet deployment of additional components (e.g. `escrow`, `access-control`,
+  `subscription`, `multi-signature`, `vesting`, `staking`) beyond the
+  currently-deployed `token` and `payment`.
 - Long-term maintenance ownership.
 
 ## Roadmap Rules

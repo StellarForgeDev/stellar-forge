@@ -10,6 +10,16 @@
 
   --accent-stellar: #5ec8f2;
   --accent-forge: #e8823c;
+
+  /* Semantic interaction tones. Stellar-Forge's identity pairs two signals:
+     cyan = Stellar / network / on-chain / Testnet; forge orange = build /
+     local / sandbox / configuration. Feedback states reuse these so the
+     visual language stays coherent. */
+  --tone-onchain: #5ec8f2;
+  --tone-local: #e8823c;
+  --tone-success: #5ec8f2;
+  --tone-error: #e8823c;
+  --tone-pending: #8b93a7;
 }
 
 @theme inline {
@@ -20,6 +30,12 @@
   --color-text-secondary: var(--text-secondary);
   --color-accent-stellar: var(--accent-stellar);
   --color-accent-forge: var(--accent-forge);
+
+  --color-tone-onchain: var(--tone-onchain);
+  --color-tone-local: var(--tone-local);
+  --color-tone-success: var(--tone-success);
+  --color-tone-error: var(--tone-error);
+  --color-tone-pending: var(--tone-pending);
 
   --font-display: "Space Grotesk", sans-serif;
   --font-sans: "Inter", sans-serif;
