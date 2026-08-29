@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   web:
     name: Web (lint, typecheck, test, build)
@@ -40,35 +44,31 @@ jobs:
         run: pnpm build
 
   rust:
-    name: Rust (contract tests + sandbox build)
+    name: Rust (contract tests + prebuilt WASM integrity)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install stable Rust
+      - name: Install stable Rust (toolchain pinned via rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32v1-none
 
-      - name: Install Stellar CLI
-        env:
-          STELLAR_VERSION: 27.1.0
-        run: |
-          curl -sSL "https://github.com/stellar/stellar-cli/releases/download/v${STELLAR_VERSION}/stellar-cli-${STELLAR_VERSION}-x86_64-unknown-linux-gnu.tar.gz" -o /tmp/stellar-cli.tar.gz
-          mkdir -p "$HOME/.local/bin" /tmp/stellar-extract
-          tar -xzf /tmp/stellar-cli.tar.gz -C /tmp/stellar-extract
-          BIN=$(find /tmp/stellar-extract -type f -name stellar | head -n1)
-          cp "$BIN" "$HOME/.local/bin/stellar"
-          chmod +x "$HOME/.local/bin/stellar"
-          "$HOME/.local/bin/stellar" --version
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
 
-      - name: Add Stellar CLI to PATH
-        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Run contract tests
+      - name: Build WASM targets (release)
         working-directory: contracts
-        run: cargo test
+        run: cargo build --workspace --target wasm32v1-none --release --exclude sandbox-runner
 
-      - name: Build sandbox runner + contract wasm
-        run: node scripts/sandbox-build.mjs
+      - name: Run workspace tests
+        working-directory: contracts
+        run: cargo test --workspace --release
+
+      - name: Run sandbox-runner tests
+        working-directory: contracts
+        run: cargo test -p sandbox-runner --release
+
+      - name: Verify prebuilt WASM integrity
+        run: node scripts/verify-prebuilt.mjs

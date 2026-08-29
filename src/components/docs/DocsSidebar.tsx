@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { stellarComponents } from "@/data/components";
+import { stellarComponents, orderComponents } from "@/data/components";
 
 const itemBase =
   "block shrink-0 rounded-default border px-3 py-1.5 font-mono text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-stellar";
@@ -43,7 +43,7 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 export function DocsSidebar() {
   const pathname = usePathname();
 
-  const componentItems = stellarComponents.map((component) => ({
+  const componentItems = orderComponents(stellarComponents).map((component) => ({
     href: `/docs/components/${component.slug}`,
     label: component.name,
   }));

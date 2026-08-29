@@ -114,7 +114,20 @@ export function generateRustIntegration({
   lines.push("    let bob = Address::generate(env);");
   lines.push("");
 
-  lines.push("    // 1 · Deploy — the constructor runs at deployment.");
+  if (dependencies.length > 0) {
+    lines.push("    // 1 · Dependencies — auto-provisioned by the Playground sandbox.");
+    lines.push("    //    Each dependency is deployed from its own contract wasm; the");
+    lines.push("    //    sandbox resolves it by alias. Declared before deploy because a");
+    lines.push("    //    constructor may receive a dependency address.");
+    for (const dependency of dependencies) {
+      lines.push(
+        `    let ${snakeCase(dependency.alias)}_address = Address::generate(env); // alias: ${dependency.alias} → ${dependency.package}`,
+      );
+    }
+    lines.push("");
+  }
+
+  lines.push("    // 2 · Deploy — the constructor runs at deployment.");
   if (constructor) {
     const params = constructor.params
       .map((param) => `${param.name}: ${param.type}`)
@@ -148,20 +161,7 @@ export function generateRustIntegration({
   );
   lines.push("");
 
-  if (dependencies.length > 0) {
-    lines.push("    // 3 · Dependencies — auto-provisioned by the Playground sandbox.");
-    lines.push("    //    Each dependency is deployed from its own contract wasm; the");
-    lines.push("    //    sandbox resolves it by alias. Provide the deployed address");
-    lines.push("    //    here (illustratively generated) when adapting this example.");
-    for (const dependency of dependencies) {
-      lines.push(
-        `    let ${snakeCase(dependency.alias)}_address = Address::generate(env); // alias: ${dependency.alias} → ${dependency.package}`,
-      );
-    }
-    lines.push("");
-  }
-
-  lines.push("    // 4 · Interface examples from the catalog interface.");
+  lines.push("    // 3 · Interface examples from the catalog interface.");
   lines.push(
     "    //    Authorized operations assume host-level mock auth, like the",
   );
@@ -437,6 +437,15 @@ function cliLiteral(
       return value.length > 0 ? value : "1000000";
     case "u32":
       return value.length > 0 ? value : "200";
+    case "u64":
+    case "i64":
+    case "Timepoint":
+    case "Duration":
+      return value.length > 0 ? value : "0";
+    case "bool":
+      return value.length > 0 ? value : "true";
+    case "Bytes":
+      return value.length > 0 ? value : "<hex>";
     case "String":
     case "Symbol":
       return value.length > 0
@@ -445,6 +454,27 @@ function cliLiteral(
     default:
       return `<${param.name}>`;
   }
+}
+
+// Produces a TypeScript expression yielding the inner ScVal of an Option<T>
+// (or nested composite) so the generated example exercises the `Some` path.
+function tsInnerValue(typeName: string): string {
+  const t = typeName.trim();
+  if (t.startsWith("Option<")) {
+    const inner = t.slice("Option<".length, -1).trim();
+    return tsInnerValue(inner);
+  }
+  if (t.startsWith("Vec<")) return "nativeToScVal([])";
+  if (t.startsWith("Map<")) return "nativeToScVal({})";
+  if (t === "i128") return 'nativeToScVal(BigInt(1000000), { type: "i128" })';
+  if (t === "u32") return 'nativeToScVal(200, { type: "u32" })';
+  if (t === "u64" || t === "i64") return "nativeToScVal(1n)";
+  if (t === "Timepoint" || t === "Duration") return "nativeToScVal(0n)";
+  if (t === "bool") return "nativeToScVal(true)";
+  if (t === "String") return 'nativeToScVal("value", { type: "string" })';
+  if (t === "Symbol") return 'nativeToScVal("symbol", { type: "symbol" })';
+  if (t === "Bytes") return 'nativeToScVal(Buffer.from("00", "hex"))';
+  return "nativeToScVal(null)";
 }
 
 // Maps a method parameter to a TypeScript expression that produces the
@@ -472,11 +502,29 @@ function tsMethodArgValue(
   if (param.type === "u32") {
     return 'nativeToScVal(200, { type: "u32" })';
   }
+  if (param.type === "u64" || param.type === "i64") {
+    return "nativeToScVal(1n)";
+  }
+  if (param.type === "Timepoint" || param.type === "Duration") {
+    return "nativeToScVal(0n)";
+  }
+  if (param.type === "bool") {
+    return "nativeToScVal(true)";
+  }
   if (param.type === "String") {
     return 'nativeToScVal("value", { type: "string" })';
   }
   if (param.type === "Symbol") {
     return 'nativeToScVal("symbol", { type: "symbol" })';
+  }
+  if (param.type === "Bytes") {
+    return 'nativeToScVal(Buffer.from("00", "hex"))';
+  }
+  if (param.type.startsWith("Vec<")) return "nativeToScVal([])";
+  if (param.type.startsWith("Map<")) return "nativeToScVal({})";
+  if (param.type.startsWith("Option<")) {
+    const inner = param.type.slice("Option<".length, -1).trim();
+    return tsInnerValue(inner);
   }
   return `nativeToScVal(null) /* ${param.name}: ${param.type} — configure me */`;
 }
@@ -487,15 +535,34 @@ function constructorArg(
   dependencyAliases: Set<string> = new Set(),
   constructorArgs: Record<string, string> = {},
 ): string {
-  if (param.type === "Address") {
-    // A constructor parameter that is a dependency alias resolves to the
-    // provisioned dependency address, mirroring how method arguments are handled
-    // in `placeholderArg`. This keeps the generated example correct for
-    // components whose constructor receives a dependency (e.g. Escrow's asset).
-    return dependencyAliases.has(param.name)
-      ? `&${param.name}_address`
-      : "admin.clone()";
+  // A constructor parameter that is a dependency alias resolves to the
+  // provisioned dependency address, mirroring how method arguments are handled
+  // in `placeholderArg`. This keeps the generated example correct for
+  // components whose constructor receives a dependency (e.g. Escrow's asset).
+  if (dependencyAliases.has(param.name)) {
+    return `&${param.name}_address`;
   }
+
+  if (param.type === "Address") {
+    // Honor the catalog constructorArgs when present. A strkey is embedded
+    // directly; a known identity/alias name references the corresponding
+    // generated address. Only when no catalog value exists do we generate a
+    // fresh address — there is no fabricated admin fallback.
+    const catalog = constructorArgs[param.name];
+    if (catalog) {
+      if (/^[GC]/.test(catalog)) {
+        return `&Address::from_str(env, "${catalog}")`;
+      }
+      if (catalog === "admin" || catalog === "alice" || catalog === "bob") {
+        return `&${catalog}`;
+      }
+      if (dependencyAliases.has(catalog)) {
+        return `&${catalog}_address`;
+      }
+    }
+    return "&Address::generate(env)";
+  }
+
   const candidates = [
     param.name,
     param.name.toLowerCase(),
@@ -510,8 +577,14 @@ function constructorArg(
     candidates.map((key) => configValues[key]).find((v) => v !== undefined) ??
     constructorArgs[param.name] ??
     "";
-  if (param.type === "u32" && value.length > 0) return `${value}_u32`;
-  if (param.type === "i128" && value.length > 0) return `${value}_i128`;
+  if (param.type === "u32") return value.length > 0 ? `${value}_u32` : "200";
+  if (param.type === "u64") return value.length > 0 ? `${value}u64` : "0u64";
+  if (param.type === "i64") return value.length > 0 ? `${value}i64` : "0i64";
+  if (param.type === "i128") return value.length > 0 ? `${value}_i128` : "1_000_000_i128";
+  if (param.type === "Timepoint" || param.type === "Duration") {
+    return value.length > 0 ? `${value}u64` : "0u64";
+  }
+  if (param.type === "bool") return value.length > 0 ? value : "true";
   if (param.type === "String") {
     return `String::from_str(env, "${value}")`;
   }
@@ -520,6 +593,19 @@ function constructorArg(
   }
   if (param.type === "MuxedAddress") {
     return `MuxedAddress::from_str(env, "<muxed address>")`;
+  }
+  if (param.type === "Bytes") {
+    return `Bytes::from_slice(env, &[])`;
+  }
+  if (param.type.startsWith("Vec<")) {
+    return `soroban_sdk::vec![env]`;
+  }
+  if (param.type.startsWith("Map<")) {
+    return `soroban_sdk::Map::new(env)`;
+  }
+  if (param.type.startsWith("Option<")) {
+    const inner = param.type.slice("Option<".length, -1).trim();
+    return `soroban_sdk::Option::Some(${defaultInnerValue(inner)})`;
   }
   return `/* ${param.name}: ${param.type} — configure me */`;
 }
@@ -539,6 +625,31 @@ function pascalCase(value: string): string {
     .join("");
 }
 
+// Produces a valid owned Rust expression for the inner type of an Option<T>
+// (or any nested composite) so the generated example exercises the `Some`
+// path instead of always emitting `None`. Composite types recurse.
+function defaultInnerValue(typeName: string): string {
+  const t = typeName.trim();
+  if (t.startsWith("Option<")) {
+    const inner = t.slice("Option<".length, -1).trim();
+    return `soroban_sdk::Option::Some(${defaultInnerValue(inner)})`;
+  }
+  if (t.startsWith("Vec<")) return "soroban_sdk::vec![env]";
+  if (t.startsWith("Map<")) return "soroban_sdk::Map::new(env)";
+  if (t === "i128") return "1_000_000";
+  if (t === "u32") return "200";
+  if (t === "u64") return "0u64";
+  if (t === "i64") return "0i64";
+  if (t === "Timepoint" || t === "Duration") return "0u64";
+  if (t === "bool") return "true";
+  if (t === "String") return 'String::from_str(env, "value")';
+  if (t === "Symbol") return 'Symbol::new(env, "value")';
+  if (t === "Bytes") return "Bytes::from_slice(env, &[])";
+  if (t === "Address") return "admin.clone()";
+  if (t === "MuxedAddress") return 'MuxedAddress::from_str(env, "<muxed address>")';
+  return "/* unknown */";
+}
+
 function placeholderArg(
   param: ParameterSpec,
   dependencyAliases: Set<string> = new Set(),
@@ -549,10 +660,21 @@ function placeholderArg(
   }
   if (param.type === "i128") return "&1_000_000";
   if (param.type === "u32") return "&200";
+  if (param.type === "u64") return "&0u64";
+  if (param.type === "i64") return "&0i64";
+  if (param.type === "Timepoint" || param.type === "Duration") return "&0u64";
+  if (param.type === "bool") return "&true";
   if (param.type === "String") {
     return '&String::from_str(env, "value")';
   }
   if (param.type === "Symbol") return '&Symbol::new(env, "value")';
+  if (param.type === "Bytes") return "&Bytes::from_slice(env, &[])";
+  if (param.type.startsWith("Vec<")) return "&soroban_sdk::vec![env]";
+  if (param.type.startsWith("Map<")) return "&soroban_sdk::Map::new(env)";
+  if (param.type.startsWith("Option<")) {
+    const inner = param.type.slice("Option<".length, -1).trim();
+    return `&soroban_sdk::Option::Some(${defaultInnerValue(inner)})`;
+  }
   const name = param.name.toLowerCase();
   if (name.includes("admin") || name === "new_admin") return "&admin";
   if (name === "to" || name.startsWith("to_")) return "&bob";

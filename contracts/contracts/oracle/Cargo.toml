@@ -1,0 +1,19 @@
+[package]
+name = "oracle"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+# `ed25519-dalek` is TEST-ONLY. The contract verifies signatures with the
+# Soroban host's `ed25519_verify` (no production dependency); this crate is used
+# solely by the contract's own test suite to generate valid signatures.
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+ed25519-dalek = "2"

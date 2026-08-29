@@ -4,16 +4,43 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { StateBadge } from "@/components/ui/StateBadge";
-import { getComponentBySlug, getConfigDefaults } from "@/data/components";
+import {
+  getConfigDefaults,
+  stellarComponents,
+  orderComponents,
+  type FunctionSpec,
+  type StellarComponent,
+} from "@/data/components";
 import { buildConstructorRequest, callRequestFor } from "@/lib/playground/execution";
 import { postPlaygroundRequest } from "@/lib/playground/client";
 
 type Phase = "running" | "live" | "preview";
 
-const token = getComponentBySlug("token");
-const decimalsFn = token?.interface?.find((fn) => fn.name === "decimals");
-const expectedDecimals =
-  token != null ? (getConfigDefaults(token).decimals ?? "7") : "7";
+// The homepage may showcase ONE real component executing locally. The choice is
+// catalog-driven: a component opts in via `demo`, otherwise we fall back to the
+// first implemented component with a callable interface. The generic UI never
+// embeds a specific slug, method name, or expected value.
+function pickDemoComponent(): StellarComponent | undefined {
+  return (
+    stellarComponents.find((c) => c.demo) ??
+    orderComponents(stellarComponents).find(
+      (c) => c.capabilities.implemented && (c.interface?.length ?? 0) > 0,
+    )
+  );
+}
+
+function pickDemoMethod(component: StellarComponent): FunctionSpec | undefined {
+  if (component.demo) {
+    return component.interface?.find((fn) => fn.name === component.demo!.method);
+  }
+  return component.interface?.find(
+    (fn) => fn.name !== "__constructor" && fn.params.length === 0,
+  );
+}
+
+const demoComponent = pickDemoComponent();
+const demoMethod = demoComponent ? pickDemoMethod(demoComponent) : undefined;
+const expectedPreview = demoComponent?.demo?.preview ?? null;
 
 function StepIcon({ pending }: { pending: boolean }) {
   if (pending) {
@@ -58,20 +85,23 @@ function StepIcon({ pending }: { pending: boolean }) {
 
 export function HomeSandboxPreview() {
   const [phase, setPhase] = useState<Phase>("running");
-  const [resultValue, setResultValue] = useState<string | null>(null);
+  const [resultValue, setResultValue] = useState<string | null>(expectedPreview);
   const started = useRef(false);
 
   async function runDemo() {
-    if (token == null || decimalsFn == null) {
-      setResultValue(expectedDecimals);
+    if (demoComponent == null || demoMethod == null) {
+      setResultValue(expectedPreview);
       setPhase("preview");
       return;
     }
     setPhase("running");
     const request = {
-      componentSlug: token.slug,
-      constructor: buildConstructorRequest(token, getConfigDefaults(token)),
-      calls: [callRequestFor(decimalsFn, [])],
+      componentSlug: demoComponent.slug,
+      constructor: buildConstructorRequest(
+        demoComponent,
+        getConfigDefaults(demoComponent),
+      ),
+      calls: [callRequestFor(demoMethod, [])],
     };
     const result = await postPlaygroundRequest(request);
     const outcome = result.ok ? result.response.calls?.[0] : undefined;
@@ -79,7 +109,7 @@ export function HomeSandboxPreview() {
       setResultValue(outcome.result == null ? "" : String(outcome.result));
       setPhase("live");
     } else {
-      setResultValue(expectedDecimals);
+      setResultValue(expectedPreview);
       setPhase("preview");
     }
   }
@@ -92,8 +122,8 @@ export function HomeSandboxPreview() {
 
   const running = phase === "running";
   const stepRows = [
-    { label: "Initialize token contract", pending: running },
-    { label: "Execute decimals()", pending: running },
+    { label: `Initialize ${demoComponent?.name ?? "contract"} contract`, pending: running },
+    { label: `Execute ${demoMethod?.name ?? "method"}()`, pending: running },
   ];
 
   return (
@@ -103,7 +133,9 @@ export function HomeSandboxPreview() {
           <span className="h-2.5 w-2.5 rounded-full border border-border" />
           <span className="h-2.5 w-2.5 rounded-full border border-border" />
           <span className="h-2.5 w-2.5 rounded-full border border-border" />
-          <span className="ml-2 text-text-secondary">token · local sandbox</span>
+          <span className="ml-2 text-text-secondary">
+            {demoComponent?.slug ?? "contract"} · local sandbox
+          </span>
         </div>
 
         {phase === "live" ? (
@@ -128,7 +160,9 @@ export function HomeSandboxPreview() {
           <StepIcon pending={running} />
           <span className="text-text-secondary">Result</span>
           <span className="ml-auto font-mono text-sm text-text-primary">
-            {running ? "…" : `decimals() → ${resultValue ?? "—"}`}
+            {running
+              ? "…"
+              : `${demoMethod?.name ?? "method"}() → ${resultValue ?? "—"}`}
           </span>
         </div>
       </div>

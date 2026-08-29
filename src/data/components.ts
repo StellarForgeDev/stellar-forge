@@ -86,6 +86,12 @@ export interface StellarComponent {
   name: string;
   description: string;
   category: string;
+  /// Presentation/discovery order within the catalog (lower numbers first).
+  /// This is intentional product ordering, not a measure of technical
+  /// importance, and it is the single source of truth for component ordering
+  /// across every listing surface. Spaced (10, 20, 30, ...) so new components
+  /// can be slotted in without renumbering everything.
+  displayOrder: number;
   capabilities: ComponentCapabilities;
   shortDescription: string;
   overview: string;
@@ -102,6 +108,12 @@ export interface StellarComponent {
   /// Named `constructorArgs` (not `constructor`) to avoid the built-in
   /// `Object.prototype.constructor`.
   constructorArgs?: Record<string, string>;
+  /// Optional opt-in for the homepage "real contract, executed locally" demo.
+  /// When present, the generic homepage widget showcases THIS component using
+  /// the named read-only method and shows `preview` as the offline fallback.
+  /// This keeps component selection catalog-driven instead of embedding a
+  /// specific slug inside the generic UI.
+  demo?: { method: string; preview: string };
 }
 
 const networkConfig: ConfigField = {
@@ -145,6 +157,7 @@ function decimalsConfig(
 export const stellarComponents: StellarComponent[] = [
   {
     slug: "token",
+    displayOrder: 10,
     name: "Token",
     description:
       "A standard fungible token contract implementing the SEP-41 Soroban token interface — initialize, mint, transfer, and query balances.",
@@ -301,10 +314,12 @@ export const stellarComponents: StellarComponent[] = [
       networkConfig,
     ],
     capabilities: { implemented: true, sandbox: true, testnet: true },
+    demo: { method: "decimals", preview: "7" },
   },
 
   {
     slug: "payment",
+    displayOrder: 20,
     name: "Payment",
     description:
       "A stateless payment primitive that moves a SEP-41 asset from one address to another on behalf of the sender.",
@@ -372,7 +387,779 @@ export const stellarComponents: StellarComponent[] = [
   },
 
   {
+    slug: "allowance",
+    displayOrder: 30,
+    name: "Allowance",
+    description:
+      "A delegated spending manager: an owner grants a spender the right to move up to a set amount of a SEP-41 asset, and the spender executes transfers within that limit without the owner signing each one.",
+    category: "Payments",
+    shortDescription: "Delegated spending manager",
+    overview:
+      "Allowance is a delegated spending manager for any SEP-41 token. An owner grants a spender an allowance — a spending limit — for a specific asset; the spender then moves tokens from the owner to a recipient, up to the remaining allowance, without the owner authorizing each transfer. The manager is the sole spending authority: when an owner grants or adjusts an allowance it also approves itself on the underlying token, and `transfer_from` pulls using the manager's own address while the manager's per-spender ledger enforces the policy limit. The contract ships with a passing Rust test suite and runs in the local Playground sandbox.",
+    useCases: [
+      "Grant a spender a capped, revocable allowance of an asset",
+      "Let a spender execute transfers within an approved limit",
+      "Build higher-level primitives (subscriptions, payroll) on a managed allowance",
+    ],
+    implementation: {
+      language: "rust",
+      package: "allowance",
+      sourcePath: "contracts/contracts/allowance",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [],
+        authorization: "none",
+        description:
+          "Stateless init. Allowance stores allowances per (owner, asset, spender), so the constructor takes no arguments.",
+      },
+      {
+        name: "approve",
+        params: [
+          { name: "owner", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "spender", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Grants spender the right to spend amount of asset from owner's balance, replacing any prior allowance. Also approves the manager on the token. Authorized by owner.",
+      },
+      {
+        name: "increase_allowance",
+        params: [
+          { name: "owner", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "spender", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Adds amount to the existing allowance for (owner, asset, spender) and re-syncs the token approval. Authorized by owner.",
+      },
+      {
+        name: "decrease_allowance",
+        params: [
+          { name: "owner", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "spender", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Subtracts amount from the existing allowance for (owner, asset, spender), never below zero, and re-syncs the token approval. Authorized by owner.",
+      },
+      {
+        name: "allowance",
+        params: [
+          { name: "owner", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "spender", type: "Address" },
+        ],
+        returns: "i128",
+        authorization: "none",
+        description:
+          "Returns the remaining allowance spender may spend of asset from owner.",
+      },
+      {
+        name: "transfer_from",
+        params: [
+          { name: "spender", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "from", type: "Address" },
+          { name: "to", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Spends amount of asset from from to to on behalf of spender, debiting spender's remaining allowance. Authorized by spender.",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Allowance name",
+        type: "text",
+        default: "Allowance",
+      },
+      networkConfig,
+    ],
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Delegated Asset",
+          symbol: "DEL",
+        },
+        setup: [
+          { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+        ],
+      },
+    ],
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+  },
+
+  {
+    slug: "atomic-swap",
+    displayOrder: 40,
+    name: "Atomic Swap",
+    description:
+      "A reusable two-party atomic asset exchange: one party publishes an offer (give X of asset A for Y of asset B) and the other party executes it, atomically moving both assets or reverting.",
+    category: "Payments",
+    shortDescription: "Two-party atomic asset exchange",
+    overview:
+      "Atomic Swap is a minimal two-party exchange, not an AMM or order book. An offerer creates an offer declaring how much of one asset they will give for how much of another; the contract records the offer and the offerer pre-approves the contract on the offered asset. A taker executes the offer: the contract atomically pulls the ask asset from the taker (to the offerer) and the offer asset from the offerer (to the taker). Because the pulls happen inside a single contract call, the swap is all-or-nothing — there is no partial state. The contract ships with a passing Rust test suite and runs in the local Playground sandbox.",
+    useCases: [
+      "Exchange two distinct tokens between two parties atomically",
+      "Publish a fixed-rate offer that any counterparty can fill",
+      "Cancel an unfilled offer before it is executed",
+    ],
+    implementation: {
+      language: "rust",
+      package: "atomic-swap",
+      sourcePath: "contracts/contracts/atomic-swap",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [],
+        authorization: "none",
+        description:
+          "Stateless init. Atomic Swap stores offers per id, so the constructor takes no arguments.",
+      },
+      {
+        name: "create_offer",
+        params: [
+          { name: "offerer", type: "Address" },
+          { name: "offer_asset", type: "Address" },
+          { name: "offer_amount", type: "i128" },
+          { name: "ask_asset", type: "Address" },
+          { name: "ask_amount", type: "i128" },
+        ],
+        returns: "u64",
+        authorization: "first-address",
+        description:
+          "Publishes an offer: offerer gives offer_amount of offer_asset for ask_amount of ask_asset. Pre-approves the contract on the offered asset. Returns the new offer id. Authorized by offerer.",
+      },
+      {
+        name: "execute",
+        params: [
+          { name: "entrant", type: "Address" },
+          { name: "offer_id", type: "u64" },
+        ],
+        authorization: "first-address",
+        description:
+          "Fills offer_id: atomically pulls the ask asset from the entrant to the offerer and the offer asset from the offerer to the entrant, then marks the offer inactive. Authorized by entrant.",
+      },
+      {
+        name: "cancel_offer",
+        params: [
+          { name: "offerer", type: "Address" },
+          { name: "offer_id", type: "u64" },
+        ],
+        authorization: "first-address",
+        description:
+          "Cancels an unfilled offer. Only the original offerer may cancel. Authorized by offerer.",
+      },
+      {
+        name: "offer_active",
+        params: [{ name: "offer_id", type: "u64" }],
+        returns: "bool",
+        authorization: "none",
+        description:
+          "Returns whether offer_id is still active (published, unfilled, and uncancelled).",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Atomic Swap name",
+        type: "text",
+        default: "Atomic Swap",
+      },
+      networkConfig,
+    ],
+    dependencies: [
+      {
+        alias: "offer_asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Offer Asset",
+          symbol: "OFA",
+        },
+        setup: [
+          { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+        ],
+      },
+      {
+        alias: "ask_asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Ask Asset",
+          symbol: "ASK",
+        },
+        setup: [
+          { fn: "mint", args: ["user1", "1000000"], signer: "admin" },
+        ],
+      },
+    ],
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+  },
+
+  {
+    slug: "timelock",
+    displayOrder: 110,
+    name: "Simple Timelock",
+    description:
+      "A minimal conditional-release lock: an owner escrows an asset for a beneficiary, which the contract releases only after a configured unlock time (ledger timestamp) has been reached.",
+    category: "Payments",
+    shortDescription: "Time-gated conditional asset release",
+    overview:
+      "Simple Timelock is a minimal escrow primitive, not a vesting, governance, multisig, or subscription system. An owner locks an asset amount for a beneficiary together with an unlock time (a ledger timestamp in seconds). The asset is pulled into the contract at lock time, so it is genuinely held until release. Release moves the asset to the beneficiary only when the ledger timestamp has reached the unlock time and the beneficiary authorizes the call. It ships with a passing Rust test suite (including legitimate ledger-time advancement) and runs in the local Playground sandbox.",
+    useCases: [
+      "Release funds to a beneficiary only after a specific time",
+      "Escrow an asset without a third-party custodian",
+      "Encode a simple time-based unlock condition",
+    ],
+    implementation: {
+      language: "rust",
+      package: "timelock",
+      sourcePath: "contracts/contracts/timelock",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [],
+        authorization: "none",
+        description:
+          "Stateless init. Timelock stores locks per id, so the constructor takes no arguments.",
+      },
+      {
+        name: "lock",
+        params: [
+          { name: "owner", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "amount", type: "i128" },
+          { name: "beneficiary", type: "Address" },
+          { name: "unlock_time", type: "Timepoint" },
+        ],
+        returns: "u64",
+        authorization: "first-address",
+        description:
+          "Escrows amount of asset for beneficiary, released no earlier than unlock_time (a ledger timestamp in seconds). The asset is pulled into the contract immediately. Returns the new lock id. Authorized by owner.",
+      },
+      {
+        name: "release",
+        params: [{ name: "lock_id", type: "u64" }],
+        authorization: "none",
+        description:
+          "Releases lock_id to its beneficiary. Fails unless the ledger timestamp has reached unlock_time, and requires beneficiary authorization. Marks the lock spent; cannot be released twice.",
+      },
+      {
+        name: "unlock_time",
+        params: [{ name: "lock_id", type: "u64" }],
+        returns: "Timepoint",
+        authorization: "none",
+        description:
+          "Returns the ledger timestamp at or after which lock_id may be released.",
+      },
+      {
+        name: "is_unlocked",
+        params: [{ name: "lock_id", type: "u64" }],
+        returns: "bool",
+        authorization: "none",
+        description:
+          "Returns whether lock_id's unlock time has been reached (ledger timestamp >= unlock_time).",
+      },
+      {
+        name: "lock_released",
+        params: [{ name: "lock_id", type: "u64" }],
+        returns: "bool",
+        authorization: "none",
+        description: "Returns whether lock_id has already been released.",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Simple Timelock name",
+        type: "text",
+        default: "Simple Timelock",
+      },
+      networkConfig,
+    ],
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Timelock Asset",
+          symbol: "TLA",
+        },
+        setup: [{ fn: "mint", args: ["admin", "1000000"], signer: "admin" }],
+      },
+    ],
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+  },
+
+  {
+    slug: "claimable-balance",
+    displayOrder: 50,
+    name: "Claimable Balance",
+    description:
+      "A time- and expiry-gated conditional payment: a funder escrows an asset for a specific claimant, who can claim it only after a delay and (optionally) before an expiry. If never claimed, the admin can cancel and refund the funder.",
+    category: "Payments",
+    shortDescription: "Time-locked, optionally expiring conditional payment",
+    overview:
+      "Claimable Balance is a conditional-payment primitive built on Soroban. A funder deposits an asset amount for a designated claimant behind two time bounds: a `delay` (a `Duration` added to the current ledger time) before which the balance cannot be claimed, and an optional `expiry` (`Option<Timepoint>`) after which the claim window closes forever. Until claimed, the asset is genuinely held by the contract. The funder authorizes the deposit (first-address authorization), the claimant authorizes the claim, and the admin may cancel an unclaimed balance to refund the funder. It ships with a passing Rust test suite (including legitimate ledger-time advancement) and runs in the local Playground sandbox. The contract exercises the synthetic-only `Duration` and `Option<Timepoint>` parameter types.",
+    useCases: [
+      "Pay a recipient only after a vesting or cliff delay",
+      "Issue a time-limited reward that expires if unclaimed",
+      "Escrow a refundable payment the admin can claw back",
+    ],
+    implementation: {
+      language: "rust",
+      package: "claimable-balance",
+      sourcePath: "contracts/contracts/claimable-balance",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [
+          { name: "admin", type: "Address" },
+          { name: "asset", type: "Address" },
+        ],
+        authorization: "none",
+        description:
+          "Initializes the contract with an admin (who may cancel balances) and the asset that will be escrowed.",
+      },
+      {
+        name: "deposit",
+        params: [
+          { name: "funder", type: "Address" },
+          { name: "claimant", type: "Address" },
+          { name: "amount", type: "i128" },
+          { name: "delay", type: "Duration" },
+          { name: "expiry", type: "Option<Timepoint>" },
+        ],
+        returns: "u64",
+        authorization: "first-address",
+        description:
+          "Escrows `amount` of the asset from `funder` for `claimant`. `delay` is a `Duration` added to the current ledger time as the earliest claim time; `expiry` is an optional `Option<Timepoint>` claim deadline. Returns the new balance id. Authorized by `funder`.",
+      },
+      {
+        name: "claim",
+        params: [{ name: "balance_id", type: "u64" }],
+        authorization: "none",
+        description:
+          "Transfers the balance to its claimant. Fails if the delay has not elapsed, if the expiry has passed, or if already claimed or cancelled. Requires claimant authorization.",
+      },
+      {
+        name: "cancel",
+        params: [{ name: "balance_id", type: "u64" }],
+        authorization: "admin",
+        description:
+          "Refunds an unclaimed, uncancelled balance to its funder and marks it cancelled. Requires admin authorization.",
+      },
+      {
+        name: "balance_of",
+        params: [{ name: "balance_id", type: "u64" }],
+        returns: "i128",
+        authorization: "none",
+        description:
+          "Returns the remaining escrowed amount for a balance (0 if claimed or cancelled).",
+      },
+      {
+        name: "is_claimable",
+        params: [{ name: "balance_id", type: "u64" }],
+        returns: "bool",
+        authorization: "none",
+        description:
+          "Returns whether the balance can be claimed now (delay elapsed, not expired, not claimed/cancelled).",
+      },
+      {
+        name: "expiry",
+        params: [{ name: "balance_id", type: "u64" }],
+        returns: "Option<Timepoint>",
+        authorization: "none",
+        description: "Returns the optional claim deadline of a balance.",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Claimable Balance name",
+        type: "text",
+        default: "Claimable Balance",
+      },
+      networkConfig,
+    ],
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Claimable Asset",
+          symbol: "CBA",
+        },
+        setup: [{ fn: "mint", args: ["admin", "1000000"], signer: "admin" }],
+      },
+    ],
+    constructorArgs: {
+      admin: "admin",
+      asset: "asset",
+    },
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+  },
+
+  {
+    slug: "merkle-airdrop",
+    displayOrder: 60,
+    name: "Merkle Airdrop / Distributor",
+    description:
+      "A token distributor that stores a Merkle root and lets eligible recipients claim their allocation by presenting a Merkle proof. The admin funds the contract and may rotate the root; each recipient proves entitlement for a specific (index, claimant, amount) leaf.",
+    category: "Tokens",
+    shortDescription: "Merkle-proof-gated token distributor",
+    overview:
+      "Merkle Airdrop is a gas-efficient token distributor built on Soroban. Instead of storing every recipient on-chain, the contract stores a single SHA-256 Merkle root. A recipient claims by supplying a proof (a concatenation of 32-byte sibling hashes) that certifies a leaf committing to (index, claimant, amount) under the active root. Leaves use SHA-256 with sorted-pair hashing, so the proof needs only the sibling hashes and the verifier recombines them in a position-independent way. The admin authorizes deposits and root rotations; the claimant authorizes their own claim. Each index can be claimed at most once. It ships with a passing Rust test suite (including genuine multi-level Merkle verification) and runs in the local Playground sandbox. The contract exercises the generic-only `Bytes` parameter type for both the root and the proof.",
+    useCases: [
+      "Distribute an airdrop to a large allowlist without on-chain storage per recipient",
+      "Let recipients claim only their allocation by proving membership",
+      "Rotate the distribution set by replacing the Merkle root",
+    ],
+    implementation: {
+      language: "rust",
+      package: "merkle-airdrop",
+      sourcePath: "contracts/contracts/merkle-airdrop",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [
+          { name: "admin", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "root", type: "Bytes" },
+        ],
+        authorization: "none",
+        description:
+          "Initializes the distributor with an admin, the distributed asset, and the initial Merkle root. The root is a 32-byte SHA-256 `Bytes` value.",
+      },
+      {
+        name: "deposit",
+        params: [{ name: "amount", type: "i128" }],
+        authorization: "admin",
+        description:
+          "Pulls `amount` of the asset from the admin into the contract. Authorized by the admin. Rejects non-positive amounts.",
+      },
+      {
+        name: "claim",
+        params: [
+          { name: "index", type: "u32" },
+          { name: "claimant", type: "Address" },
+          { name: "amount", type: "i128" },
+          { name: "proof", type: "Bytes" },
+        ],
+        authorization: "first-address",
+        description:
+          "Claims the allocation for `index` on behalf of `claimant` if `proof` certifies (index, claimant, amount) under the stored root. `proof` is a `Bytes` concatenation of 32-byte sibling hashes. Requires claimant authorization, rejects zero/negative amounts, already-claimed indices, and invalid proofs.",
+      },
+      {
+        name: "claimed",
+        params: [{ name: "index", type: "u32" }],
+        returns: "bool",
+        authorization: "none",
+        description: "Returns whether `index` has already been claimed.",
+      },
+      {
+        name: "root",
+        params: [],
+        returns: "Bytes",
+        authorization: "none",
+        description:
+          "Returns the currently active Merkle root as a `Bytes` value.",
+      },
+      {
+        name: "update_root",
+        params: [{ name: "new_root", type: "Bytes" }],
+        authorization: "admin",
+        description:
+          "Replaces the active Merkle root. Authorized by the admin. A claim carrying a proof for the previous root is rejected after rotation.",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Merkle Airdrop name",
+        type: "text",
+        default: "Merkle Airdrop",
+      },
+      networkConfig,
+    ],
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Airdrop Asset",
+          symbol: "AIR",
+        },
+        setup: [{ fn: "mint", args: ["admin", "1000000"], signer: "admin" }],
+      },
+    ],
+    constructorArgs: {
+      admin: "admin",
+      asset: "asset",
+      root: "0000000000000000000000000000000000000000000000000000000000000000",
+    },
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+  },
+
+  {
+    slug: "oracle",
+    displayOrder: 65,
+    name: "Oracle / Signed Price Feed",
+    description:
+      "An on-chain price oracle that accepts signed price observations from a single authorized Ed25519 signer. The admin deploys the feed with the signer's public key and a symbol; anyone can submit a (price, timestamp, signature) tuple, and the contract verifies the Ed25519 signature before accepting the value. The latest accepted price and its timestamp are readable on-chain.",
+    category: "Tokens",
+    shortDescription: "Ed25519-signed on-chain price feed",
+    overview:
+      "Oracle is a minimal, dependency-free price feed built on Soroban. It stores a single authorized Ed25519 public key (32-byte `Bytes`) and a feed symbol. A publisher submits a price together with a unix timestamp and an Ed25519 signature over the canonical message `ORACLE-V1 || price || timestamp`. The contract verifies the signature using the host's `ed25519_verify` before storing the value, so a forged or replayed observation is rejected. Prices must be published with strictly increasing timestamps to prevent replay. The admin can rotate the signer key. The contract genuinely exercises the `i64`, `Timepoint`, `Symbol`, and `Bytes` parameter types, and performs real cryptographic signature verification rather than simulating it. It ships with a passing Rust test suite (including genuine Ed25519 round-trips and rejection cases) and runs in the local Playground sandbox.",
+    useCases: [
+      "Publish a signed price feed that off-chain signers push on a schedule",
+      "Let dApps read the latest trusted price without trusting the submitter",
+      "Rotate the authorized signer without redeploying the contract",
+    ],
+    implementation: {
+      language: "rust",
+      package: "oracle",
+      sourcePath: "contracts/contracts/oracle",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [
+          { name: "admin", type: "Address" },
+          { name: "signer", type: "Bytes" },
+          { name: "symbol", type: "Symbol" },
+        ],
+        authorization: "none",
+        description:
+          "Initializes the oracle with an admin, the authorized Ed25519 public key (32-byte `Bytes`), and the feed symbol.",
+      },
+      {
+        name: "publish",
+        params: [
+          { name: "price", type: "i64" },
+          { name: "timestamp", type: "Timepoint" },
+          { name: "signature", type: "Bytes" },
+        ],
+        returns: "bool",
+        authorization: "none",
+        description:
+          "Verifies the Ed25519 signature over `ORACLE-V1 || price || timestamp` and, if valid and the timestamp is strictly greater than the last, stores the price and returns true. An invalid signature fails the invocation; a non-increasing timestamp returns false.",
+      },
+      {
+        name: "latest_price",
+        params: [],
+        returns: "i64",
+        authorization: "none",
+        description: "Returns the most recently published price.",
+      },
+      {
+        name: "latest_time",
+        params: [],
+        returns: "Timepoint",
+        authorization: "none",
+        description:
+          "Returns the unix timestamp of the most recently published price.",
+      },
+      {
+        name: "set_signer",
+        params: [{ name: "new_signer", type: "Bytes" }],
+        authorization: "admin",
+        description:
+          "Rotates the authorized Ed25519 public key. Authorized only by the admin.",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Oracle name",
+        type: "text",
+        default: "Oracle",
+      },
+      networkConfig,
+    ],
+    constructorArgs: {
+      admin: "admin",
+      signer: "4242424242424242424242424242424242424242424242424242424242424242",
+      symbol: "USD",
+    },
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+  },
+
+  {
+    slug: "crowdfund",
+    displayOrder: 90,
+    name: "Simple Crowdfund",
+    description:
+      "A minimal fixed-deadline crowdfunding campaign: an owner sets a funding goal and deadline in a SEP-41 asset; contributors fund it; after the deadline the owner withdraws on success or each contributor reclaims on failure.",
+    category: "Payments",
+    shortDescription: "Fixed-deadline funding campaign",
+    overview:
+      "Simple Crowdfund is a minimal funding primitive, not a DAO, governance system, token issuer, AMM, or multi-round platform. An owner creates a campaign with a goal and a deadline (a ledger timestamp). Contributors send the asset to the contract before the deadline. After the deadline, if the goal was reached only the owner may withdraw the full balance; if it was not reached, each contributor may claim a refund of exactly their own contribution. Funds are always resolvable — there is no path that permanently locks the held balance. It ships with a passing Rust test suite (including legitimate ledger-time advancement) and runs in the local Playground sandbox.",
+    useCases: [
+      "Run a fixed-deadline fundraising campaign in a single asset",
+      "Let contributors reclaim funds when a campaign misses its goal",
+      "Release collected funds to the creator only after success",
+    ],
+    implementation: {
+      language: "rust",
+      package: "crowdfund",
+      sourcePath: "contracts/contracts/crowdfund",
+      buildTarget: "wasm32v1-none",
+    },
+    interface: [
+      {
+        name: "__constructor",
+        params: [],
+        authorization: "none",
+        description:
+          "Stateless init. Crowdfund stores campaigns per id, so the constructor takes no arguments.",
+      },
+      {
+        name: "create_campaign",
+        params: [
+          { name: "owner", type: "Address" },
+          { name: "asset", type: "Address" },
+          { name: "goal", type: "i128" },
+          { name: "deadline", type: "u64" },
+        ],
+        returns: "u64",
+        authorization: "first-address",
+        description:
+          "Creates a campaign owned by owner, collecting asset, targeting goal, closing at deadline (a ledger timestamp). Returns the new campaign id. Authorized by owner.",
+      },
+      {
+        name: "contribute",
+        params: [
+          { name: "campaign_id", type: "u64" },
+          { name: "contributor", type: "Address" },
+          { name: "amount", type: "i128" },
+        ],
+        authorization: "first-address",
+        description:
+          "Contributes amount of the campaign's asset from contributor before the deadline. Pulls the asset into the contract and tracks the contributor's cumulative amount. Authorized by contributor.",
+      },
+      {
+        name: "withdraw",
+        params: [
+          { name: "campaign_id", type: "u64" },
+          { name: "owner", type: "Address" },
+        ],
+        authorization: "first-address",
+        description:
+          "Withdraws the full balance to the owner after the deadline, but only if the goal was reached. Single-use and owner-only. Authorized by owner.",
+      },
+      {
+        name: "claim_refund",
+        params: [
+          { name: "campaign_id", type: "u64" },
+          { name: "contributor", type: "Address" },
+        ],
+        authorization: "first-address",
+        description:
+          "Claims a refund of the caller's own contribution after the deadline, but only if the goal was not reached. Single-use. Authorized by contributor.",
+      },
+      {
+        name: "contributors",
+        params: [{ name: "campaign_id", type: "u64" }],
+        returns: "Vec<Address>",
+        authorization: "none",
+        description:
+          "Returns the addresses that have contributed a positive amount to campaign_id.",
+      },
+      {
+        name: "contribution_of",
+        params: [
+          { name: "campaign_id", type: "u64" },
+          { name: "contributor", type: "Address" },
+        ],
+        returns: "i128",
+        authorization: "none",
+        description: "Returns contributor's contribution to campaign_id (0 if none).",
+      },
+      {
+        name: "contributions",
+        params: [{ name: "campaign_id", type: "u64" }],
+        returns: "Map<Address, i128>",
+        authorization: "none",
+        description:
+          "Returns the non-zero contributions to campaign_id, keyed by contributor.",
+      },
+      {
+        name: "total_raised",
+        params: [{ name: "campaign_id", type: "u64" }],
+        returns: "i128",
+        authorization: "none",
+        description: "Returns the total amount contributed to campaign_id.",
+      },
+      {
+        name: "goal_reached",
+        params: [{ name: "campaign_id", type: "u64" }],
+        returns: "bool",
+        authorization: "none",
+        description: "Returns whether campaign_id's goal has been reached.",
+      },
+    ],
+    config: [
+      {
+        key: "name",
+        label: "Simple Crowdfund name",
+        type: "text",
+        default: "Simple Crowdfund",
+      },
+      networkConfig,
+    ],
+    dependencies: [
+      {
+        alias: "asset",
+        package: "token",
+        constructorArgs: {
+          admin: "admin",
+          decimal: "7",
+          name: "Crowdfund Asset",
+          symbol: "CFA",
+        },
+        setup: [{ fn: "mint", args: ["admin", "1000000"], signer: "admin" }],
+      },
+    ],
+    capabilities: { implemented: true, sandbox: true, testnet: false },
+  },
+
+  {
     slug: "access-control",
+    displayOrder: 130,
     name: "Access Control",
     description:
       "A minimal role-based authorization contract: a single admin grants and revokes roles, and transfers administration.",
@@ -452,6 +1239,7 @@ export const stellarComponents: StellarComponent[] = [
 
   {
     slug: "escrow",
+    displayOrder: 120,
     name: "Escrow",
     description:
       "Holds a SEP-41 asset between a depositor and beneficiary until the arbiter releases or refunds it.",
@@ -552,6 +1340,7 @@ export const stellarComponents: StellarComponent[] = [
 
   {
     slug: "multi-signature",
+    displayOrder: 140,
     name: "Multi-signature",
     description:
       "Requires multiple approving signers before a proposal executes.",
@@ -629,6 +1418,7 @@ export const stellarComponents: StellarComponent[] = [
 
   {
     slug: "subscription",
+    displayOrder: 80,
     name: "Subscription",
     description:
       "A recurring-payment agreement that charges a subscriber on a fixed interval.",
@@ -719,6 +1509,7 @@ export const stellarComponents: StellarComponent[] = [
   },
   {
     slug: "vesting",
+    displayOrder: 70,
     name: "Vesting",
     category: "Tokens",
     description:
@@ -825,6 +1616,7 @@ export const stellarComponents: StellarComponent[] = [
 
   {
     slug: "staking",
+    displayOrder: 100,
     name: "Staking",
     category: "Tokens",
     description:
@@ -956,12 +1748,40 @@ export const stellarComponents: StellarComponent[] = [
   },
 ];
 
-export const componentCategories = [
-  "All",
-  "Tokens",
-  "Payments",
-  "Security",
-] as const;
+/// Returns a new array sorted by the catalog's canonical presentation order.
+/// Order: displayOrder (ascending) -> name -> slug, the latter two being a
+/// deterministic, component-agnostic tiebreaker. The input array is never
+/// mutated, so callers may sort the live catalog safely.
+export function orderComponents(
+  components: StellarComponent[],
+): StellarComponent[] {
+  return [...components].sort((a, b) => {
+    const diff = (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+    if (diff !== 0) return diff;
+    const byName = a.name.localeCompare(b.name);
+    if (byName !== 0) return byName;
+    return a.slug.localeCompare(b.slug);
+  });
+}
+
+/// Category filter options derived from the catalog itself. "All" is always
+/// first; the remaining categories are ordered by the lowest displayOrder of
+/// their member components (so the category bar follows the product hierarchy)
+/// with a deterministic name tiebreaker. No separate hardcoded list is required.
+export const componentCategories: string[] = (() => {
+  const categoryOrder = new Map<string, number>();
+  for (const component of stellarComponents) {
+    const order = component.displayOrder ?? 0;
+    const current = categoryOrder.get(component.category);
+    if (current === undefined || order < current) {
+      categoryOrder.set(component.category, order);
+    }
+  }
+  const categories = [...categoryOrder.entries()]
+    .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
+    .map(([category]) => category);
+  return ["All", ...categories];
+})();
 
 export function getComponentBySlug(slug: string) {
   return stellarComponents.find((component) => component.slug === slug);

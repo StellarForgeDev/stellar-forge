@@ -6,6 +6,7 @@ import {
   componentCategories,
   stellarComponents,
   componentMaturity,
+  orderComponents,
 } from "@/data/components";
 
 const capabilityFilters = ["All", "Sandbox", "Testnet"] as const;
@@ -139,7 +140,7 @@ export default function ComponentsPage() {
 
         {filteredComponents.length > 0 ? (
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredComponents.map((component) => (
+            {orderComponents(filteredComponents).map((component) => (
               <ComponentCard
                 key={component.slug}
                 name={component.name}

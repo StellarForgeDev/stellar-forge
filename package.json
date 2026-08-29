@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sandbox:build": "node scripts/sandbox-build.mjs",
+    "verify:prebuilt": "node scripts/verify-prebuilt.mjs",
     "vercel-build": "bash scripts/vercel-sandbox-build.sh && next build"
   },
   "dependencies": {

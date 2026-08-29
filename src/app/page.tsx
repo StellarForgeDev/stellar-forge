@@ -4,9 +4,9 @@ import { Card } from "@/components/ui/Card";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { ComponentCard } from "@/components/catalog/ComponentCard";
 import { HomeSandboxPreview } from "@/components/home/HomeSandboxPreview";
-import { stellarComponents } from "@/data/components";
+import { stellarComponents, orderComponents } from "@/data/components";
 
-const showcase = stellarComponents.slice(0, 6);
+const showcase = orderComponents(stellarComponents).slice(0, 6);
 
 const lifecycle = [
   {

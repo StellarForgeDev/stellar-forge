@@ -10,6 +10,7 @@ import {
   getConfigDefaults,
   stellarComponents,
   componentMaturity,
+  orderComponents,
   type ConfigField,
 } from "@/data/components";
 
@@ -43,7 +44,7 @@ export default function PlaygroundPage() {
 
   const selectedComponent =
     stellarComponents.find((component) => component.slug === urlSlug) ??
-    stellarComponents[0];
+    orderComponents(stellarComponents)[0];
   const selectedSlug = selectedComponent.slug;
 
   const [previousSlug, setPreviousSlug] = useState(selectedSlug);
@@ -146,7 +147,7 @@ export default function PlaygroundPage() {
               </p>
 
               <div className="mt-4 space-y-2">
-                {stellarComponents.map((component) => (
+                {orderComponents(stellarComponents).map((component) => (
                   <button
                     key={component.slug}
                     type="button"

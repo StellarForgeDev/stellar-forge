@@ -17,6 +17,7 @@ import type {
   TransactionValidation,
 } from "@/lib/transactions/types";
 import type { WalletState } from "@/lib/wallet/types";
+import { orderComponents } from "@/data/components";
 import { validateTransactionRequest } from "@/lib/transactions/validate";
 
 export function callableMethods(
@@ -30,9 +31,11 @@ export function callableMethods(
 export function transactionComponents(
   components: StellarComponent[],
 ): StellarComponent[] {
-  return components.filter(
-    (component) =>
-      component.capabilities.testnet && callableMethods(component).length > 0,
+  return orderComponents(
+    components.filter(
+      (component) =>
+        component.capabilities.testnet && callableMethods(component).length > 0,
+    ),
   );
 }
 

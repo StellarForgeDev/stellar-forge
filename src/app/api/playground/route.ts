@@ -15,8 +15,9 @@ import {
 } from "@/data/components";
 import type { PlaygroundApiError, PlaygroundResponse } from "@/lib/playground/types";
 import {
-  isSupportedParameterType,
-  type SupportedParameterType,
+  describeParameterType,
+  parseParameterType,
+  type ParameterType,
 } from "@/lib/transactions/parameter-types";
 
 export const runtime = "nodejs";
@@ -38,27 +39,57 @@ const ACCOUNT_STRKEY = /^[GC][A-Z2-7]{55}$/;
 const MUXED_STRKEY = /^[GCM][A-Z2-7]{55}$/;
 const INTEGER_STRING = /^-?\d+$/;
 const DECIMAL_STRING = /^\d+$/;
+const HEX_STRING = /^(0x)?[0-9a-fA-F]*$/;
 const I128_MIN = BigInt("-170141183460469231731687303715884105728");
 const I128_MAX = BigInt("170141183460469231731687303715884105727");
 const U32_MAX = BigInt("4294967295");
+const U64_MAX = BigInt(2) ** BigInt(64) - BigInt(1);
 
-type ArgKind = "address" | "muxed" | "i128" | "u32" | "string" | "symbol";
+// Maps a declared parameter type to its Playground API argument category.
+// Composite types (Vec/Map/Option) are supported generically via the shared
+// parameter-type parser — there is no component-specific branching.
+export function argKindForType(type: string): string | null {
+  const ast = parseParameterType(type);
+  return ast ? argKindForAST(ast) : null;
+}
 
-// Behavioral mapping from a canonical supported type to its Playground API
-// argument category. The keys are the canonical SupportedParameterType union,
-// so this mapping cannot list a type the canonical registry does not support.
-const ARG_KIND_BY_TYPE: Record<SupportedParameterType, ArgKind> = {
-  Address: "address",
-  MuxedAddress: "muxed",
-  i128: "i128",
-  u32: "u32",
-  String: "string",
-  Symbol: "symbol",
-};
-
-export function argKindForType(type: string): ArgKind | null {
-  if (!isSupportedParameterType(type)) return null;
-  return ARG_KIND_BY_TYPE[type];
+function argKindForAST(t: ParameterType): string {
+  if (typeof t === "string") {
+    switch (t) {
+      case "Address":
+        return "address";
+      case "MuxedAddress":
+        return "muxed";
+      case "i128":
+        return "i128";
+      case "u32":
+        return "u32";
+      case "String":
+        return "string";
+      case "Symbol":
+        return "symbol";
+      case "bool":
+        return "bool";
+      case "u64":
+        return "u64";
+      case "i64":
+        return "i64";
+      case "Timepoint":
+        return "timepoint";
+      case "Duration":
+        return "duration";
+      case "Bytes":
+        return "bytes";
+    }
+  }
+  switch (t.kind) {
+    case "Vec":
+      return "vec";
+    case "Map":
+      return "map";
+    case "Option":
+      return "option";
+  }
 }
 
 interface ValidatedRequest {
@@ -443,18 +474,18 @@ export function validateConstructor(
   }
   const ctor = value as Record<string, unknown>;
   for (const param of params) {
-    const kind = argKindForType(param.type);
-    if (kind === null) {
+    const ast = parseParameterType(param.type);
+    if (!ast) {
       return {
         error: inputError(
           `constructor parameter ${param.name} has unsupported type ${param.type}`,
         ),
       };
     }
-    if (!isValidArg(kind, ctor[param.name], knownNames)) {
+    if (!isValidArg(ast, ctor[param.name], knownNames)) {
       return {
         error: inputError(
-          `constructor.${param.name} must be ${describeArgKind(kind)}`,
+          `constructor.${param.name} must be ${describeParameterType(param.type)}`,
         ),
       };
     }
@@ -489,18 +520,18 @@ export function validateCall(
     };
   }
   for (let i = 0; i < args.length; i++) {
-    const kind = argKindForType(spec.params[i].type);
-    if (kind === null) {
+    const ast = parseParameterType(spec.params[i].type);
+    if (!ast) {
       return {
         error: inputError(
           `${fn} argument ${i} has unsupported type ${spec.params[i].type}`,
         ),
       };
     }
-    if (!isValidArg(kind, args[i], knownNames)) {
+    if (!isValidArg(ast, args[i], knownNames)) {
       return {
         error: inputError(
-          `${fn} argument ${i} must be ${describeArgKind(kind)}`,
+          `${fn} argument ${i} must be ${describeParameterType(spec.params[i].type)}`,
         ),
       };
     }
@@ -520,41 +551,82 @@ export function validateCall(
 }
 
 function isValidArg(
-  kind: ArgKind,
+  t: ParameterType,
   value: unknown,
   knownNames: Set<string>,
 ): boolean {
-  switch (kind) {
-    case "address":
-      return isAddressRef(value, knownNames, false);
-    case "muxed":
-      return isAddressRef(value, knownNames, true);
-    case "i128":
-      return isI128(value);
-    case "u32":
-      return isU32(value);
-    case "string":
-      return isBoundedString(value, MAX_STRING_LENGTH);
-    case "symbol":
-      return isBoundedString(value, MAX_SYMBOL_LENGTH);
+  if (typeof t === "string") {
+    switch (t) {
+      case "Address":
+        return isAddressRef(value, knownNames, false);
+      case "MuxedAddress":
+        return isAddressRef(value, knownNames, true);
+      case "i128":
+        return isI128(value);
+      case "u32":
+        return isU32(value);
+      case "u64":
+      case "Timepoint":
+      case "Duration":
+        return isU64(value);
+      case "i64":
+        return isI64(value);
+      case "bool":
+        return value === true || value === "true" || value === "false";
+      case "Bytes":
+        return typeof value === "string" && HEX_STRING.test(value);
+      case "String":
+        return isBoundedString(value, MAX_STRING_LENGTH);
+      case "Symbol":
+        return isBoundedString(value, MAX_SYMBOL_LENGTH);
+    }
   }
+
+  switch (t.kind) {
+    case "Vec":
+      return (
+        Array.isArray(value) &&
+        value.every((el) => isValidArg(t.item, el, knownNames))
+      );
+    case "Map":
+      return (
+        Array.isArray(value) &&
+        value.every(
+          (p) =>
+            p !== null &&
+            typeof p === "object" &&
+            "key" in p &&
+            "value" in p &&
+            isValidArg(t.key, (p as { key: unknown }).key, knownNames) &&
+            isValidArg(t.value, (p as { value: unknown }).value, knownNames),
+        )
+      );
+    case "Option":
+      return value === null || isValidArg(t.item, value, knownNames);
+  }
+
+  return false;
 }
 
-function describeArgKind(kind: ArgKind): string {
-  switch (kind) {
-    case "address":
-      return "an identity name or G/C strkey";
-    case "muxed":
-      return "an identity name or G/C/M strkey";
-    case "i128":
-      return "an integer (number or string)";
-    case "u32":
-      return "an unsigned 32-bit integer (number or string)";
-    case "string":
-      return "a non-empty string of at most 100 characters";
-    case "symbol":
-      return "a non-empty symbol of at most 32 characters";
+function isU64(value: unknown): boolean {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value >= 0;
   }
+  if (typeof value === "string" && DECIMAL_STRING.test(value)) {
+    try {
+      return BigInt(value) <= U64_MAX;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function isI64(value: unknown): boolean {
+  if (typeof value === "number") {
+    return Number.isInteger(value);
+  }
+  return typeof value === "string" && INTEGER_STRING.test(value);
 }
 
 function isAddressRef(

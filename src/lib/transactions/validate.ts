@@ -1,17 +1,15 @@
 import type { ParameterSpec, StellarComponent } from "@/data/components";
 import { isTransactionNetwork, networkLabel } from "@/lib/transactions/networks";
-import { isSupportedParameterType } from "@/lib/transactions/parameter-types";
+import {
+  describeParameterType,
+  isSupportedParameterType,
+  validateParameterValue,
+} from "@/lib/transactions/parameter-types";
 import type {
   TransactionRequest,
   TransactionValidationError,
   TransactionValidationResult,
 } from "@/lib/transactions/types";
-
-const INTEGER_PATTERN = /^-?\d+$/;
-const UNSIGNED_PATTERN = /^\d+$/;
-const U32_MAX = 4294967295;
-const I128_MIN = -(BigInt(2) ** BigInt(127));
-const I128_MAX = BigInt(2) ** BigInt(127) - BigInt(1);
 
 export function validateTransactionRequest(
   request: TransactionRequest,
@@ -111,37 +109,9 @@ export function validateTransactionRequest(
 }
 
 function parameterValueIsValid(param: ParameterSpec, rawValue: string): boolean {
-  const value = rawValue.trim();
-
-  switch (param.type) {
-    case "i128":
-      if (!INTEGER_PATTERN.test(value)) return false;
-      try {
-        const n = BigInt(value);
-        return n >= I128_MIN && n <= I128_MAX;
-      } catch {
-        return false;
-      }
-    case "u32":
-      return UNSIGNED_PATTERN.test(value) && Number(value) <= U32_MAX;
-    case "Address":
-    case "MuxedAddress":
-      return value.startsWith("G") || value.startsWith("M");
-    default:
-      return value.length > 0;
-  }
+  return validateParameterValue(param.type, rawValue);
 }
 
 function parameterTypeMessage(type: string): string {
-  switch (type) {
-    case "i128":
-      return "Expected an integer between -2^127 and 2^127-1.";
-    case "u32":
-      return "Expected an unsigned 32-bit integer (0-4294967295).";
-    case "Address":
-    case "MuxedAddress":
-      return "Expected a Stellar address starting with G or M.";
-    default:
-      return `Value is not valid for the declared type (${type}).`;
-  }
+  return describeParameterType(type);
 }

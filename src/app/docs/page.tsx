@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ComponentCard } from "@/components/catalog/ComponentCard";
 import { LinkButton } from "@/components/ui/LinkButton";
-import { stellarComponents } from "@/data/components";
+import { stellarComponents, orderComponents } from "@/data/components";
 
 const textLink =
   "inline-flex font-mono text-xs text-accent-stellar hover:underline";
@@ -202,7 +202,7 @@ export default function DocsPage() {
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {stellarComponents.map((component) => (
+          {orderComponents(stellarComponents).map((component) => (
             <ComponentCard
               key={component.slug}
               name={component.name}

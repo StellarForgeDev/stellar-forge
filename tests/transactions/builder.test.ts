@@ -25,9 +25,15 @@ describe("transaction builder", () => {
   });
 
   describe("transactionComponents", () => {
-    it("includes only components deployed on Testnet with a callable interface", () => {
+    it("includes exactly the testnet-capable components with a callable interface", () => {
       const result = transactionComponents(stellarComponents);
-      expect(result.map((c) => c.slug)).toEqual(["token", "payment"]);
+      const expected = stellarComponents
+        .filter(
+          (c) => c.capabilities.testnet && callableMethods(c).length > 0,
+        )
+        .map((c) => c.slug)
+        .sort();
+      expect(result.map((c) => c.slug).sort()).toEqual(expected);
     });
 
     it("excludes components without the testnet capability", () => {
@@ -113,10 +119,11 @@ describe("transaction builder", () => {
   });
 
   describe("initialBuilderState", () => {
-    it("selects the first testnet component and its first method", () => {
+    it("selects the first testnet component and its first callable method", () => {
+      const first = transactionComponents(stellarComponents)[0];
       const state = initialBuilderState(stellarComponents);
-      expect(state.componentSlug).toBe("token");
-      expect(state.methodName).toBe("name");
+      expect(state.componentSlug).toBe(first.slug);
+      expect(state.methodName).toBe(callableMethods(first)[0].name);
       expect(state.network).toBe("testnet");
       expect(state.sourceAccount).toBe("");
     });
@@ -162,9 +169,10 @@ describe("transaction builder", () => {
         { phase: "idle" },
         { phase: "idle" },
       );
+      const firstComponent = transactionComponents(stellarComponents)[0];
       expect(preview.networkLabel).toBe("Stellar Testnet");
-      expect(preview.componentName).toBe("Token");
-      expect(preview.methodName).toBe("name");
+      expect(preview.componentName).toBe(firstComponent.name);
+      expect(preview.methodName).toBe(callableMethods(firstComponent)[0].name);
       expect(preview.phase).toBe("draft");
       expect(preview.statusLabel).toBe("Waiting for required parameters");
     });

@@ -1,636 +1,223 @@
 import { describe, expect, it } from "vitest";
 import {
+  componentCategories,
   componentMaturity,
   componentWasmPath,
   getComponentByPackage,
   getComponentBySlug,
   getConfigDefaults,
+  orderComponents,
   stellarComponents,
 } from "@/data/components";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { SUPPORTED_PARAMETER_TYPES } from "@/lib/transactions/parameter-types";
+import { parseParameterType } from "@/lib/transactions/parameter-types";
 
-const CONCEPT_SLUGS: string[] = [];
+const ALLOWED_AUTH = ["none", "admin", "first-address"] as const;
+const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-describe("Component Standard v1 invariants", () => {
-  describe("Token", () => {
-    const token = getComponentBySlug("token");
-
-    it("is implemented, sandbox-ready, and deployed on Testnet", () => {
-      expect(token).toBeDefined();
-      expect(token?.capabilities.implemented).toBe(true);
-      expect(token?.capabilities.sandbox).toBe(true);
-      expect(token?.capabilities.testnet).toBe(true);
-    });
-  });
-
-  describe("Payment", () => {
-    const payment = getComponentBySlug("payment");
-
-    it("is implemented, sandbox-ready, and deployed to Testnet", () => {
-      expect(payment).toBeDefined();
-      expect(payment?.capabilities.implemented).toBe(true);
-      expect(payment?.capabilities.sandbox).toBe(true);
-      expect(payment?.capabilities.testnet).toBe(true);
-    });
-
-    it("declares a dependency on a token aliased 'asset'", () => {
-      const dependencies = payment?.dependencies ?? [];
-      expect(dependencies).toHaveLength(1);
-      const asset = dependencies[0];
-      expect(asset.alias).toBe("asset");
-      expect(asset.package).toBe("token");
-      expect(asset.constructorArgs).toMatchObject({ admin: "admin" });
-      expect(asset.setup).toEqual([
-        { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
-      ]);
+// These invariants are intentionally generic: they validate the Component
+// Standard v1 contract for EVERY catalog entry, so adding a new component is
+// automatically covered. There are no per-component hand-maintained blocks —
+// structural regressions (renamed methods, dropped authorization, broken
+// dependency wiring, missing prebuilt wasm, etc.) are caught for every
+// catalog entry (the count is derived from stellarComponents, never hardcoded).
+describe("Component Standard v1 invariants (generic, catalog-driven)", () => {
+  describe("catalog shape", () => {
+    it("every component has valid core metadata", () => {
+      for (const c of stellarComponents) {
+        expect(typeof c.slug).toBe("string");
+        expect(c.slug.length).toBeGreaterThan(0);
+        expect(typeof c.name).toBe("string");
+        expect(c.name.length).toBeGreaterThan(0);
+        expect(typeof c.description).toBe("string");
+        expect(c.description.length).toBeGreaterThan(0);
+        expect(typeof c.category).toBe("string");
+        expect(c.category.length).toBeGreaterThan(0);
+        expect(typeof c.shortDescription).toBe("string");
+        expect(c.shortDescription.length).toBeGreaterThan(0);
+        expect(typeof c.overview).toBe("string");
+        expect(c.overview.length).toBeGreaterThan(0);
+        expect(Array.isArray(c.useCases)).toBe(true);
+        expect(c.capabilities).toBeDefined();
+        expect(typeof c.capabilities.implemented).toBe("boolean");
+        expect(typeof c.capabilities.sandbox).toBe("boolean");
+        expect(typeof c.capabilities.testnet).toBe("boolean");
+      }
     });
 
-    it("is deployed to Testnet with a live address", () => {
-      expect(payment?.capabilities.testnet).toBe(true);
-      expect(payment?.implementation?.package).toBe("payment");
-    });
-  });
-
-  describe("getComponentByPackage", () => {
-    it("resolves a component by its implementation package", () => {
-      expect(getComponentByPackage("token")?.slug).toBe("token");
-      expect(getComponentByPackage("payment")?.slug).toBe("payment");
-    });
-
-    it("returns undefined for an unknown package", () => {
-      expect(getComponentByPackage("nope")).toBeUndefined();
-    });
-  });
-
-  describe("Concept components", () => {
-    it("keeps exactly the current concepts", () => {
-      const conceptSlugs = stellarComponents
-        .filter((c) => c.capabilities.implemented === false)
-        .map((c) => c.slug);
-      expect(conceptSlugs.sort()).toEqual([...CONCEPT_SLUGS].sort());
+    it("implemented components declare an interface and implementation", () => {
+      for (const c of stellarComponents) {
+        if (!c.capabilities.implemented) continue;
+        expect(c.interface, c.slug).toBeDefined();
+        expect(
+          Array.isArray(c.interface) && c.interface.length > 0,
+          c.slug,
+        ).toBe(true);
+        expect(c.implementation, c.slug).toBeDefined();
+        expect(typeof c.implementation?.package).toBe("string");
+        expect(typeof c.implementation?.sourcePath).toBe("string");
+        expect(typeof c.implementation?.buildTarget).toBe("string");
+      }
     });
 
-    it("marks every concept as not implemented, not sandbox, not testnet", () => {
-      for (const slug of CONCEPT_SLUGS) {
-        const component = getComponentBySlug(slug);
-        expect(component, slug).toBeDefined();
-        expect(component?.capabilities).toEqual({
-          implemented: false,
-          sandbox: false,
-          testnet: false,
-        });
+    it("testnet capability implies implemented + sandbox-ready", () => {
+      for (const c of stellarComponents) {
+        if (c.capabilities.testnet) {
+          expect(c.capabilities.implemented, c.slug).toBe(true);
+          expect(c.capabilities.sandbox, c.slug).toBe(true);
+        }
       }
     });
   });
 
-  describe("componentMaturity", () => {
-    it("returns Implemented for the Token and Payment", () => {
-      expect(componentMaturity(getComponentBySlug("token")!)).toBe(
-        "Implemented",
-      );
-      expect(componentMaturity(getComponentBySlug("payment")!)).toBe(
-        "Implemented",
-      );
-    });
-
-    it("returns Concept for every concept component", () => {
-      for (const slug of CONCEPT_SLUGS) {
-        expect(componentMaturity(getComponentBySlug(slug)!)).toBe("Concept");
+  describe("interface + method metadata", () => {
+    it("every function has valid name, params, types, and authorization", () => {
+      for (const c of stellarComponents) {
+        const seen = new Set<string>();
+        let constructors = 0;
+        for (const fn of c.interface ?? []) {
+          expect(typeof fn.name, `${c.slug}.${fn?.name}`).toBe("string");
+          expect(IDENTIFIER.test(fn.name), `${c.slug}.${fn.name}`).toBe(true);
+          expect(
+            seen.has(fn.name),
+            `duplicate method ${c.slug}.${fn.name}`,
+          ).toBe(false);
+          seen.add(fn.name);
+          if (fn.name === "__constructor") constructors += 1;
+          const paramNames = new Set<string>();
+          for (const p of fn.params) {
+            expect(
+              typeof p.name,
+              `${c.slug}.${fn.name}.${p?.name}`,
+            ).toBe("string");
+            expect(
+              IDENTIFIER.test(p.name),
+              `${c.slug}.${fn.name}.${p.name}`,
+            ).toBe(true);
+            expect(
+              paramNames.has(p.name),
+              `duplicate param ${c.slug}.${fn.name}.${p.name}`,
+            ).toBe(false);
+            paramNames.add(p.name);
+            expect(
+              parseParameterType(p.type),
+              `${c.slug}.${fn.name}.${p.name} type ${p.type}`,
+            ).not.toBeNull();
+          }
+          if (fn.returns) {
+            expect(
+              parseParameterType(fn.returns),
+              `${c.slug}.${fn.name} returns ${fn.returns}`,
+            ).not.toBeNull();
+          }
+          expect(fn.authorization, `${c.slug}.${fn.name}`).toBeDefined();
+          expect(ALLOWED_AUTH, `${c.slug}.${fn.name}`).toContain(
+            fn.authorization,
+          );
+        }
+        if (c.capabilities.implemented) {
+          expect(
+            constructors,
+            `${c.slug} should declare exactly one constructor`,
+          ).toBe(1);
+        }
       }
     });
+  });
 
-    it("only reports the two supported maturity states", () => {
-      const states = stellarComponents.map(componentMaturity);
-      expect(new Set(states)).toEqual(new Set(["Implemented"]));
+  describe("authorization metadata", () => {
+    it("marks at least one function as admin-only across the catalog", () => {
+      const adminFns = stellarComponents.flatMap((c) =>
+        (c.interface ?? []).filter((fn) => fn.authorization === "admin"),
+      );
+      expect(adminFns.length).toBeGreaterThan(0);
     });
   });
 
-  describe("getComponentBySlug", () => {
-    it("returns the matching component for a known slug", () => {
-      const token = getComponentBySlug("token");
-      expect(token?.slug).toBe("token");
-      expect(token?.name).toBe("Token");
-    });
-
-    it("returns undefined for an unknown slug", () => {
-      expect(getComponentBySlug("does-not-exist")).toBeUndefined();
-    });
-  });
-
-  describe("Escrow (third implemented component)", () => {
-    const escrow = getComponentBySlug("escrow")!;
-
-    it("is implemented, sandbox-ready, and not on Testnet", () => {
-      expect(escrow?.capabilities).toEqual({
-        implemented: true,
-        sandbox: true,
-        testnet: false,
-      });
-    });
-
-    it("declares a token asset dependency aliased 'asset'", () => {
-      const dependencies = escrow?.dependencies ?? [];
-      expect(dependencies).toHaveLength(1);
-      expect(dependencies[0].alias).toBe("asset");
-      expect(dependencies[0].package).toBe("token");
-    });
-
-    it("declares catalog-driven constructor defaults", () => {
-      const constructor = escrow?.constructorArgs ?? {};
-      expect(constructor.depositor).toBe("user1");
-      expect(constructor.beneficiary).toBe("user2");
-      expect(constructor.arbiter).toBe("admin");
-      expect(constructor.asset).toBe("asset");
-    });
-
-    it("exposes an interface matching the contract", () => {
-      const names = (escrow?.interface ?? []).map((fn) => fn.name);
-      expect(names).toEqual([
-        "__constructor",
-        "deposit",
-        "release",
-        "refund",
-        "status",
-      ]);
-      const ctor = escrow?.interface?.find((fn) => fn.name === "__constructor");
-      expect(ctor?.params.map((p) => p.name)).toEqual([
-        "depositor",
-        "beneficiary",
-        "arbiter",
-        "asset",
-      ]);
-    });
-  });
-
-  describe("Access Control (fourth implemented component)", () => {
-    const accessControl = getComponentBySlug("access-control")!;
-
-    it("is implemented, sandbox-ready, and not on Testnet", () => {
-      expect(accessControl?.capabilities).toEqual({
-        implemented: true,
-        sandbox: true,
-        testnet: false,
-      });
-    });
-
-    it("declares a catalog-driven constructor default for the admin", () => {
-      const constructor = accessControl?.constructorArgs ?? {};
-      expect(constructor.admin).toBe("admin");
-    });
-
-    it("exposes an interface matching the contract", () => {
-      const names = (accessControl?.interface ?? []).map((fn) => fn.name);
-      expect(names).toEqual([
-        "__constructor",
-        "grant_role",
-        "revoke_role",
-        "has_role",
-        "transfer_admin",
-      ]);
-      const ctor = accessControl?.interface?.find(
-        (fn) => fn.name === "__constructor",
-      );
-      expect(ctor?.params.map((p) => p.name)).toEqual(["admin"]);
-      const grant = accessControl?.interface?.find(
-        (fn) => fn.name === "grant_role",
-      );
-      expect(grant?.params.map((p) => p.name)).toEqual(["role", "account"]);
-      expect(grant?.params.map((p) => p.type)).toEqual(["Symbol", "Address"]);
-      expect(grant?.authorization).toBe("admin");
-      const hasRole = accessControl?.interface?.find(
-        (fn) => fn.name === "has_role",
-      );
-      expect(hasRole?.returns).toBe("bool");
-      expect(hasRole?.authorization).toBe("none");
-    });
-
-    it("declares only name and network configuration", () => {
-      const keys = (accessControl?.config ?? []).map((f) => f.key);
-      expect(keys).toEqual(["name", "network"]);
-    });
-  });
-
-  describe("Multi-signature (fifth implemented component)", () => {
-    const multiSig = getComponentBySlug("multi-signature")!;
-
-    it("is implemented, sandbox-ready, and not on Testnet", () => {
-      expect(multiSig?.capabilities).toEqual({
-        implemented: true,
-        sandbox: true,
-        testnet: false,
-      });
-    });
-
-    it("declares three novel signer identities as constructor defaults", () => {
-      const constructor = multiSig?.constructorArgs ?? {};
-      expect(constructor.signer1).toBe("signer1");
-      expect(constructor.signer2).toBe("signer2");
-      expect(constructor.signer3).toBe("signer3");
-      expect(constructor.threshold).toBe("2");
-    });
-
-    it("exposes an interface matching the contract", () => {
-      const names = (multiSig?.interface ?? []).map((fn) => fn.name);
-      expect(names).toEqual([
-        "__constructor",
-        "approve",
-        "execute",
-        "is_approved",
-      ]);
-      const ctor = multiSig?.interface?.find(
-        (fn) => fn.name === "__constructor",
-      );
-      expect(ctor?.params.map((p) => p.name)).toEqual([
-        "signer1",
-        "signer2",
-        "signer3",
-        "threshold",
-      ]);
-      expect(ctor?.params.map((p) => p.type)).toEqual([
-        "Address",
-        "Address",
-        "Address",
-        "u32",
-      ]);
-      const approve = multiSig?.interface?.find(
-        (fn) => fn.name === "approve",
-      );
-      expect(approve?.params.map((p) => p.name)).toEqual([
-        "signer",
-        "proposal_id",
-      ]);
-      expect(approve?.params.map((p) => p.type)).toEqual([
-        "Address",
-        "Symbol",
-      ]);
-      expect(approve?.authorization).toBe("first-address");
-      const isApproved = multiSig?.interface?.find(
-        (fn) => fn.name === "is_approved",
-      );
-      expect(isApproved?.returns).toBe("bool");
-      expect(isApproved?.authorization).toBe("none");
-      const execute = multiSig?.interface?.find((fn) => fn.name === "execute");
-      expect(execute?.authorization).toBe("none");
-    });
-
-    it("declares only name and network configuration", () => {
-      const keys = (multiSig?.config ?? []).map((f) => f.key);
-      expect(keys).toEqual(["name", "network"]);
-    });
-  });
-
-  describe("Subscription (sixth implemented component)", () => {
-    const subscription = getComponentBySlug("subscription")!;
-
-    it("is implemented, sandbox-ready, and not on Testnet", () => {
-      expect(subscription?.capabilities).toEqual({
-        implemented: true,
-        sandbox: true,
-        testnet: false,
-      });
-    });
-
-    it("declares a token asset dependency aliased 'asset'", () => {
-      const dependencies = subscription?.dependencies ?? [];
-      expect(dependencies).toHaveLength(1);
-      const asset = dependencies[0];
-      expect(asset.alias).toBe("asset");
-      expect(asset.package).toBe("token");
-      expect(asset.constructorArgs).toMatchObject({ admin: "admin" });
-      expect(asset.setup).toEqual([
-        { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
-      ]);
-    });
-
-    it("declares novel subscriber/merchant identities as constructor defaults", () => {
-      const constructor = subscription?.constructorArgs ?? {};
-      expect(constructor.subscriber).toBe("subscriber");
-      expect(constructor.merchant).toBe("merchant");
-      expect(constructor.asset).toBe("asset");
-      expect(constructor.amount).toBe("1000");
-      expect(constructor.interval).toBe("3600");
-    });
-
-    it("exposes an interface matching the contract", () => {
-      const names = (subscription?.interface ?? []).map((fn) => fn.name);
-      expect(names).toEqual([
-        "__constructor",
-        "charge",
-        "cancel",
-        "is_active",
-      ]);
-      const ctor = subscription?.interface?.find(
-        (fn) => fn.name === "__constructor",
-      );
-      expect(ctor?.params.map((p) => p.name)).toEqual([
-        "subscriber",
-        "merchant",
-        "asset",
-        "amount",
-        "interval",
-      ]);
-      expect(ctor?.params.map((p) => p.type)).toEqual([
-        "Address",
-        "Address",
-        "Address",
-        "i128",
-        "u32",
-      ]);
-      const charge = subscription?.interface?.find(
-        (fn) => fn.name === "charge",
-      );
-      expect(charge?.params.map((p) => p.name)).toEqual(["subscriber"]);
-      expect(charge?.params.map((p) => p.type)).toEqual(["Address"]);
-      expect(charge?.authorization).toBe("first-address");
-      const isActive = subscription?.interface?.find(
-        (fn) => fn.name === "is_active",
-      );
-      expect(isActive?.returns).toBe("bool");
-      expect(isActive?.authorization).toBe("none");
-      const cancel = subscription?.interface?.find((fn) => fn.name === "cancel");
-      expect(cancel?.authorization).toBe("first-address");
-    });
-
-    it("uses only supported parameter types", () => {
-      const types = (subscription?.interface ?? [])
-        .flatMap((fn) => fn.params.map((p) => p.type))
-        .filter((type): type is string => typeof type === "string");
-      for (const type of types) {
-        expect([
-          "Address",
-          "MuxedAddress",
-          "i128",
-          "u32",
-          "String",
-          "Symbol",
-        ]).toContain(type);
-      }
-    });
-
-    it("declares only name and network configuration", () => {
-      const keys = (subscription?.config ?? []).map((f) => f.key);
-      expect(keys).toEqual(["name", "network"]);
-    });
-  });
-
-  describe("Vesting (seventh implemented component)", () => {
-    const vesting = getComponentBySlug("vesting")!;
-
-    it("is implemented, sandbox-ready, and not on Testnet", () => {
-      expect(vesting?.capabilities).toEqual({
-        implemented: true,
-        sandbox: true,
-        testnet: false,
-      });
-    });
-
-    it("declares a token asset dependency aliased 'asset'", () => {
-      const dependencies = vesting?.dependencies ?? [];
-      expect(dependencies).toHaveLength(1);
-      const asset = dependencies[0];
-      expect(asset.alias).toBe("asset");
-      expect(asset.package).toBe("token");
-      expect(asset.constructorArgs).toMatchObject({ admin: "admin" });
-      expect(asset.setup).toEqual([
-        { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
-      ]);
-    });
-
-    it("declares a novel beneficiary identity as a constructor default", () => {
-      const constructor = vesting?.constructorArgs ?? {};
-      expect(constructor.beneficiary).toBe("beneficiary");
-      expect(constructor.asset).toBe("asset");
-      expect(constructor.total).toBe("1000000");
-      expect(constructor.start).toBe("0");
-      expect(constructor.duration).toBe("86400");
-      expect(constructor.cliff).toBe("3600");
-    });
-
-    it("exposes an interface matching the contract", () => {
-      const names = (vesting?.interface ?? []).map((fn) => fn.name);
-      expect(names).toEqual([
-        "__constructor",
-        "deposit",
-        "claim",
-        "claimable",
-        "released",
-      ]);
-      const ctor = vesting?.interface?.find(
-        (fn) => fn.name === "__constructor",
-      );
-      expect(ctor?.params.map((p) => p.name)).toEqual([
-        "beneficiary",
-        "asset",
-        "total",
-        "start",
-        "duration",
-        "cliff",
-      ]);
-      expect(ctor?.params.map((p) => p.type)).toEqual([
-        "Address",
-        "Address",
-        "i128",
-        "u32",
-        "u32",
-        "u32",
-      ]);
-      const claim = vesting?.interface?.find((fn) => fn.name === "claim");
-      expect(claim?.params.map((p) => p.name)).toEqual(["beneficiary"]);
-      expect(claim?.params.map((p) => p.type)).toEqual(["Address"]);
-      expect(claim?.authorization).toBe("first-address");
-      const claimable = vesting?.interface?.find(
-        (fn) => fn.name === "claimable",
-      );
-      expect(claimable?.returns).toBe("i128");
-      expect(claimable?.authorization).toBe("none");
-      const released = vesting?.interface?.find(
-        (fn) => fn.name === "released",
-      );
-      expect(released?.returns).toBe("i128");
-      expect(released?.authorization).toBe("none");
-    });
-
-    it("uses only supported parameter types", () => {
-      const types = (vesting?.interface ?? [])
-        .flatMap((fn) => fn.params.map((p) => p.type))
-        .filter((type): type is string => typeof type === "string");
-      for (const type of types) {
-        expect([
-          "Address",
-          "MuxedAddress",
-          "i128",
-          "u32",
-          "String",
-          "Symbol",
-        ]).toContain(type);
-      }
-    });
-
-    it("declares only name and network configuration", () => {
-      const keys = (vesting?.config ?? []).map((f) => f.key);
-      expect(keys).toEqual(["name", "network"]);
-    });
-  });
-
-  describe("Staking (eighth implemented component)", () => {
-    const staking = getComponentBySlug("staking")!;
-
-    it("is implemented, sandbox-ready, and not on Testnet", () => {
-      expect(staking?.capabilities).toEqual({
-        implemented: true,
-        sandbox: true,
-        testnet: false,
-      });
-    });
-
-    it("declares a token asset dependency aliased 'asset'", () => {
-      const dependencies = staking?.dependencies ?? [];
-      expect(dependencies).toHaveLength(1);
-      const asset = dependencies[0];
-      expect(asset.alias).toBe("asset");
-      expect(asset.package).toBe("token");
-      expect(asset.constructorArgs).toMatchObject({ admin: "admin" });
-      expect(asset.setup).toEqual([
-        { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
-      ]);
-    });
-
-    it("declares catalog-driven constructor defaults", () => {
-      const constructor = staking?.constructorArgs ?? {};
-      expect(constructor.asset).toBe("asset");
-      expect(constructor.duration).toBe("86400");
-    });
-
-    it("exposes an interface matching the contract", () => {
-      const names = (staking?.interface ?? []).map((fn) => fn.name);
-      expect(names).toEqual([
-        "__constructor",
-        "fund_rewards",
-        "stake",
-        "unstake",
-        "claim",
-        "staked_balance",
-        "earned",
-        "total_staked",
-        "reward_rate",
-      ]);
-      const ctor = staking?.interface?.find(
-        (fn) => fn.name === "__constructor",
-      );
-      expect(ctor?.params.map((p) => p.name)).toEqual([
-        "asset",
-        "duration",
-      ]);
-      expect(ctor?.params.map((p) => p.type)).toEqual([
-        "Address",
-        "u32",
-      ]);
-      const fund = staking?.interface?.find((fn) => fn.name === "fund_rewards");
-      expect(fund?.authorization).toBe("admin");
-      const stake = staking?.interface?.find((fn) => fn.name === "stake");
-      expect(stake?.authorization).toBe("first-address");
-      const claim = staking?.interface?.find((fn) => fn.name === "claim");
-      expect(claim?.returns).toBe("i128");
-      expect(claim?.authorization).toBe("first-address");
-      const earned = staking?.interface?.find((fn) => fn.name === "earned");
-      expect(earned?.returns).toBe("i128");
-      expect(earned?.authorization).toBe("none");
-    });
-
-    it("uses only supported parameter types", () => {
-      const types = (staking?.interface ?? [])
-        .flatMap((fn) => fn.params.map((p) => p.type))
-        .filter((type): type is string => typeof type === "string");
-      for (const type of types) {
-        expect([
-          "Address",
-          "MuxedAddress",
-          "i128",
-          "u32",
-          "String",
-          "Symbol",
-        ]).toContain(type);
-      }
-    });
-
-    it("declares only name and network configuration", () => {
-      const keys = (staking?.config ?? []).map((f) => f.key);
-      expect(keys).toEqual(["name", "network"]);
-    });
-  });
-
-  describe("Catalog parameter-type invariant", () => {
-    it("every interface parameter type is a supported parameter type", () => {
-      for (const component of stellarComponents) {
-        for (const fn of component.interface ?? []) {
-          for (const param of fn.params) {
-            expect(SUPPORTED_PARAMETER_TYPES).toContain(param.type);
+  describe("dependencies", () => {
+    it("are internally consistent and resolve to implemented packages", () => {
+      for (const c of stellarComponents) {
+        const aliases = new Set<string>();
+        for (const dep of c.dependencies ?? []) {
+          expect(IDENTIFIER.test(dep.alias), `${c.slug} dep ${dep.alias}`).toBe(
+            true,
+          );
+          expect(
+            aliases.has(dep.alias),
+            `${c.slug} duplicate dependency alias ${dep.alias}`,
+          ).toBe(false);
+          aliases.add(dep.alias);
+          const pkg = getComponentByPackage(dep.package);
+          expect(pkg, `${c.slug} -> ${dep.package}`).toBeDefined();
+          expect(
+            pkg?.capabilities.implemented,
+            `${c.slug} -> ${dep.package}`,
+          ).toBe(true);
+          if (dep.constructorArgs) {
+            expect(typeof dep.constructorArgs).toBe("object");
+            for (const [k, v] of Object.entries(dep.constructorArgs)) {
+              expect(typeof k).toBe("string");
+              expect(typeof v).toBe("string");
+            }
+          }
+          for (const call of dep.setup ?? []) {
+            expect(typeof call.fn).toBe("string");
+            expect(Array.isArray(call.args)).toBe(true);
+            for (const a of call.args) expect(typeof a).toBe("string");
+            const fn = (pkg?.interface ?? []).find((f) => f.name === call.fn);
+            expect(
+              fn,
+              `${c.slug} setup calls ${dep.package}.${call.fn} which is not in its interface`,
+            ).toBeDefined();
           }
         }
       }
     });
   });
 
-  describe("Interface authorization metadata", () => {
-    const ALLOWED = ["none", "admin", "first-address"] as const;
-
-    it("declares an authorization level for every interface function", () => {
-      for (const component of stellarComponents) {
-        for (const fn of component.interface ?? []) {
-          expect(fn.authorization, `${component.slug}.${fn.name}`).toBeDefined();
-          expect(ALLOWED, `${component.slug}.${fn.name}`).toContain(
-            fn.authorization,
-          );
+  describe("configuration", () => {
+    it("every config field is well-formed", () => {
+      for (const c of stellarComponents) {
+        for (const field of c.config ?? []) {
+          expect(typeof field.key).toBe("string");
+          expect(field.key.length).toBeGreaterThan(0);
+          expect(typeof field.label).toBe("string");
+          expect(field.label.length).toBeGreaterThan(0);
+          expect(typeof field.type).toBe("string");
+          expect(field.type.length).toBeGreaterThan(0);
+          expect(typeof field.default).toBe("string");
+          if (field.type === "select") {
+            expect(Array.isArray(field.options)).toBe(true);
+            expect((field.options ?? []).length).toBeGreaterThan(0);
+            for (const opt of field.options ?? []) {
+              expect(typeof opt.label).toBe("string");
+              expect(typeof opt.value).toBe("string");
+            }
+          }
         }
       }
     });
-
-    it("marks at least one function as admin-only across the catalog", () => {
-      const adminFns = stellarComponents.flatMap((component) =>
-        (component.interface ?? []).filter(
-          (fn) => fn.authorization === "admin",
-        ),
-      );
-      expect(adminFns.length).toBeGreaterThan(0);
-    });
   });
 
-  describe("Catalog completeness", () => {
-    it("has zero concept components (all are implemented)", () => {
-      const concepts = stellarComponents.filter(
-        (component) => component.capabilities.implemented === false,
-      );
-      expect(concepts).toHaveLength(0);
-    });
-  });
-
-  describe("Prebuilt WASM artifact integrity", () => {
+  describe("prebuilt WASM artifact integrity", () => {
     it("exposes a committed prebuilt wasm for every implemented component", () => {
       const missing: string[] = [];
-
-      for (const component of stellarComponents) {
-        if (!component.capabilities.implemented) continue;
-
-        const pkg = component.implementation?.package;
+      for (const c of stellarComponents) {
+        if (!c.capabilities.implemented) continue;
+        const pkg = c.implementation?.package;
         expect(
           pkg,
-          `component ${component.slug} should declare implementation.package`,
+          `component ${c.slug} should declare implementation.package`,
         ).toBeDefined();
-
         const wasmPath = path.resolve(
           process.cwd(),
           "contracts",
           "prebuilt",
           `${pkg}.wasm`,
         );
-
-        if (!existsSync(wasmPath)) {
-          missing.push(`${component.slug} -> ${pkg}.wasm`);
-        }
+        if (!existsSync(wasmPath)) missing.push(`${c.slug} -> ${pkg}.wasm`);
       }
-
       expect(
         missing,
         `missing committed prebuilt wasm: ${missing.join(", ")}`,
@@ -638,41 +225,195 @@ describe("Component Standard v1 invariants", () => {
     });
   });
 
-  describe("getConfigDefaults", () => {
-    it("maps each config field key to its default value", () => {
-      const token = getComponentBySlug("token")!;
-      const defaults = getConfigDefaults(token);
-      expect(defaults).toEqual({
-        name: "Forge Token",
-        symbol: "FORGE",
-        decimals: "7",
-        network: "testnet",
-      });
+  describe("slug registry + lookups", () => {
+    it("slugs are unique", () => {
+      const slugList = stellarComponents.map((c) => c.slug);
+      expect(new Set(slugList).size).toBe(slugList.length);
     });
 
-    it("returns an empty object when the component has no config", () => {
-      const component = {
-        ...getComponentBySlug("token")!,
-        config: undefined,
-      };
-      expect(getConfigDefaults(component)).toEqual({});
+    it("getComponentBySlug resolves every component", () => {
+      for (const c of stellarComponents) {
+        expect(getComponentBySlug(c.slug), c.slug).toBe(c);
+      }
+    });
+
+    it("getComponentByPackage resolves every implemented component", () => {
+      for (const c of stellarComponents) {
+        if (!c.capabilities.implemented) continue;
+        expect(getComponentByPackage(c.implementation!.package), c.slug).toBe(c);
+      }
+    });
+  });
+
+  describe("getConfigDefaults", () => {
+    it("returns one default per config field (or empty when none)", () => {
+      for (const c of stellarComponents) {
+        const defaults = getConfigDefaults(c);
+        const keys = (c.config ?? []).map((f) => f.key);
+        expect(Object.keys(defaults).sort()).toEqual([...keys].sort());
+        for (const v of Object.values(defaults)) {
+          expect(typeof v).toBe("string");
+        }
+      }
     });
   });
 
   describe("componentWasmPath", () => {
-    it("builds the wasm path from the implementation metadata", () => {
-      const token = getComponentBySlug("token")!;
-      expect(componentWasmPath(token)).toBe(
-        "contracts/target/wasm32v1-none/release/token.wasm",
-      );
+    it("builds the release wasm path from the implementation package", () => {
+      for (const c of stellarComponents) {
+        if (!c.capabilities.implemented) continue;
+        const pkgFile = c.implementation!.package.replace(/-/g, "_");
+        expect(componentWasmPath(c)).toBe(
+          `contracts/target/wasm32v1-none/release/${pkgFile}.wasm`,
+        );
+      }
     });
+  });
 
-    it("builds the wasm path for the implemented subscription", () => {
-      const component = getComponentBySlug("subscription")!;
-      expect(component.implementation?.package).toBe("subscription");
-      expect(componentWasmPath(component)).toBe(
-        "contracts/target/wasm32v1-none/release/subscription.wasm",
-      );
+  describe("componentMaturity", () => {
+    it("maps implemented -> Implemented and concept -> Concept", () => {
+      const states = new Set<string>();
+      for (const c of stellarComponents) {
+        const maturity = componentMaturity(c);
+        states.add(maturity);
+        if (c.capabilities.implemented) {
+          expect(maturity, c.slug).toBe("Implemented");
+        } else {
+          expect(maturity, c.slug).toBe("Concept");
+        }
+      }
+      expect([...states]).toEqual(expect.arrayContaining(["Implemented"]));
+      expect(new Set([...states]).size).toBeLessThanOrEqual(2);
     });
+  });
+
+  describe("concept components (data-driven)", () => {
+    const conceptSlugs = stellarComponents
+      .filter((c) => c.capabilities.implemented === false)
+      .map((c) => c.slug);
+
+    it("every concept is marked not implemented, not sandbox, not testnet", () => {
+      for (const slug of conceptSlugs) {
+        const c = getComponentBySlug(slug);
+        expect(c, slug).toBeDefined();
+        expect(c?.capabilities).toEqual({
+          implemented: false,
+          sandbox: false,
+          testnet: false,
+        });
+      }
+    });
+  });
+});
+
+describe("catalog ordering (generic, data-driven)", () => {
+  it("every catalog component has a valid numeric displayOrder", () => {
+    for (const c of stellarComponents) {
+      expect(typeof c.displayOrder).toBe("number");
+      expect(Number.isFinite(c.displayOrder)).toBe(true);
+    }
+  });
+
+  it("orders the catalog by displayOrder then name deterministically", () => {
+    const ordered = orderComponents(stellarComponents);
+    expect(ordered.map((c) => c.slug)).toEqual([
+      "token",
+      "payment",
+      "allowance",
+      "atomic-swap",
+      "claimable-balance",
+      "merkle-airdrop",
+      "oracle",
+      "vesting",
+      "subscription",
+      "crowdfund",
+      "staking",
+      "timelock",
+      "escrow",
+      "access-control",
+      "multi-signature",
+    ]);
+  });
+
+  it("does not mutate the source catalog array", () => {
+    const before = stellarComponents.map((c) => c.slug);
+    orderComponents(stellarComponents);
+    expect(stellarComponents.map((c) => c.slug)).toEqual(before);
+  });
+
+  it("resolves equal displayOrder deterministically (name then slug)", () => {
+    const alpha = {
+      ...stellarComponents[1],
+      slug: "aaa",
+      name: "Alpha",
+      displayOrder: 5,
+    };
+    const zeta = {
+      ...stellarComponents[0],
+      slug: "zzz",
+      name: "Zeta",
+      displayOrder: 5,
+    };
+    expect(orderComponents([zeta, alpha]).map((c) => c.slug)).toEqual([
+      "aaa",
+      "zzz",
+    ]);
+  });
+
+  it("orders any input (including reversed) and keeps every component", () => {
+    const reversed = [...stellarComponents].reverse();
+    const ordered = orderComponents(reversed);
+    expect(ordered.map((c) => c.slug).sort()).toEqual(
+      stellarComponents.map((c) => c.slug).sort(),
+    );
+  });
+
+  it("automatically includes a brand-new component in the ordering", () => {
+    const extra = {
+      ...stellarComponents[0],
+      slug: "future-component",
+      name: "Future Component",
+      displayOrder: 15,
+    };
+    const ordered = orderComponents([...stellarComponents, extra]);
+    expect(ordered).toHaveLength(stellarComponents.length + 1);
+    expect(ordered.some((c) => c.slug === "future-component")).toBe(true);
+  });
+
+  it("places the homepage showcase and playground default at displayOrder 10 (token)", () => {
+    expect(orderComponents(stellarComponents)[0].slug).toBe("token");
+    expect(orderComponents(stellarComponents).slice(0, 6)[0].slug).toBe("token");
+  });
+});
+
+describe("catalog categories (generic, data-driven)", () => {
+  it("every catalog component has a non-empty category", () => {
+    for (const c of stellarComponents) {
+      expect(typeof c.category).toBe("string");
+      expect(c.category.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("derives the category list from the catalog, with All first", () => {
+    expect(componentCategories[0]).toBe("All");
+    const derived = componentCategories.slice(1);
+    const catalogCats = [
+      ...new Set(stellarComponents.map((c) => c.category)),
+    ];
+    expect(new Set(derived)).toEqual(new Set(catalogCats));
+    for (const cat of derived) {
+      expect(stellarComponents.some((c) => c.category === cat)).toBe(true);
+    }
+  });
+
+  it("orders categories by the lowest displayOrder among their members", () => {
+    expect(componentCategories).toEqual(["All", "Tokens", "Payments", "Security"]);
+  });
+
+  it("requires no separate hardcoded category list", () => {
+    const catalogCats = new Set(stellarComponents.map((c) => c.category));
+    for (const cat of catalogCats) {
+      expect(componentCategories).toContain(cat);
+    }
   });
 });

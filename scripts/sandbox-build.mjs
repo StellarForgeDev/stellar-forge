@@ -1,15 +1,17 @@
 // Builds the artifacts the Playground API needs for local development:
 //   1. the native sandbox-runner executable (cargo build),
-//   2. the contract wasm artifacts (stellar contract build).
+//   2. the contract wasm artifacts (cargo build --target wasm32v1-none).
 //
 // Usage:
 //   node scripts/sandbox-build.mjs            build for local development
 //   node scripts/sandbox-build.mjs --prebuilt also refresh contracts/prebuilt/*.wasm
 //
-// The prebuilt wasm files are committed and used on Vercel, where the wasm
-// cannot be rebuilt without the Stellar CLI. The runner is never committed:
-// locally it is built here, and on Vercel it is compiled by
-// scripts/vercel-sandbox-build.sh.
+// The prebuilt wasm files are committed and used on Vercel, where the Rust +
+// wasm32v1-none toolchain is unavailable. They are produced by plain
+// `cargo build` (no Stellar CLI), which is the SAME method used by
+// scripts/verify-prebuilt.mjs so the committed artifacts stay byte-for-byte
+// reproducible. The runner is never committed: locally it is built here, and
+// on Vercel it is compiled by scripts/vercel-sandbox-build.sh.
 
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
@@ -63,7 +65,11 @@ function wasmBaseName(packageName) {
 for (const packageName of implementedPackages) {
   const wasm = path.join(WASM_TARGET, wasmBaseName(packageName));
   if (!existsSync(wasm)) {
-    run("stellar", ["contract", "build", "--package", packageName], CONTRACTS);
+    run(
+      "cargo",
+      ["build", "--target", "wasm32v1-none", "--release", "-p", packageName],
+      CONTRACTS,
+    );
   }
 }
 

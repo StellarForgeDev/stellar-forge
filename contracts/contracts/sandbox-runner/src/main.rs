@@ -5,8 +5,8 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use serde_json::{json, Value};
 use soroban_sdk::{
     xdr::{ScError, ScVal},
-    Address, Bytes, Env, IntoVal, MuxedAddress, String as SdkString, Symbol, TryFromVal, Val,
-    Vec as SdkVec,
+    Address, Bytes, Duration, Env, IntoVal, MuxedAddress, String as SdkString, Symbol,
+    Timepoint, TryFromVal, Val, Vec as SdkVec,
 };
 
 /// Default location of the built contract wasm, relative to the repository
@@ -359,6 +359,30 @@ fn build_arg(
         }
         "i128" => Ok(parse_i128(arg)?.into_val(env)),
         "u32" => Ok(parse_u32(arg)?.into_val(env)),
+        "u64" => Ok(parse_u64(arg)?.into_val(env)),
+        "i64" => Ok(parse_i64(arg)?.into_val(env)),
+        "bool" => {
+            let b = arg
+                .as_bool()
+                .ok_or_else(|| format!("bool argument must be a boolean, got {arg}"))?;
+            Ok(b.into_val(env))
+        }
+        "Timepoint" => Ok(Timepoint::from_unix(env, parse_u64(arg)?).to_val()),
+        "Duration" => Ok(Duration::from_seconds(env, parse_u64(arg)?).to_val()),
+        "Bytes" => {
+            let s = arg
+                .as_str()
+                .ok_or_else(|| format!("bytes argument must be a string, got {arg}"))?;
+            Ok(Bytes::from_slice(env, &hex_decode(s).map_err(|e| format!("bytes: {e}"))?).to_val())
+        }
+        // `Option<Timepoint>` is encoded as `void` for `None` and the inner
+        // `Timepoint` `Val` for `Some` (Soroban has no `ScVal::Option` variant).
+        "Option<Timepoint>" => {
+            if arg.is_null() {
+                return Ok(ScVal::Void.into_val(env));
+            }
+            Ok(Timepoint::from_unix(env, parse_u64(arg)?).to_val())
+        }
         "String" => {
             let s = arg
                 .as_str()
@@ -432,6 +456,57 @@ fn parse_u32(value: &Value) -> Result<u32, String> {
             .map_err(|_| format!("invalid u32 value: {s}"));
     }
     Err(format!("expected a u32 value, got {value}"))
+}
+
+fn parse_u64(value: &Value) -> Result<u64, String> {
+    if let Some(n) = value.as_u64() {
+        return Ok(n);
+    }
+    if let Some(s) = value.as_str() {
+        return s
+            .parse::<u64>()
+            .map_err(|_| format!("invalid u64 value: {s}"));
+    }
+    Err(format!("expected a u64 value, got {value}"))
+}
+
+fn parse_i64(value: &Value) -> Result<i64, String> {
+    if let Some(n) = value.as_i64() {
+        return Ok(n);
+    }
+    if let Some(s) = value.as_str() {
+        return s
+            .parse::<i64>()
+            .map_err(|_| format!("invalid i64 value: {s}"));
+    }
+    Err(format!("expected an i64 value, got {value}"))
+}
+
+/// Decodes a hex string (lower- or upper-case, optional `0x` prefix) into bytes.
+fn hex_decode(s: &str) -> Result<Vec<u8>, String> {
+    let s = s.strip_prefix("0x").unwrap_or(s);
+    if s.len() % 2 != 0 {
+        return Err(format!("hex string has an odd length: {s}"));
+    }
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(s.len() / 2);
+    let mut i = 0;
+    while i < bytes.len() {
+        let hi = hex_nibble(bytes[i])?;
+        let lo = hex_nibble(bytes[i + 1])?;
+        out.push((hi << 4) | lo);
+        i += 2;
+    }
+    Ok(out)
+}
+
+fn hex_nibble(b: u8) -> Result<u8, String> {
+    match b {
+        b'0'..=b'9' => Ok(b - b'0'),
+        b'a'..=b'f' => Ok(b - b'a' + 10),
+        b'A'..=b'F' => Ok(b - b'A' + 10),
+        _ => Err(format!("invalid hex character: {}", b as char)),
+    }
 }
 
 fn val_to_json(env: &Env, val: &Val) -> Value {
@@ -1743,5 +1818,235 @@ mod tests {
         // claim(user1): 0 rewards before any time passes.
         assert_eq!(calls[7].get("ok").and_then(Value::as_bool), Some(true));
         assert_eq!(calls[7].get("result").and_then(Value::as_i64), Some(0));
+    }
+
+    #[test]
+    fn timelock_executes_against_provisioned_dependency() {
+        // Regression test: the sandbox runner must be able to build
+        // `Timepoint` arguments (and serialize `Timepoint` results). `lock`
+        // takes a `Timepoint` `unlock_time`; `unlock_time` returns one. Before
+        // the runner learned these types, every call failed with
+        // "unsupported parameter type".
+        let timelock_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/timelock.wasm"
+        );
+        let token_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/token.wasm"
+        );
+        if !std::path::Path::new(timelock_wasm).exists()
+            || !std::path::Path::new(token_wasm).exists()
+        {
+            return;
+        }
+        let request = json!({
+            "wasmPath": timelock_wasm,
+            "constructorParams": [],
+            "constructor": {},
+            "dependencies": [{
+                "alias": "asset",
+                "wasmPath": token_wasm,
+                "constructorParams": [
+                    { "name": "admin", "type": "Address" },
+                    { "name": "decimal", "type": "u32" },
+                    { "name": "name", "type": "String" },
+                    { "name": "symbol", "type": "String" },
+                ],
+                "constructor": {
+                    "admin": "admin",
+                    "decimal": "7",
+                    "name": "Timelock Asset",
+                    "symbol": "TLA",
+                },
+                "setup": [
+                    { "fn": "mint", "params": [{ "name": "to", "type": "Address" }, { "name": "amount", "type": "i128" }], "args": ["admin", "1000000"], "signer": "admin" }
+                ],
+            }],
+            "calls": [
+                { "fn": "lock", "params": [{ "name": "owner", "type": "Address" }, { "name": "asset", "type": "Address" }, { "name": "amount", "type": "i128" }, { "name": "beneficiary", "type": "Address" }, { "name": "unlock_time", "type": "Timepoint" }], "args": ["admin", "asset", "100", "user1", "1000"], "signer": "admin" },
+                { "fn": "is_unlocked", "params": [{ "name": "lock_id", "type": "u64" }], "args": [0] },
+                { "fn": "unlock_time", "params": [{ "name": "lock_id", "type": "u64" }], "args": [0] },
+                { "fn": "lock_released", "params": [{ "name": "lock_id", "type": "u64" }], "args": [0] },
+                { "fn": "release", "params": [{ "name": "lock_id", "type": "u64" }], "args": [0], "signer": "user1" },
+            ],
+        });
+        let response = execute(request);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 5);
+        // lock escrows successfully.
+        assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
+        // is_unlocked == false before unlock time.
+        assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[1].get("result").and_then(Value::as_bool), Some(false));
+        // unlock_time returns the stored Timepoint (serialized as u64).
+        assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[2].get("result").and_then(Value::as_u64), Some(1000));
+        // lock_released == false before release.
+        assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[3].get("result").and_then(Value::as_bool), Some(false));
+        // release before unlock must be refused.
+        assert_eq!(calls[4].get("ok").and_then(Value::as_bool), Some(false));
+    }
+
+    #[test]
+    fn crowdfund_executes_against_provisioned_dependency() {
+        // Regression test: `create_campaign` takes a `Timepoint` `deadline`.
+        // Before the runner learned to build `Timepoint` arguments, the call
+        // failed with "unsupported parameter type" and the whole e2e failed.
+        let crowdfund_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/crowdfund.wasm"
+        );
+        let token_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/token.wasm"
+        );
+        if !std::path::Path::new(crowdfund_wasm).exists()
+            || !std::path::Path::new(token_wasm).exists()
+        {
+            return;
+        }
+        let request = json!({
+            "wasmPath": crowdfund_wasm,
+            "constructorParams": [],
+            "constructor": {},
+            "dependencies": [{
+                "alias": "asset",
+                "wasmPath": token_wasm,
+                "constructorParams": [
+                    { "name": "admin", "type": "Address" },
+                    { "name": "decimal", "type": "u32" },
+                    { "name": "name", "type": "String" },
+                    { "name": "symbol", "type": "String" },
+                ],
+                "constructor": {
+                    "admin": "admin",
+                    "decimal": "7",
+                    "name": "Crowdfund Asset",
+                    "symbol": "CFA",
+                },
+                "setup": [
+                    { "fn": "mint", "params": [{ "name": "to", "type": "Address" }, { "name": "amount", "type": "i128" }], "args": ["admin", "1000000"], "signer": "admin" },
+                    { "fn": "mint", "params": [{ "name": "to", "type": "Address" }, { "name": "amount", "type": "i128" }], "args": ["user1", "1000000"], "signer": "admin" },
+                    { "fn": "mint", "params": [{ "name": "to", "type": "Address" }, { "name": "amount", "type": "i128" }], "args": ["user2", "1000000"], "signer": "admin" },
+                ],
+            }],
+            "calls": [
+                { "fn": "create_campaign", "params": [{ "name": "owner", "type": "Address" }, { "name": "asset", "type": "Address" }, { "name": "goal", "type": "i128" }, { "name": "deadline", "type": "u64" }], "args": ["admin", "asset", "1000", "1000"], "signer": "admin" },
+                { "fn": "contribute", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "contributor", "type": "Address" }, { "name": "amount", "type": "i128" }], "args": [0, "user1", "500"], "signer": "user1" },
+                { "fn": "contribute", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "contributor", "type": "Address" }, { "name": "amount", "type": "i128" }], "args": [0, "user2", "300"], "signer": "user2" },
+                { "fn": "goal_reached", "params": [{ "name": "campaign_id", "type": "u64" }], "args": [0] },
+                { "fn": "total_raised", "params": [{ "name": "campaign_id", "type": "u64" }], "args": [0] },
+                { "fn": "contribution_of", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "contributor", "type": "Address" }], "args": [0, "user1"] },
+                { "fn": "withdraw", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "owner", "type": "Address" }], "args": [0, "admin"], "signer": "admin" },
+                { "fn": "claim_refund", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "contributor", "type": "Address" }], "args": [0, "user1"], "signer": "user1" },
+            ],
+        });
+        let response = execute(request);
+        eprintln!("CROWDFUND RESPONSE: {}", response);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 8);
+        assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[3].get("result").and_then(Value::as_bool), Some(false));
+        assert_eq!(calls[4].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[4].get("result").and_then(Value::as_i64), Some(800));
+        assert_eq!(calls[5].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[5].get("result").and_then(Value::as_i64), Some(500));
+        // withdraw / claim_refund before the deadline must be refused.
+        assert_eq!(calls[6].get("ok").and_then(Value::as_bool), Some(false));
+        assert_eq!(calls[7].get("ok").and_then(Value::as_bool), Some(false));
+    }
+
+    #[test]
+    fn claimable_balance_executes_against_provisioned_dependency() {
+        // Regression test: `deposit` takes a `Duration` `delay` and an
+        // `Option<Timepoint>` `expiry`. Before the runner learned to build
+        // these argument types, the call failed and the whole e2e failed.
+        let claimable_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/claimable_balance.wasm"
+        );
+        let token_wasm = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/wasm32v1-none/release/token.wasm"
+        );
+        if !std::path::Path::new(claimable_wasm).exists()
+            || !std::path::Path::new(token_wasm).exists()
+        {
+            return;
+        }
+        let request = json!({
+            "wasmPath": claimable_wasm,
+            "constructorParams": [
+                { "name": "admin", "type": "Address" },
+                { "name": "asset", "type": "Address" },
+            ],
+            "constructor": {
+                "admin": "admin",
+                "asset": "asset",
+            },
+            "dependencies": [{
+                "alias": "asset",
+                "wasmPath": token_wasm,
+                "constructorParams": [
+                    { "name": "admin", "type": "Address" },
+                    { "name": "decimal", "type": "u32" },
+                    { "name": "name", "type": "String" },
+                    { "name": "symbol", "type": "String" },
+                ],
+                "constructor": {
+                    "admin": "admin",
+                    "decimal": "7",
+                    "name": "Claimable Asset",
+                    "symbol": "CBA",
+                },
+                "setup": [
+                    { "fn": "mint", "params": [{ "name": "to", "type": "Address" }, { "name": "amount", "type": "i128" }], "args": ["admin", "1000000"], "signer": "admin" },
+                ],
+            }],
+            "calls": [
+                { "fn": "deposit", "params": [{ "name": "funder", "type": "Address" }, { "name": "claimant", "type": "Address" }, { "name": "amount", "type": "i128" }, { "name": "delay", "type": "Duration" }, { "name": "expiry", "type": "Option<Timepoint>" }], "args": ["admin", "user1", "1000", "86400", null], "signer": "admin" },
+                { "fn": "deposit", "params": [{ "name": "funder", "type": "Address" }, { "name": "claimant", "type": "Address" }, { "name": "amount", "type": "i128" }, { "name": "delay", "type": "Duration" }, { "name": "expiry", "type": "Option<Timepoint>" }], "args": ["admin", "user2", "500", "86400", "1000"], "signer": "admin" },
+                { "fn": "balance_of", "params": [{ "name": "balance_id", "type": "u64" }], "args": [0] },
+                { "fn": "is_claimable", "params": [{ "name": "balance_id", "type": "u64" }], "args": [0] },
+                { "fn": "expiry", "params": [{ "name": "balance_id", "type": "u64" }], "args": [1] },
+            ],
+        });
+        let response = execute(request);
+        eprintln!("CLAIMABLE RESPONSE: {}", response);
+        assert_eq!(
+            response.get("ok").and_then(Value::as_bool),
+            Some(true),
+            "response was: {}",
+            response
+        );
+        let calls = response.get("calls").and_then(Value::as_array).unwrap();
+        assert_eq!(calls.len(), 5);
+        assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(calls[2].get("result").and_then(Value::as_i64), Some(1000));
+        assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
+        // The delay has not elapsed at ledger start, so not claimable yet.
+        assert_eq!(calls[3].get("result").and_then(Value::as_bool), Some(false));
+        assert_eq!(calls[4].get("ok").and_then(Value::as_bool), Some(true));
+        // expiry for balance 1 was provided as Some(Timepoint(1000)).
+        assert_eq!(calls[4].get("result").and_then(Value::as_i64), Some(1000));
     }
 }

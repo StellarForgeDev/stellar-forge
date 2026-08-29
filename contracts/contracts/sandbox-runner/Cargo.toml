@@ -7,3 +7,7 @@ publish = false
 [dependencies]
 soroban-sdk = { workspace = true, features = ["testutils", "alloc"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
+
+[dev-dependencies]
+merkle-airdrop = { path = "../merkle-airdrop" }
+ed25519-dalek = "2"
