@@ -176,7 +176,7 @@ No features beyond the above are implied or promised.
 
 ## Contributing
 
-Contribution guidance will be expanded as the project matures. For now, the repository follows the development principles in `AGENTS.md` and `CLAUDE.md`.
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, verification commands, and how to add a new catalog-driven component. The repository also follows the development principles in `AGENTS.md` and `CLAUDE.md`.
 
 ### Adding a component
 
@@ -191,4 +191,4 @@ No edits to `src/app`, the API routes, the transaction builder, or the integrati
 
 ## License
 
-Licensing has not yet been finalized. No `LICENSE` file is present in the repository.
+Stellar-Forge is distributed under the MIT License. See [`LICENSE`](./LICENSE).
