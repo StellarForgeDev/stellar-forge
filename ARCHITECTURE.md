@@ -588,6 +588,16 @@ placeholder instead of generated code. The supported languages are `rust` and
 
 ## Deployment Architecture
 
+> **Status note (Phase 5.2, 2026-08-30):** the `vercel-sandbox-build.sh` script was
+> corrected to build from the `contracts/` Cargo workspace (it previously `cd`'d to
+> the repo root, where no `Cargo.toml` exists, which would have failed the Vercel
+> build). The local runtime path — API route → `sandbox-runner` → prebuilt WASM →
+> structured JSON — is verified. An actual Vercel deployment has **not** been
+> reached in this environment (no credentialed access), so the cloud path remains
+> unverified; the primary residual cloud risk is whether Next.js output tracing
+> preserves the runner's executable bit (the build script now `chmod +x`s it as a
+> guard).
+
 Current arrangement (committed, **not verified end-to-end**):
 
 - Vercel invokes `vercel-build` (`scripts/vercel-sandbox-build.sh` then

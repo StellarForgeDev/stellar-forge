@@ -10,7 +10,7 @@
 # Runs as the `vercel-build` script (Vercel invokes it instead of `build`).
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../contracts"
 
 if ! command -v cargo >/dev/null 2>&1; then
   if command -v rustup >/dev/null 2>&1; then
@@ -33,5 +33,10 @@ CARGO_PROFILE_RELEASE_LTO=false \
 CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
 CARGO_PROFILE_RELEASE_PANIC=unwind \
 cargo build --release -p sandbox-runner
+
+# Ensure the binary is executable. Next.js output tracing copies the runner
+# into the serverless bundle; reinforcing the mode here guards against a lost
+# executable bit (which would make execFile fail at runtime on Vercel).
+chmod +x "target/release/sandbox-runner" 2>/dev/null || true
 
 echo "[sandbox] sandbox-runner ready" >&2
