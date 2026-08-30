@@ -23,9 +23,16 @@ fn next_id_key(e: &Env) -> Symbol {
     Symbol::new(e, NEXT_ID_KEY)
 }
 
-// Allowance live-until ledger, generous like the other components.
-fn live(e: &Env) -> u32 {
-    e.ledger().sequence().saturating_add(5_000_000)
+const SAFE_ALLOWANCE_TTL: u32 = 1_000_000;
+
+fn check_expiration(e: &Env, expiration_ledger: u32) {
+    let current = e.ledger().sequence();
+    if expiration_ledger <= current {
+        panic!("expiration_ledger must be in the future");
+    }
+    if expiration_ledger.saturating_sub(current) > SAFE_ALLOWANCE_TTL {
+        panic!("expiration_ledger too far");
+    }
 }
 
 #[contracttype]
@@ -88,10 +95,12 @@ impl ClaimableBalance {
         amount: i128,
         delay: Duration,
         expiry: Option<Timepoint>,
+        expiration_ledger: u32,
     ) -> u64 {
         if amount <= 0 {
             panic!("amount must be positive");
         }
+        check_expiration(e, expiration_ledger);
         funder.require_auth();
 
         let asset = load_asset(e);
@@ -99,7 +108,7 @@ impl ClaimableBalance {
         let unlock_time = e.ledger().timestamp().saturating_add(delay.to_seconds());
 
         let token = TokenClient::new(e, &asset);
-        token.approve(&funder, &contract, &amount, &live(e));
+        token.approve(&funder, &contract, &amount, &expiration_ledger);
         token.transfer_from(&contract, &funder, &contract, &amount);
 
         let mut balances = load_balances(e);

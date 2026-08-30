@@ -24,6 +24,71 @@ const DEPLOYMENTS: ContractDeployment[] = [
     componentSlug: "payment",
     address: "CDHHS2W3TYYHQ3RJSZKB4HLUGMQ4TX6KPBBUUH7B57CVYSNXO646DABR",
   },
+  {
+    network: "testnet",
+    componentSlug: "access-control",
+    address: "CB5LA255QBGZH4UURMOGL6SJIVQE5PFQXZZ5JSF7UD5SIYQSGVAM3HQY",
+  },
+  {
+    network: "testnet",
+    componentSlug: "multi-signature",
+    address: "CDDEDAVZZGKCWAJAGW5O4HPMMZB567MEBWXQZL7WOCPCBAPZ6IIIV5Q6",
+  },
+  {
+    network: "testnet",
+    componentSlug: "escrow",
+    address: "CAIQCE5T6E75W4Y73ZETK4VP4GACIXZ2EU7HRQSKLNPVK6WBAMYFUYHH",
+  },
+  {
+    network: "testnet",
+    componentSlug: "oracle",
+    address: "CAFLTWXJL667NIEORFFOYGWKE27UZVPS3QSTY5P2GXEB7J2V4DI64PSR",
+  },
+  {
+    network: "testnet",
+    componentSlug: "subscription",
+    address: "CDNIQAKTBIGDXKEO7D473GDKBKHCKF2WKORPTB7GO53MBPLJRCIHFVAY",
+  },
+  {
+    network: "testnet",
+    componentSlug: "vesting",
+    address: "CCKMY7NC4PZJ4772HFGFSQOM5OVLFVVFXBVAE2VLBP74EMLO6QRJWTPY",
+  },
+  {
+    network: "testnet",
+    componentSlug: "staking",
+    address: "CCBNO5JQWKTIYU3EVCZOJXKBAJ5LBYXQCPXIYAV4SHQ43AL22JZOUHHG",
+  },
+  {
+    network: "testnet",
+    componentSlug: "atomic-swap",
+    address: "CATGWSXC7LJ4QONVEFQIZD6IHA4XHLK3HLR4LERSDLJ2DVVC4TWQDE4K",
+  },
+  {
+    network: "testnet",
+    componentSlug: "timelock",
+    address: "CA7PII42RSAZVYAG6NXQFT5ZY7ME3NMNK2PKQU2CG2GJ5M4XYSCCMA4C",
+  },
+  {
+    network: "testnet",
+    componentSlug: "merkle-airdrop",
+    address: "CDJ7QXPQNI6VVZQ24G3T3D4B7MTV45COGERRZBN2XHB7QHRAUCSGUKO7",
+  },
+  {
+    network: "testnet",
+    componentSlug: "crowdfund",
+    address: "CAHZASCRPTE3GNKC26I3UALHEUBZDSNOIAQOPVWSTT3EBIFS7SQR6YJC",
+  },
+  {
+    network: "testnet",
+    componentSlug: "allowance",
+    address: "CBLYFW2TV6MPGPBKBU6P6HUMANYEQLR4XXBXVQBG5M5BX75WSKQMWOKN",
+  },
+  {
+    network: "testnet",
+    componentSlug: "claimable-balance",
+    address: "CCNGYMU2DLXIL4TJGS4KUXNQTWY7XZMEQ5JLNIAIL4BSTZB3KODKK5LP",
+  },
 ];
 
 export function getDeployment(

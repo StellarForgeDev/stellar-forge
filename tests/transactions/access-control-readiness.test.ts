@@ -22,17 +22,17 @@ const accessControlRequest = {
 
 describe("Access Control discovery and sandbox readiness (generic machinery)", () => {
   describe("capabilities", () => {
-    it("is implemented and sandbox-ready but not on Testnet", () => {
+    it("is implemented, sandbox-ready, and deployed on Testnet", () => {
       expect(accessControl.capabilities.implemented).toBe(true);
       expect(accessControl.capabilities.sandbox).toBe(true);
-      expect(accessControl.capabilities.testnet).toBe(false);
+      expect(accessControl.capabilities.testnet).toBe(true);
     });
   });
 
   describe("discovery", () => {
-    it("is excluded from Testnet transactions because testnet=false", () => {
+    it("is included in Testnet transactions because it is deployed", () => {
       const slugs = transactionComponents([accessControl]).map((c) => c.slug);
-      expect(slugs).not.toContain("access-control");
+      expect(slugs).toContain("access-control");
     });
 
     it("exposes its interface generically through callableMethods", () => {
@@ -66,14 +66,11 @@ describe("Access Control discovery and sandbox readiness (generic machinery)", (
   });
 
   describe("validation gating", () => {
-    it("rejects Access Control for Testnet because it is not deployed", () => {
+    it("accepts Access Control for Testnet now that it is deployed", () => {
       const result = validateTransactionRequest(accessControlRequest, [
         accessControl,
       ]);
-      expect(result.ok).toBe(false);
-      expect(
-        result.errors.some((error) => error.code === "component.not-deployed"),
-      ).toBe(true);
+      expect(result.ok).toBe(true);
     });
   });
 

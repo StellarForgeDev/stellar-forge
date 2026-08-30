@@ -27,6 +27,10 @@ fn create_crowdfund(e: &Env) -> CrowdfundClient<'static> {
     CrowdfundClient::new(e, &address)
 }
 
+fn live(e: &Env) -> u32 {
+    e.ledger().sequence() + 1000
+}
+
 #[test]
 fn successful_campaign_reaches_goal_and_owner_withdraws() {
     let e = Env::default();
@@ -41,8 +45,8 @@ fn successful_campaign_reaches_goal_and_owner_withdraws() {
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
 
-    cf.contribute(&id, &a, &600);
-    cf.contribute(&id, &b, &400);
+    cf.contribute(&id, &a, &600, &live(&e));
+    cf.contribute(&id, &b, &400, &live(&e));
 
     // Composite result serialization exercised before the deadline.
     assert_eq!(cf.total_raised(&id), 1000);
@@ -74,8 +78,8 @@ fn failed_campaign_refunds_contributors() {
     tc.mint(&b, &1000);
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
-    cf.contribute(&id, &a, &300);
-    cf.contribute(&id, &b, &200);
+    cf.contribute(&id, &a, &300, &live(&e));
+    cf.contribute(&id, &b, &200, &live(&e));
 
     assert_eq!(cf.total_raised(&id), 500);
     assert_eq!(cf.goal_reached(&id), false);
@@ -109,7 +113,7 @@ fn contribute_after_deadline_panics() {
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
     e.ledger().set_timestamp(1000);
-    cf.contribute(&id, &a, &100);
+    cf.contribute(&id, &a, &100, &live(&e));
 }
 
 #[test]
@@ -123,7 +127,7 @@ fn withdraw_before_deadline_panics() {
     tc.mint(&a, &1000);
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
-    cf.contribute(&id, &a, &1000);
+    cf.contribute(&id, &a, &1000, &live(&e));
     cf.withdraw(&id, &owner);
 }
 
@@ -138,7 +142,7 @@ fn withdraw_when_goal_unmet_panics() {
     tc.mint(&a, &1000);
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
-    cf.contribute(&id, &a, &500);
+    cf.contribute(&id, &a, &500, &live(&e));
     e.ledger().set_timestamp(1000);
     cf.withdraw(&id, &owner);
 }
@@ -155,7 +159,7 @@ fn non_owner_withdraw_panics() {
     tc.mint(&a, &1000);
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
-    cf.contribute(&id, &a, &1000);
+    cf.contribute(&id, &a, &1000, &live(&e));
     e.ledger().set_timestamp(1000);
     // A non-owner address must be refused even with auth mocked.
     cf.withdraw(&id, &stranger);
@@ -172,7 +176,7 @@ fn withdraw_twice_panics() {
     tc.mint(&a, &1000);
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
-    cf.contribute(&id, &a, &1000);
+    cf.contribute(&id, &a, &1000, &live(&e));
     e.ledger().set_timestamp(1000);
     cf.withdraw(&id, &owner);
     cf.withdraw(&id, &owner);
@@ -189,7 +193,7 @@ fn refund_claimed_twice_panics() {
     tc.mint(&a, &1000);
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
-    cf.contribute(&id, &a, &500);
+    cf.contribute(&id, &a, &500, &live(&e));
     e.ledger().set_timestamp(1000);
     cf.claim_refund(&id, &a);
     // Second claim (for the same contributor) must be refused.
@@ -207,7 +211,7 @@ fn refund_when_goal_reached_panics() {
     tc.mint(&a, &1000);
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
-    cf.contribute(&id, &a, &1000);
+    cf.contribute(&id, &a, &1000, &live(&e));
     e.ledger().set_timestamp(1000);
     // Goal was reached, so refunds are not available.
     cf.claim_refund(&id, &a);
@@ -223,7 +227,7 @@ fn rejects_zero_contribution() {
     let (asset, _tc) = create_token(&e, &owner);
     let cf = create_crowdfund(&e);
     let id = cf.create_campaign(&owner, &asset, &1000, &1000);
-    cf.contribute(&id, &a, &0);
+    cf.contribute(&id, &a, &0, &live(&e));
 }
 
 #[test]
@@ -235,4 +239,49 @@ fn rejects_zero_goal() {
     let (asset, _tc) = create_token(&e, &owner);
     let cf = create_crowdfund(&e);
     cf.create_campaign(&owner, &asset, &0, &1000);
+}
+
+#[test]
+#[should_panic(expected = "expiration_ledger must be in the future")]
+fn rejects_past_expiration() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let owner = Address::generate(&e);
+    let a = Address::generate(&e);
+    let (asset, tc) = create_token(&e, &owner);
+    tc.mint(&a, &1000);
+    let cf = create_crowdfund(&e);
+    let id = cf.create_campaign(&owner, &asset, &1000, &1000);
+    // expiration 0 is in the past (current seq is 0/1)
+    cf.contribute(&id, &a, &100, &0);
+}
+
+#[test]
+#[should_panic(expected = "expiration_ledger too far")]
+fn rejects_far_expiration() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let owner = Address::generate(&e);
+    let a = Address::generate(&e);
+    let (asset, tc) = create_token(&e, &owner);
+    tc.mint(&a, &1000);
+    let cf = create_crowdfund(&e);
+    let id = cf.create_campaign(&owner, &asset, &1000, &1000);
+    let far = e.ledger().sequence() + 1_000_001;
+    cf.contribute(&id, &a, &100, &far);
+}
+
+#[test]
+#[should_panic(expected = "expiration_ledger must be in the future")]
+fn rejects_equal_current_expiration() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let owner = Address::generate(&e);
+    let a = Address::generate(&e);
+    let (asset, tc) = create_token(&e, &owner);
+    tc.mint(&a, &1000);
+    let cf = create_crowdfund(&e);
+    let id = cf.create_campaign(&owner, &asset, &1000, &1000);
+    let current = e.ledger().sequence();
+    cf.contribute(&id, &a, &100, &current);
 }

@@ -20,8 +20,6 @@ use soroban_sdk::{
     Address, Env, Map, Symbol, Vec,
 };
 
-const LEDGER_DURATION: u32 = 5_000_000;
-
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct Campaign {
@@ -45,10 +43,16 @@ fn next_id_key(e: &Env) -> Symbol {
     Symbol::new(e, "next_id")
 }
 
-fn live(e: &Env) -> u32 {
-    // Token allowances are temporary entries bounded by the network max TTL,
-    // so keep the horizon under it by tying it to the current ledger.
-    e.ledger().sequence().saturating_add(LEDGER_DURATION)
+const SAFE_ALLOWANCE_TTL: u32 = 1_000_000;
+
+fn check_expiration(e: &Env, expiration_ledger: u32) {
+    let current = e.ledger().sequence();
+    if expiration_ledger <= current {
+        panic!("expiration_ledger must be in the future");
+    }
+    if expiration_ledger.saturating_sub(current) > SAFE_ALLOWANCE_TTL {
+        panic!("expiration_ledger too far");
+    }
 }
 
 fn load_campaigns(e: &Env) -> Map<u64, Campaign> {
@@ -114,11 +118,18 @@ impl Crowdfund {
     /// deadline and for a positive amount. The asset is pulled into the
     /// contract. Tracks the caller's cumulative contribution.
     ///
+    /// The caller supplies a stable `expiration_ledger` (absolute ledger) for
+    /// the SEP-41 allowance. It must be in the future and at most
+    /// `SAFE_ALLOWANCE_TTL` (1_000_000) ahead of the current ledger so the
+    /// authorization payload remains identical between simulation and execution
+    /// and the TTL stays below the network max.
+    ///
     /// Authorization: `caller` (the contributor) must authorize.
-    pub fn contribute(e: &Env, campaign_id: u64, contributor: Address, amount: i128) {
+    pub fn contribute(e: &Env, campaign_id: u64, contributor: Address, amount: i128, expiration_ledger: u32) {
         if amount <= 0 {
             panic!("amount must be positive");
         }
+        check_expiration(e, expiration_ledger);
         contributor.require_auth();
         let mut campaigns = load_campaigns(e);
         let mut campaign = campaigns.get(campaign_id).expect("no such campaign");
@@ -127,7 +138,7 @@ impl Crowdfund {
         }
         let contract = e.current_contract_address();
         let token = TokenClient::new(e, &campaign.asset);
-        token.approve(&contributor, &contract, &amount, &live(e));
+        token.approve(&contributor, &contract, &amount, &expiration_ledger);
         token.transfer_from(&contract, &contributor, &contract, &amount);
         let so_far = campaign.contributions.get(contributor.clone()).unwrap_or(0);
         campaign.contributions.set(contributor.clone(), so_far + amount);

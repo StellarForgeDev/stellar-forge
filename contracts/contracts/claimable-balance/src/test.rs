@@ -20,6 +20,10 @@ fn create_token<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, StellarAssetC
 /// Runs `f` with a freshly deployed Claimable Balance contract plus a funded
 /// token. Authorization is mocked by default; individual tests disable it to
 /// exercise refusal paths.
+fn live(e: &Env) -> u32 {
+    e.ledger().sequence() + 1000
+}
+
 fn with_setup<F, R>(f: F) -> R
 where
     F: FnOnce(
@@ -58,6 +62,7 @@ fn deposit_escrows_and_reports_state() {
             &amount,
             &Duration::from_seconds(&e, 10),
             &SOption::None,
+            &live(e),
         );
         assert_eq!(id, 0u64);
         let after = token.balance(&client.address);
@@ -77,6 +82,7 @@ fn claim_fails_before_unlock() {
             &1_000,
             &Duration::from_seconds(&e, 100),
             &SOption::None,
+            &live(e),
         );
         assert!(client.try_claim(&id).is_err());
     });
@@ -92,6 +98,7 @@ fn claim_succeeds_after_unlock() {
             &1_000,
             &Duration::from_seconds(&e, 100),
             &SOption::None,
+            &live(e),
         );
         e.ledger().set_timestamp(500);
         client.claim(&id);
@@ -110,6 +117,7 @@ fn double_claim_fails() {
             &1_000,
             &Duration::from_seconds(&e, 0),
             &SOption::None,
+            &live(e),
         );
         client.claim(&id);
         assert!(client.try_claim(&id).is_err());
@@ -126,6 +134,7 @@ fn claimant_must_authorize_claim() {
             &1_000,
             &Duration::from_seconds(&e, 0),
             &SOption::None,
+            &live(e),
         );
         e.set_auths(&[]);
         assert!(client.try_claim(&id).is_err());
@@ -142,6 +151,7 @@ fn expiry_none_claimable_after_delay() {
             &1_000,
             &Duration::from_seconds(&e, 10),
             &SOption::None,
+            &live(e),
         );
         e.ledger().set_timestamp(5);
         assert_eq!(client.is_claimable(&id), false);
@@ -162,6 +172,7 @@ fn expiry_some_blocks_past_expiry() {
             &1_000,
             &Duration::from_seconds(&e, 10),
             &SOption::Some(Timepoint::from_unix(&e, exp)),
+            &live(e),
         );
         e.ledger().set_timestamp(15);
         assert_eq!(client.is_claimable(&id), true);
@@ -173,6 +184,7 @@ fn expiry_some_blocks_past_expiry() {
             &1_000,
             &Duration::from_seconds(&e, 10),
             &SOption::Some(Timepoint::from_unix(&e, exp)),
+            &live(e),
         );
         e.ledger().set_timestamp(25);
         assert_eq!(client.is_claimable(&id2), false);
@@ -192,6 +204,7 @@ fn admin_cancel_refunds_funder() {
             &amount,
             &Duration::from_seconds(&e, 100),
             &SOption::None,
+            &live(e),
         );
         client.cancel(&id);
         let after = token.balance(funder);
@@ -213,6 +226,7 @@ fn cancel_requires_admin() {
             &1_000,
             &Duration::from_seconds(&e, 100),
             &SOption::None,
+            &live(e),
         );
         e.set_auths(&[]);
         assert!(client.try_cancel(&id).is_err());
@@ -229,6 +243,7 @@ fn cancel_after_claim_fails() {
             &1_000,
             &Duration::from_seconds(&e, 0),
             &SOption::None,
+            &live(e),
         );
         client.claim(&id);
         assert!(client.try_cancel(&id).is_err());
@@ -246,7 +261,8 @@ fn zero_amount_rejected() {
                 &0,
                 &Duration::from_seconds(&e, 10),
                 &SOption::None,
-            )
+            &live(e),
+        )
             .is_err());
     });
 }
@@ -262,7 +278,8 @@ fn insufficient_funds_rejected() {
                 &1_000_000_000_000_000_000_000_000,
                 &Duration::from_seconds(&e, 10),
                 &SOption::None,
-            )
+            &live(e),
+        )
             .is_err());
     });
 }
@@ -277,6 +294,7 @@ fn expiry_roundtrip_serialization() {
             &1_000,
             &Duration::from_seconds(&e, 10),
             &SOption::None,
+            &live(e),
         );
         assert!(client.expiry(&none_id).is_none());
 
@@ -287,6 +305,7 @@ fn expiry_roundtrip_serialization() {
             &1_000,
             &Duration::from_seconds(&e, 10),
             &SOption::Some(Timepoint::from_unix(&e, exp)),
+            &live(e),
         );
         let got = client.expiry(&some_id);
         assert!(got.is_some());
@@ -304,6 +323,7 @@ fn funder_must_authorize_deposit() {
             &1_000,
             &Duration::from_seconds(&e, 10),
             &SOption::None,
+            &live(e),
         );
         e.set_auths(&[]);
         assert!(client
@@ -313,7 +333,8 @@ fn funder_must_authorize_deposit() {
                 &1_000,
                 &Duration::from_seconds(&e, 10),
                 &SOption::None,
-            )
+            &live(e),
+        )
             .is_err());
     });
 }
@@ -328,6 +349,7 @@ fn sequential_balance_ids() {
             &1_000,
             &Duration::from_seconds(&e, 10),
             &SOption::None,
+            &live(e),
         );
         let id1 = client.deposit(
             funder,
@@ -335,8 +357,59 @@ fn sequential_balance_ids() {
             &1_000,
             &Duration::from_seconds(&e, 10),
             &SOption::None,
+            &live(e),
         );
         assert_eq!(id0, 0u64);
         assert_eq!(id1, 1u64);
+    });
+}
+
+#[test]
+#[should_panic(expected = "expiration_ledger must be in the future")]
+fn rejects_past_expiration() {
+    with_setup(|e, _a, funder, claimant, _o, _t, client| {
+        e.mock_all_auths();
+        client.deposit(
+            funder,
+            claimant,
+            &1_000,
+            &Duration::from_seconds(&e, 10),
+            &SOption::None,
+            &0,
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "expiration_ledger too far")]
+fn rejects_far_expiration() {
+    with_setup(|e, _a, funder, claimant, _o, _t, client| {
+        e.mock_all_auths();
+        let far = e.ledger().sequence() + 1_000_001;
+        client.deposit(
+            funder,
+            claimant,
+            &1_000,
+            &Duration::from_seconds(&e, 10),
+            &SOption::None,
+            &far,
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "expiration_ledger must be in the future")]
+fn rejects_equal_current_expiration() {
+    with_setup(|e, _a, funder, claimant, _o, _t, client| {
+        e.mock_all_auths();
+        let current = e.ledger().sequence();
+        client.deposit(
+            funder,
+            claimant,
+            &1_000,
+            &Duration::from_seconds(&e, 10),
+            &SOption::None,
+            &current,
+        );
     });
 }

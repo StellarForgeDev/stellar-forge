@@ -14,12 +14,12 @@ import { resolveIdentityContext } from "@/app/api/playground/route";
 describe("Multi-signature catalog metadata", () => {
   const multiSig = getComponentBySlug("multi-signature")!;
 
-  it("exists as an implemented, sandbox-ready, non-Testnet component", () => {
+  it("exists as an implemented, sandbox-ready, Testnet-deployed component", () => {
     expect(multiSig).toBeDefined();
     expect(multiSig.capabilities).toEqual({
       implemented: true,
       sandbox: true,
-      testnet: false,
+      testnet: true,
     });
   });
 

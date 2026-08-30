@@ -422,10 +422,11 @@ export const stellarComponents: StellarComponent[] = [
           { name: "asset", type: "Address" },
           { name: "spender", type: "Address" },
           { name: "amount", type: "i128" },
+          { name: "expiration_ledger", type: "u32" },
         ],
         authorization: "first-address",
         description:
-          "Grants spender the right to spend amount of asset from owner's balance, replacing any prior allowance. Also approves the manager on the token. Authorized by owner.",
+          "Grants spender the right to spend amount of asset from owner's balance, replacing any prior allowance. Also approves the manager on the token with a caller-supplied stable expiration_ledger (must be in the future and at most 1,000,000 ledgers ahead so the authorization remains stable between simulation and execution). Authorized by owner.",
       },
       {
         name: "increase_allowance",
@@ -434,10 +435,11 @@ export const stellarComponents: StellarComponent[] = [
           { name: "asset", type: "Address" },
           { name: "spender", type: "Address" },
           { name: "amount", type: "i128" },
+          { name: "expiration_ledger", type: "u32" },
         ],
         authorization: "first-address",
         description:
-          "Adds amount to the existing allowance for (owner, asset, spender) and re-syncs the token approval. Authorized by owner.",
+          "Adds amount to the existing allowance for (owner, asset, spender) and re-syncs the token approval with a caller-supplied stable expiration_ledger. Authorized by owner.",
       },
       {
         name: "decrease_allowance",
@@ -446,10 +448,11 @@ export const stellarComponents: StellarComponent[] = [
           { name: "asset", type: "Address" },
           { name: "spender", type: "Address" },
           { name: "amount", type: "i128" },
+          { name: "expiration_ledger", type: "u32" },
         ],
         authorization: "first-address",
         description:
-          "Subtracts amount from the existing allowance for (owner, asset, spender), never below zero, and re-syncs the token approval. Authorized by owner.",
+          "Subtracts amount from the existing allowance for (owner, asset, spender), never below zero, and re-syncs the token approval with a caller-supplied stable expiration_ledger. Authorized by owner.",
       },
       {
         name: "allowance",
@@ -501,7 +504,7 @@ export const stellarComponents: StellarComponent[] = [
         ],
       },
     ],
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -613,7 +616,7 @@ export const stellarComponents: StellarComponent[] = [
         ],
       },
     ],
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -712,7 +715,7 @@ export const stellarComponents: StellarComponent[] = [
         setup: [{ fn: "mint", args: ["admin", "1000000"], signer: "admin" }],
       },
     ],
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -755,11 +758,12 @@ export const stellarComponents: StellarComponent[] = [
           { name: "amount", type: "i128" },
           { name: "delay", type: "Duration" },
           { name: "expiry", type: "Option<Timepoint>" },
+          { name: "expiration_ledger", type: "u32" },
         ],
         returns: "u64",
         authorization: "first-address",
         description:
-          "Escrows `amount` of the asset from `funder` for `claimant`. `delay` is a `Duration` added to the current ledger time as the earliest claim time; `expiry` is an optional `Option<Timepoint>` claim deadline. Returns the new balance id. Authorized by `funder`.",
+          "Escrows `amount` of the asset from `funder` for `claimant`. `delay` is a `Duration` added to the current ledger time as the earliest claim time; `expiry` is an optional `Option<Timepoint>` claim deadline. `expiration_ledger` is a caller-supplied stable absolute ledger for the SEP-41 allowance (must be in the future and at most 1,000,000 ledgers ahead). Returns the new balance id. Authorized by `funder`.",
       },
       {
         name: "claim",
@@ -825,7 +829,7 @@ export const stellarComponents: StellarComponent[] = [
       admin: "admin",
       asset: "asset",
     },
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -930,7 +934,7 @@ export const stellarComponents: StellarComponent[] = [
       asset: "asset",
       root: "0000000000000000000000000000000000000000000000000000000000000000",
     },
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -1015,7 +1019,7 @@ export const stellarComponents: StellarComponent[] = [
       signer: "4242424242424242424242424242424242424242424242424242424242424242",
       symbol: "USD",
     },
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -1066,10 +1070,11 @@ export const stellarComponents: StellarComponent[] = [
           { name: "campaign_id", type: "u64" },
           { name: "contributor", type: "Address" },
           { name: "amount", type: "i128" },
+          { name: "expiration_ledger", type: "u32" },
         ],
         authorization: "first-address",
         description:
-          "Contributes amount of the campaign's asset from contributor before the deadline. Pulls the asset into the contract and tracks the contributor's cumulative amount. Authorized by contributor.",
+          "Contributes amount of the campaign's asset from contributor before the deadline. Pulls the asset into the contract and tracks the contributor's cumulative amount. Caller must supply a stable expiration_ledger (absolute ledger, must be in the future and at most 1,000,000 ledgers ahead) so the token allowance authorization remains stable between simulation and execution. Authorized by contributor.",
       },
       {
         name: "withdraw",
@@ -1154,7 +1159,7 @@ export const stellarComponents: StellarComponent[] = [
         setup: [{ fn: "mint", args: ["admin", "1000000"], signer: "admin" }],
       },
     ],
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -1234,7 +1239,7 @@ export const stellarComponents: StellarComponent[] = [
     constructorArgs: {
       admin: "admin",
     },
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -1335,7 +1340,7 @@ export const stellarComponents: StellarComponent[] = [
         ],
       },
     ],
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -1413,7 +1418,7 @@ export const stellarComponents: StellarComponent[] = [
       signer3: "signer3",
       threshold: "2",
     },
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 
   {
@@ -1505,7 +1510,7 @@ export const stellarComponents: StellarComponent[] = [
       amount: "1000",
       interval: "3600",
     },
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
   {
     slug: "vesting",
@@ -1588,7 +1593,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       networkConfig,
     ],
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
     dependencies: [
       {
         alias: "asset",
@@ -1744,7 +1749,7 @@ export const stellarComponents: StellarComponent[] = [
       asset: "asset",
       duration: "86400",
     },
-    capabilities: { implemented: true, sandbox: true, testnet: false },
+    capabilities: { implemented: true, sandbox: true, testnet: true },
   },
 ];
 

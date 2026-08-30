@@ -14,12 +14,12 @@ import { resolveIdentityContext } from "@/app/api/playground/route";
 describe("Subscription catalog metadata", () => {
   const subscription = getComponentBySlug("subscription")!;
 
-  it("exists as an implemented, sandbox-ready, non-Testnet component", () => {
+  it("exists as an implemented, sandbox-ready, Testnet-deployed component", () => {
     expect(subscription).toBeDefined();
     expect(subscription.capabilities).toEqual({
       implemented: true,
       sandbox: true,
-      testnet: false,
+      testnet: true,
     });
   });
 

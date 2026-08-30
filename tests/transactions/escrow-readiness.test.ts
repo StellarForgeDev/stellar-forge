@@ -22,17 +22,17 @@ const escrowRequest = {
 
 describe("Escrow discovery and sandbox readiness (generic machinery)", () => {
   describe("capabilities", () => {
-    it("is implemented and sandbox-ready but not on Testnet", () => {
+    it("is implemented, sandbox-ready, and deployed on Testnet", () => {
       expect(escrow.capabilities.implemented).toBe(true);
       expect(escrow.capabilities.sandbox).toBe(true);
-      expect(escrow.capabilities.testnet).toBe(false);
+      expect(escrow.capabilities.testnet).toBe(true);
     });
   });
 
   describe("discovery", () => {
-    it("is excluded from Testnet transactions because testnet=false", () => {
+    it("is included in Testnet transactions because it is deployed", () => {
       const slugs = transactionComponents([escrow]).map((c) => c.slug);
-      expect(slugs).not.toContain("escrow");
+      expect(slugs).toContain("escrow");
     });
 
     it("exposes its interface generically through callableMethods", () => {
@@ -45,12 +45,9 @@ describe("Escrow discovery and sandbox readiness (generic machinery)", () => {
   });
 
   describe("validation gating", () => {
-    it("rejects Escrow for Testnet because it is not deployed", () => {
+    it("accepts Escrow for Testnet now that it is deployed", () => {
       const result = validateTransactionRequest(escrowRequest, [escrow]);
-      expect(result.ok).toBe(false);
-      expect(
-        result.errors.some((error) => error.code === "component.not-deployed"),
-      ).toBe(true);
+      expect(result.ok).toBe(true);
     });
   });
 

@@ -26,6 +26,10 @@ fn create_allowance(e: &Env) -> AllowanceManagerClient<'static> {
     AllowanceManagerClient::new(e, &address)
 }
 
+fn live(e: &Env) -> u32 {
+    e.ledger().sequence() + 1000
+}
+
 #[test]
 fn approve_records_allowance() {
     let e = Env::default();
@@ -35,7 +39,7 @@ fn approve_records_allowance() {
     let (asset, _tc) = create_token(&e, &owner);
 
     let am = create_allowance(&e);
-    am.approve(&owner, &asset, &spender, &500);
+    am.approve(&owner, &asset, &spender, &500, &live(&e));
 
     assert_eq!(am.allowance(&owner, &asset, &spender), 500);
 }
@@ -54,7 +58,7 @@ fn transfer_from_spends_within_allowance() {
     // token, so the manager can pull on the owner's behalf.
     let am_address = e.register(AllowanceManager, ());
     let am = AllowanceManagerClient::new(&e, &am_address);
-    am.approve(&owner, &asset, &spender, &400);
+    am.approve(&owner, &asset, &spender, &400, &live(&e));
     am.transfer_from(&spender, &asset, &owner, &recipient, &250);
 
     assert_eq!(am.allowance(&owner, &asset, &spender), 150);
@@ -74,7 +78,7 @@ fn transfer_from_over_allowance_panics() {
     tc.mint(&owner, &1000);
 
     let am = create_allowance(&e);
-    am.approve(&owner, &asset, &spender, &100);
+    am.approve(&owner, &asset, &spender, &100, &live(&e));
     am.transfer_from(&spender, &asset, &owner, &recipient, &200);
 }
 
@@ -87,10 +91,10 @@ fn increase_and_decrease_adjust_allowance() {
     let (asset, _tc) = create_token(&e, &owner);
 
     let am = create_allowance(&e);
-    am.approve(&owner, &asset, &spender, &100);
-    am.increase_allowance(&owner, &asset, &spender, &50);
+    am.approve(&owner, &asset, &spender, &100, &live(&e));
+    am.increase_allowance(&owner, &asset, &spender, &50, &live(&e));
     assert_eq!(am.allowance(&owner, &asset, &spender), 150);
-    am.decrease_allowance(&owner, &asset, &spender, &30);
+    am.decrease_allowance(&owner, &asset, &spender, &30, &live(&e));
     assert_eq!(am.allowance(&owner, &asset, &spender), 120);
 }
 
@@ -104,6 +108,44 @@ fn decrease_below_zero_panics() {
     let (asset, _tc) = create_token(&e, &owner);
 
     let am = create_allowance(&e);
-    am.approve(&owner, &asset, &spender, &10);
-    am.decrease_allowance(&owner, &asset, &spender, &30);
+    am.approve(&owner, &asset, &spender, &10, &live(&e));
+    am.decrease_allowance(&owner, &asset, &spender, &30, &live(&e));
+}
+
+#[test]
+#[should_panic(expected = "expiration_ledger must be in the future")]
+fn rejects_past_expiration() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let (asset, _tc) = create_token(&e, &owner);
+    let am = create_allowance(&e);
+    am.approve(&owner, &asset, &spender, &100, &0);
+}
+
+#[test]
+#[should_panic(expected = "expiration_ledger too far")]
+fn rejects_far_expiration() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let (asset, _tc) = create_token(&e, &owner);
+    let am = create_allowance(&e);
+    let far = e.ledger().sequence() + 1_000_001;
+    am.approve(&owner, &asset, &spender, &100, &far);
+}
+
+#[test]
+#[should_panic(expected = "expiration_ledger must be in the future")]
+fn rejects_equal_current_expiration() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let (asset, _tc) = create_token(&e, &owner);
+    let am = create_allowance(&e);
+    let current = e.ledger().sequence();
+    am.approve(&owner, &asset, &spender, &100, &current);
 }

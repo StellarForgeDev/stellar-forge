@@ -13,11 +13,11 @@ const staking = getComponentBySlug("staking")!;
 const iface = staking.interface!;
 
 describe("Staking catalog metadata", () => {
-  it("is implemented, sandbox-ready, and not on Testnet", () => {
+  it("is implemented, sandbox-ready, and deployed on Testnet", () => {
     expect(staking.capabilities).toEqual({
       implemented: true,
       sandbox: true,
-      testnet: false,
+      testnet: true,
     });
   });
 

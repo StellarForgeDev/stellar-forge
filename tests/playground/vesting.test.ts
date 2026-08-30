@@ -14,12 +14,12 @@ import { resolveIdentityContext } from "@/app/api/playground/route";
 describe("Vesting catalog metadata", () => {
   const vesting = getComponentBySlug("vesting")!;
 
-  it("exists as an implemented, sandbox-ready, non-Testnet component", () => {
+  it("exists as an implemented, sandbox-ready, Testnet-deployed component", () => {
     expect(vesting).toBeDefined();
     expect(vesting.capabilities).toEqual({
       implemented: true,
       sandbox: true,
-      testnet: false,
+      testnet: true,
     });
   });
 
