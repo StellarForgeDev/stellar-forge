@@ -12,7 +12,22 @@ export interface ResolvedArtifact {
 
 const PROJECT_ROOT = process.cwd();
 
-const PREBUILT_DIR = path.join(PROJECT_ROOT, "contracts", "prebuilt");
+function getDefaultPrebuiltDir(): string {
+  const envDir = process.env.PREBUILT_WASM_DIR;
+  if (envDir && envDir.trim().length > 0) {
+    return path.isAbsolute(envDir) ? envDir : path.join(/* turbopackIgnore: true */ PROJECT_ROOT, envDir);
+  }
+  return path.join(/* turbopackIgnore: true */ PROJECT_ROOT, "contracts", "prebuilt");
+}
+
+const PREBUILT_DIR = getDefaultPrebuiltDir();
+
+export function getPrebuiltDir(prebuiltDir?: string): string {
+  if (prebuiltDir && prebuiltDir.trim().length > 0) {
+    return path.isAbsolute(prebuiltDir) ? prebuiltDir : path.join(/* turbopackIgnore: true */ PROJECT_ROOT, prebuiltDir);
+  }
+  return getDefaultPrebuiltDir();
+}
 
 /**
  * Candidate paths for the native sandbox-runner executable, in preference
@@ -52,8 +67,15 @@ export function resolveRunner(
  * Candidate wasm paths for a component, in preference order: the locally
  * built artifact first, then the committed prebuilt copy. The wasm is
  * platform-independent, so the prebuilt copy is valid on every deployment.
+ *
+ * The prebuilt directory can be supplied explicitly (e.g., from an external
+ * artifact package) via `options.prebuiltDir` or the `PREBUILT_WASM_DIR` env
+ * variable. The default remains `contracts/prebuilt` for the current monorepo.
  */
-export function wasmCandidates(component: StellarComponent): string[] {
+export function wasmCandidates(
+  component: StellarComponent,
+  options?: { prebuiltDir?: string },
+): string[] {
   const candidates: string[] = [];
 
   const local = componentWasmPath(component);
@@ -65,8 +87,9 @@ export function wasmCandidates(component: StellarComponent): string[] {
 
   const implementation = component.implementation;
   if (implementation) {
+    const prebuiltDir = getPrebuiltDir(options?.prebuiltDir);
     candidates.push(
-      path.join(PREBUILT_DIR, `${implementation.package}.wasm`),
+      path.join(prebuiltDir, `${implementation.package}.wasm`),
     );
   }
 
@@ -75,6 +98,7 @@ export function wasmCandidates(component: StellarComponent): string[] {
 
 export function resolveWasm(
   component: StellarComponent,
+  options?: { prebuiltDir?: string },
 ): ResolvedArtifact | null {
   const local = componentWasmPath(component);
   if (local && existsSync(path.join(/* turbopackIgnore: true */ PROJECT_ROOT, local))) {
@@ -86,7 +110,8 @@ export function resolveWasm(
 
   const implementation = component.implementation;
   if (implementation) {
-    const prebuilt = path.join(PREBUILT_DIR, `${implementation.package}.wasm`);
+    const prebuiltDir = getPrebuiltDir(options?.prebuiltDir);
+    const prebuilt = path.join(prebuiltDir, `${implementation.package}.wasm`);
     if (existsSync(prebuilt)) {
       return { path: prebuilt, source: "prebuilt" };
     }
