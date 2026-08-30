@@ -10,29 +10,9 @@ repository before being marked done.
 
 ## Current State
 
-> **Status note (Phase 20, 2026-08-27):** all eight catalog components are now
-> implemented and sandbox-executable; Token and Payment are deployed to Testnet.
-> The Completed list below records when each major capability landed and remains
-> accurate as history.
+> **Status note (Phase 5, 2026-08-30):** Phase 5 is **COMPLETE**. The catalog now has **15 reusable Soroban components**, all with passing Rust tests and local sandbox execution; all 15 are deployed to Stellar Testnet and registered in `src/lib/transactions/deployments.ts` with `testnet:true`. The transaction and integration pipelines are network-aware (`testnet` | `mainnet` | `futurenet`) via centralized `NetworkConfig` (`src/lib/transactions/networks.ts`): **Testnet is operational** (default, 15 deployments), **Mainnet is architecture-aware but unavailable** (0 deployments, all `mainnet:false`), **Futurenet** plumbing is retained (0 deployments). The generic pipeline (catalog → docs → sandbox → transactions) remains validated without component-specific branching.
 
-> **Status note (Stage 2B, 2026-08-28):** the product surface is now cohesive and
-> hardened. Stage 2B added a shared interaction layer (`Button` / `LinkButton` /
-> `CopyButton` / `StateBadge` + reduced-motion support), a global nav with active-
-> route highlighting and an accessible mobile menu, a rebuilt homepage with a live
-> local-sandbox demo, catalog capability filtering, method-level deep links from
-> docs/detail into the Playground, a structured execution timeline in the Sandbox,
-> and a responsive + accessibility hardening pass (keyboard focus, aria, contrast,
-> no horizontal overflow at 375 / 768 / 1280 px). No contracts, catalog records,
-> or transaction/integration logic changed; the architecture stays catalog-driven
-> with no component-specific branching.
-
-Stellar-Forge is at **release-candidate** maturity. It is Testnet-focused; there
-is no mainnet support. All eight catalog components are implemented and
-sandbox-executable: `token` and `payment` are deployed to Stellar Testnet, while
-`escrow`, `access-control`, `subscription`, `multi-signature`, `vesting`, and
-`staking` are sandbox-ready but not yet deployed to a public network. The generic
-pipeline (catalog → docs → sandbox → transactions) was validated across every
-component without component-specific branching.
+Stellar-Forge is at **release-candidate** maturity. The network model is centralized (`NetworkConfig` with `rpcUrl`, `passphrase`, `explorerUrl` and `STELLAR_RPC_*_URL` overrides). All 15 components are implemented and sandbox-executable and **all 15 are deployed to Stellar Testnet** (`testnet:true`); Mainnet and Futurenet have no deployments by design. The generic pipeline was validated across every component without component-specific branching.
 
 ### Completed (verified)
 
@@ -84,6 +64,22 @@ component without component-specific branching.
   `constructorArg` dependency-alias resolution). Testnet deployment is **not**
   done (`testnet: false`); the generic transaction machinery will support it once
   a deployment address is registered in `deployments.ts`.
+
+## Phase 5 — Completed
+
+> **Phase 5 is COMPLETE.** All items below are verified against the repository (`main == origin/main`, working tree clean).
+
+- **Phase 5.1 — Repo hygiene & contribution foundation** — `CONTRIBUTING.md`, `LICENSE`, `.env.example`, hygiene checks.
+- **Phase 5.2 — Vercel deployment/runtime/serverless sandbox verification** — `vercel-sandbox-build.sh` hardened to build from `contracts/` workspace, `outputFileTracingIncludes`, prebuilt WASM.
+- **Phase 5.3 — Testnet expansion for existing components** — catalog expanded to 15 reusable components (`token`, `payment`, `access-control`, `escrow`, `multi-signature`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`) with generic pipeline validation and 15 Testnet deployments registered.
+
+  **Phase 5.3B — Authorization-stable sequence** — `5.3B.18` TTL fixed but `auth/invalid_action` discovered (ledger-dependent `expiration_ledger` recomputed in contract caused simulation/execution mismatch); `5.3B.19` implemented caller-supplied stable `expiration_ledger` validated as `current < expiration ≤ current+1_000_000` for `crowdfund`, `allowance`, `claimable-balance` (+ tests + WASM 23227/10820/19465); `5.3B.20` real Testnet lifecycle validation succeeded (10 workflows: crowdfund contribute/withdraw/claim_refund, allowance approve/increase/decrease/transfer_from, claimable deposit/claim/cancel) with `latest+1000` strategy; `5.3B.21` replaced obsolete crowdfund deployment and enabled `allowance`/`claimable-balance` `testnet:true`; `5.3B.22` committed and pushed as `6b21f8e fix: stabilize token approval authorization on testnet` with working tree clean.
+
+- **Phase 5.4 — Configurable network support** — centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) with `rpcUrl`, `passphrase`, `explorerUrl` and `STELLAR_RPC_*_URL` overrides in `src/lib/transactions/networks.ts`; generic `getDeployment(network, slug)`, builder, validation, RPC selection, and integration generators are network-aware; `Testnet` operational (15 deployments, default), `Mainnet` architecture-aware but unavailable (0 deployments, all `mainnet:false`, correctly gated), `Futurenet` plumbing retained; committed as `f10764a feat: add configurable network support`.
+
+- **Phase 5.5 — Integration generator strengthening** — TypeScript generators now include `pnpm add @stellar/stellar-sdk`, `STELLAR_RPC_*_URL` override guidance derived from `NetworkConfig`, and `explorerUrl` link; Rust generators include `soroban-sdk = "27"` guidance and local-host clarification; committed as `247decb feat: strengthen integration generators`. No new language, SDK package, or publishing system introduced.
+
+**Current network state:** `Testnet = operational (15 deployments)` / `Mainnet = architecture-aware but unavailable (0 deployments, all mainnet:false)` / `Futurenet = plumbing retained (0 deployments)`. No Mainnet deployment was performed.
 
 ## Current Priority
 

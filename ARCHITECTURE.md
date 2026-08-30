@@ -9,13 +9,7 @@ Everything in the *Current implementation* sections is verified against the
 repository at the time of writing. Do not treat proposed architecture as if it
 already exists.
 
-> **Status note (Phase 20, 2026-08-27):** This document was largely written when
-> four components were implemented. As of Phase 20, **all eight** catalog
-> components are implemented and sandbox-executable (Token, Payment, Access
-> Control, Escrow, Multi-signature, Subscription, Vesting, Staking), and Token +
-> Payment are deployed to Stellar Testnet. Component lists below that name only
-> the first four are examples, not the full set; the Component Standard and
-> pipeline descriptions remain accurate.
+> **Status note (Phase 5, 2026-08-30):** All **15** catalog components are now implemented and sandbox-executable and **all 15 are deployed to Stellar Testnet** (`token`, `payment`, `access-control`, `escrow`, `multi-signature`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`). The transaction and integration pipelines are now **network-aware** via centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`): `Testnet` is operational (default, 15 deployments), `Mainnet` is architecture-aware but unavailable (0 deployments, all `mainnet:false`), `Futurenet` plumbing is retained. The authorization-stable `expiration_ledger` fix for `crowdfund`/`allowance`/`claimable-balance` is validated on Testnet.
 
 > **Status note (Stage 2B, 2026-08-28):** the product surface (global nav,
 > homepage, catalog, Playground, detail/docs, transactions) was made cohesive and
@@ -115,13 +109,20 @@ and a `config` (form fields).
   Ships with a Rust unit test suite
   (`contracts/contracts/access-control/src/test.rs`).
 - `subscription/` — an **implemented** component: recurring subscription /
-  billing logic (sandbox-ready; not yet deployed to Testnet).
+  billing logic (implemented, Testnet-deployed).
 - `vesting/` — an **implemented** component: token vesting / unlock schedules
-  (sandbox-ready; not yet deployed to Testnet).
+  (implemented, Testnet-deployed).
 - `staking/` — an **implemented** component: staking and rewards
-  (sandbox-ready; not yet deployed to Testnet).
+  (implemented, Testnet-deployed).
 - `multi-signature/` — an **implemented** component: threshold multisig
-  approvals (sandbox-ready; not yet deployed to Testnet).
+  approvals (implemented, Testnet-deployed).
+- `atomic-swap/` — an **implemented** component: atomic two-party swap (implemented, Testnet-deployed).
+- `timelock/` — an **implemented** component: simple timelock (implemented, Testnet-deployed).
+- `merkle-airdrop/` — an **implemented** component: Merkle distributor (implemented, Testnet-deployed).
+- `oracle/` — an **implemented** component: signed price feed (implemented, Testnet-deployed).
+- `crowdfund/` — an **implemented** component: fixed-deadline crowdfund with authorization-stable `expiration_ledger` (implemented, Testnet-deployed).
+- `allowance/` — an **implemented** component: delegated allowance with stable `expiration_ledger` (implemented, Testnet-deployed).
+- `claimable-balance/` — an **implemented** component: time-locked claimable balance with stable `expiration_ledger` (implemented, Testnet-deployed).
 - `sandbox-runner/` — a **native** (non-contract) Rust binary that loads a
   contract WASM into an in-process Soroban `Env`, deploys it, and invokes the
   requested functions. It is the execution engine behind the Playground.
@@ -522,27 +523,27 @@ runner.
 - The deployed contract address in the sandbox is deterministic (fixed salt), so
   all sandbox runs share the same address space.
 - Only components with `implementation` + `interface` can run in the sandbox.
-  As of Phase 20 all eight catalog components (`token`, `payment`, `escrow`,
-  `access-control`, `subscription`, `vesting`, `staking`, `multi-signature`)
-  satisfy this and run locally; none are documentation-only.
+  All **15** catalog components now satisfy this and run locally; none are documentation-only.
 - Admin-only methods (`mint`, `set_admin`) cannot be exercised by a visitor
   because the deployed token's admin key is held outside the repository; the
   sandbox is the only place a visitor can observe state changes.
 
 ## Transaction Architecture
 
+> **Phase 5.4 network model:** `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) centralized in `src/lib/transactions/networks.ts` (`rpcUrl`, `passphrase`, `explorerUrl`, `STELLAR_RPC_*_URL` overrides) is the single source for `getDeployment(network, slug)`, RPC selection, builder, validation, and integration generation. `Testnet` is operational (15 deployments, default), `Mainnet` is architecture-aware but has 0 deployments (all `mainnet:false`, correctly gated as “not deployed”), `Futurenet` plumbing is retained.
+
 The actual current transaction flow:
 
 ```text
-Builder (UI)
+Builder (UI, network-aware)
   ↓
-Preparation (prepare route → Testnet RPC simulation)
+Preparation (prepare route → selected network RPC simulation)
   ↓
 Freighter signing (client)
   ↓
-Submission (submit route → Testnet)
+Submission (submit route → selected network)
   ↓
-Testnet result (poll for settlement)
+Network result (poll for settlement)
 ```
 
 1. **Builder** — `src/components/transactions/TransactionBuilder.tsx` collects
