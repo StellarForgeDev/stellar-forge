@@ -4,8 +4,22 @@ import type {
   IntegrationContext,
   IntegrationLanguage,
 } from "@/lib/integration/types";
+import {
+  isTransactionNetwork,
+  networkConfig,
+  type TransactionNetwork,
+} from "@/lib/transactions/networks";
 
 const SOROBAN_SDK_VERSION = "27";
+
+function resolveIntegrationNetwork(
+  configValues: Record<string, string>,
+): ReturnType<typeof networkConfig> {
+  const raw = configValues.network as TransactionNetwork | undefined;
+  const networkId: TransactionNetwork =
+    raw && isTransactionNetwork(raw) ? raw : "testnet";
+  return networkConfig(networkId);
+}
 
 export function generateIntegrationCode(
   context: IntegrationContext,
@@ -221,6 +235,7 @@ export function generateTypescriptIntegration({
     return null;
   }
 
+  const network = resolveIntegrationNetwork(configValues);
   const constructor = interfaceFns.find((fn) => fn.name === "__constructor");
   const callableFns = interfaceFns.filter((fn) => fn.name !== "__constructor");
   const dependencies = component.dependencies ?? [];
@@ -285,10 +300,10 @@ export function generateTypescriptIntegration({
   lines.push("");
   lines.push("// ---- Configuration (edit these) ---------------------------------------");
   lines.push(
-    'const RPC_URL = "https://soroban-testnet.stellar.org"; // Stellar Testnet RPC',
+    `const RPC_URL = "${network.rpcUrl}"; // ${network.label} RPC`,
   );
   lines.push(
-    'const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";',
+    `const NETWORK_PASSPHRASE = "${network.passphrase}";`,
   );
   lines.push(
     'const CONTRACT_ID = "<CONTRACT_ID>"; // deployed contract address (C...); replace with your deployment',
@@ -326,7 +341,7 @@ export function generateTypescriptIntegration({
     lines.push(
       "  // Stellar CLI: stellar contract deploy --wasm",
       `  //   target/wasm32v1-none/release/${packageName}.wasm \\`,
-      "  //   --source <signer> --network testnet --",
+      `  //   --source <signer> --network ${network.id} --`,
       `  //   ${constructor.params
         .map((param) =>
           cliLiteral(param, configValues, dependencyAliases, constructorArgs),
@@ -336,7 +351,7 @@ export function generateTypescriptIntegration({
     );
   } else {
     lines.push(
-      `  // Stellar CLI: stellar contract deploy --wasm target/wasm32v1-none/release/${packageName}.wasm --source <signer> --network testnet`,
+      `  // Stellar CLI: stellar contract deploy --wasm target/wasm32v1-none/release/${packageName}.wasm --source <signer> --network ${network.id}`,
     );
   }
   lines.push("");

@@ -68,7 +68,8 @@ describe("validateTransactionRequest", () => {
       expect(result.ok).toBe(false);
       const error = result.errors.find((e) => e.code === "component.not-deployed");
       expect(error).toBeDefined();
-      expect(error?.message).toContain("not available on Testnet");
+      expect(error?.message).toContain("not available on");
+      expect(error?.message).toContain("Testnet");
     });
 
     it("rejects a component whose capabilities are all false", () => {
@@ -249,13 +250,30 @@ describe("validateTransactionRequest", () => {
   describe("request envelope validation", () => {
     it("flags an unsupported network", () => {
       const result = validateTransactionRequest(
-        { ...tokenTransferRequest(), network: "mainnet" as TransactionRequest["network"] },
+        {
+          ...tokenTransferRequest(),
+          network: "bogus" as unknown as TransactionRequest["network"],
+        },
         [getComponentBySlug("token")!],
       );
       expect(result.ok).toBe(false);
       expect(
         result.errors.some((e) => e.code === "network.unsupported"),
       ).toBe(true);
+    });
+
+    it("rejects a mainnet request for a component without mainnet capability", () => {
+      const result = validateTransactionRequest(
+        { ...tokenTransferRequest(), network: "mainnet" },
+        [getComponentBySlug("token")!],
+      );
+      expect(result.ok).toBe(false);
+      expect(
+        result.errors.some((e) => e.code === "component.not-deployed"),
+      ).toBe(true);
+      expect(result.errors.find((e) => e.code === "component.not-deployed")?.message).toContain(
+        "Mainnet",
+      );
     });
 
     it("flags a missing source account", () => {

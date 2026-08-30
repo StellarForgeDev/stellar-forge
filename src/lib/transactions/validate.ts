@@ -36,11 +36,18 @@ export function validateTransactionRequest(
       message: "Select an implemented component.",
     });
   } else {
-    if (!component.capabilities.testnet) {
+    const networkAvailable =
+      request.network === "mainnet"
+        ? !!component.capabilities.mainnet
+        : request.network === "futurenet"
+          ? false
+          : component.capabilities.testnet;
+
+    if (!networkAvailable) {
       errors.push({
         code: "component.not-deployed",
         field: "component",
-        message: `${component.name} is not available on Testnet. Transactions require a component with a deployed Testnet contract.`,
+        message: `${component.name} is not available on ${networkLabel(request.network)}. Transactions require a component with a deployed contract on the selected network.`,
       });
     }
 

@@ -7,6 +7,7 @@ import {
 import {
   generateIntegrationCode,
   generateRustIntegration,
+  generateTypescriptIntegration,
 } from "@/lib/integration/generators";
 
 describe("integration generators", () => {
@@ -79,6 +80,32 @@ describe("integration generators", () => {
       // The asset dependency is surfaced with a resolvable address placeholder.
       expect(output).toContain("asset_address");
       expect(output).toContain("alias: asset");
+    });
+  });
+
+  describe("Network-aware TypeScript generation", () => {
+    const token = getComponentBySlug("token")!;
+
+    it("uses testnet RPC and passphrase by default", () => {
+      const configValues = getConfigDefaults(token);
+      const code = generateTypescriptIntegration({
+        component: token,
+        configValues,
+      }) as string;
+      expect(code).toContain("https://soroban-testnet.stellar.org");
+      expect(code).toContain("Test SDF Network ; September 2015");
+      expect(code).toContain("--network testnet");
+    });
+
+    it("uses mainnet RPC and passphrase when network is mainnet", () => {
+      const configValues = { ...getConfigDefaults(token), network: "mainnet" };
+      const code = generateTypescriptIntegration({
+        component: token,
+        configValues,
+      }) as string;
+      expect(code).toContain("https://soroban-mainnet.stellar.org");
+      expect(code).toContain("Public Global Stellar Network ; September 2015");
+      expect(code).toContain("--network mainnet");
     });
   });
 });

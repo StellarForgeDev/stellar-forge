@@ -6,7 +6,7 @@ reusable component through the catalog-driven pipeline.
 
 Stellar-Forge is an open-source developer platform for discovering,
 understanding, experimenting with, and reusing Stellar/Soroban building blocks.
-It is Testnet-focused; there is **no mainnet** support.
+Network support is centralized in `src/lib/transactions/networks.ts` (`testnet` | `mainnet` | `futurenet`): **Testnet is operational** (default, 15 deployments), **Mainnet is architecture-aware but undeployed** (`mainnet:false` for all components, correctly gated), **Futurenet** plumbing is retained.
 
 ## Project setup
 

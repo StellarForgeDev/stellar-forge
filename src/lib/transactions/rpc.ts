@@ -186,6 +186,9 @@ function effectiveRpcUrl(network: NetworkConfig): string {
   if (network.id === "testnet") {
     return process.env.STELLAR_RPC_TESTNET_URL ?? network.rpcUrl;
   }
+  if (network.id === "mainnet") {
+    return process.env.STELLAR_RPC_MAINNET_URL ?? network.rpcUrl;
+  }
   return process.env.STELLAR_RPC_FUTURENET_URL ?? network.rpcUrl;
 }
 

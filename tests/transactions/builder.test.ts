@@ -53,6 +53,21 @@ describe("transaction builder", () => {
       };
       expect(transactionComponents([noMethods])).toHaveLength(0);
     });
+
+    it("returns no components for mainnet when no component has mainnet capability", () => {
+      const result = transactionComponents(stellarComponents, "mainnet");
+      expect(result).toHaveLength(0);
+    });
+
+    it("still returns testnet components for testnet after mainnet is added", () => {
+      const result = transactionComponents(stellarComponents, "testnet");
+      const expected = stellarComponents
+        .filter((c) => c.capabilities.testnet && callableMethods(c).length > 0)
+        .map((c) => c.slug)
+        .sort();
+      expect(result.map((c) => c.slug).sort()).toEqual(expected);
+      expect(result.length).toBeGreaterThan(0);
+    });
   });
 
   describe("emptyParameters", () => {

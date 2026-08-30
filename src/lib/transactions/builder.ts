@@ -5,7 +5,11 @@ import type {
   StellarComponent,
 } from "@/data/components";
 import { getDeployment } from "@/lib/transactions/deployments";
-import { networkConfig, networkLabel } from "@/lib/transactions/networks";
+import {
+  networkConfig,
+  networkLabel,
+  type TransactionNetwork,
+} from "@/lib/transactions/networks";
 import type {
   TransactionBuilderState,
   TransactionPreparation,
@@ -28,14 +32,35 @@ export function callableMethods(
   );
 }
 
+function isComponentAvailableForNetwork(
+  component: StellarComponent,
+  network: TransactionNetwork,
+): boolean {
+  if (network === "mainnet") return !!component.capabilities.mainnet;
+  if (network === "futurenet") return false;
+  return component.capabilities.testnet;
+}
+
 export function transactionComponents(
   components: StellarComponent[],
+  network: TransactionNetwork = "testnet",
 ): StellarComponent[] {
   return orderComponents(
     components.filter(
       (component) =>
-        component.capabilities.testnet && callableMethods(component).length > 0,
+        isComponentAvailableForNetwork(component, network) &&
+        callableMethods(component).length > 0,
     ),
+  );
+}
+
+export function isComponentAvailable(
+  component: StellarComponent,
+  network: TransactionNetwork,
+): boolean {
+  return (
+    isComponentAvailableForNetwork(component, network) &&
+    callableMethods(component).length > 0
   );
 }
 

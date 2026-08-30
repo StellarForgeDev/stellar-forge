@@ -2,6 +2,7 @@ export interface ComponentCapabilities {
   implemented: boolean;
   sandbox: boolean;
   testnet: boolean;
+  mainnet?: boolean;
 }
 
 export type ComponentMaturity = "Concept" | "Implemented";
@@ -123,6 +124,7 @@ const networkConfig: ConfigField = {
   default: "testnet",
   options: [
     { label: "Stellar Testnet", value: "testnet" },
+    { label: "Stellar Mainnet", value: "mainnet" },
     { label: "Stellar Futurenet", value: "futurenet" },
   ],
 };
