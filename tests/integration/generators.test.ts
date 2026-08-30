@@ -95,6 +95,9 @@ describe("integration generators", () => {
       expect(code).toContain("https://soroban-testnet.stellar.org");
       expect(code).toContain("Test SDF Network ; September 2015");
       expect(code).toContain("--network testnet");
+      expect(code).toContain("pnpm add @stellar/stellar-sdk");
+      expect(code).toContain("STELLAR_RPC_TESTNET_URL");
+      expect(code).toContain("https://stellar.expert/explorer/testnet");
     });
 
     it("uses mainnet RPC and passphrase when network is mainnet", () => {
@@ -106,6 +109,21 @@ describe("integration generators", () => {
       expect(code).toContain("https://soroban-mainnet.stellar.org");
       expect(code).toContain("Public Global Stellar Network ; September 2015");
       expect(code).toContain("--network mainnet");
+      expect(code).toContain("STELLAR_RPC_MAINNET_URL");
+      expect(code).toContain("https://stellar.expert/explorer/public");
+      expect(code).not.toContain("https://soroban-testnet.stellar.org");
+      expect(code).not.toContain("STELLAR_RPC_TESTNET_URL");
+    });
+  });
+
+  describe("Rust generator guidance", () => {
+    const token = getComponentBySlug("token")!;
+    const configValues = getConfigDefaults(token);
+
+    it("contains soroban-sdk installation guidance and local-host clarification", () => {
+      const code = generateRustIntegration({ component: token, configValues }) as string;
+      expect(code).toContain('soroban-sdk = "27"');
+      expect(code).toContain("local Soroban host");
     });
   });
 });

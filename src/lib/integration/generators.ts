@@ -106,6 +106,13 @@ export function generateRustIntegration({
     `// selected network only matters when deploying to a live network.`,
     `// Verify this example against your project before shipping.`,
   );
+  lines.push("//");
+  lines.push(
+    `// Install: soroban-sdk = "${SOROBAN_SDK_VERSION}" in Cargo.toml`,
+  );
+  lines.push(
+    `// Note: This example runs in a local Soroban host (Env::default()); live network interaction requires a Stellar RPC/client flow.`,
+  );
   lines.push(`// ${rule}`);
 
   lines.push("");
@@ -299,6 +306,13 @@ export function generateTypescriptIntegration({
 
   lines.push("");
   lines.push("// ---- Configuration (edit these) ---------------------------------------");
+  lines.push("// Install: pnpm add @stellar/stellar-sdk");
+  lines.push(
+    `// RPC override: set STELLAR_RPC_${network.id.toUpperCase()}_URL to use a custom RPC (default is ${network.rpcUrl})`,
+  );
+  lines.push(
+    `// Explorer: ${network.explorerUrl}/contract/<CONTRACT_ID> (view contract on ${network.label})`,
+  );
   lines.push(
     `const RPC_URL = "${network.rpcUrl}"; // ${network.label} RPC`,
   );
