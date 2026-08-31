@@ -1941,8 +1941,8 @@ mod tests {
             }],
             "calls": [
                 { "fn": "create_campaign", "params": [{ "name": "owner", "type": "Address" }, { "name": "asset", "type": "Address" }, { "name": "goal", "type": "i128" }, { "name": "deadline", "type": "u64" }], "args": ["admin", "asset", "1000", "1000"], "signer": "admin" },
-                { "fn": "contribute", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "contributor", "type": "Address" }, { "name": "amount", "type": "i128" }], "args": [0, "user1", "500"], "signer": "user1" },
-                { "fn": "contribute", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "contributor", "type": "Address" }, { "name": "amount", "type": "i128" }], "args": [0, "user2", "300"], "signer": "user2" },
+                { "fn": "contribute", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "contributor", "type": "Address" }, { "name": "amount", "type": "i128" }, { "name": "expiration_ledger", "type": "u32" }], "args": [0, "user1", "500", 1000], "signer": "user1" },
+                { "fn": "contribute", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "contributor", "type": "Address" }, { "name": "amount", "type": "i128" }, { "name": "expiration_ledger", "type": "u32" }], "args": [0, "user2", "300", 1000], "signer": "user2" },
                 { "fn": "goal_reached", "params": [{ "name": "campaign_id", "type": "u64" }], "args": [0] },
                 { "fn": "total_raised", "params": [{ "name": "campaign_id", "type": "u64" }], "args": [0] },
                 { "fn": "contribution_of", "params": [{ "name": "campaign_id", "type": "u64" }, { "name": "contributor", "type": "Address" }], "args": [0, "user1"] },
@@ -2022,8 +2022,8 @@ mod tests {
                 ],
             }],
             "calls": [
-                { "fn": "deposit", "params": [{ "name": "funder", "type": "Address" }, { "name": "claimant", "type": "Address" }, { "name": "amount", "type": "i128" }, { "name": "delay", "type": "Duration" }, { "name": "expiry", "type": "Option<Timepoint>" }], "args": ["admin", "user1", "1000", "86400", null], "signer": "admin" },
-                { "fn": "deposit", "params": [{ "name": "funder", "type": "Address" }, { "name": "claimant", "type": "Address" }, { "name": "amount", "type": "i128" }, { "name": "delay", "type": "Duration" }, { "name": "expiry", "type": "Option<Timepoint>" }], "args": ["admin", "user2", "500", "86400", "1000"], "signer": "admin" },
+                { "fn": "deposit", "params": [{ "name": "funder", "type": "Address" }, { "name": "claimant", "type": "Address" }, { "name": "amount", "type": "i128" }, { "name": "delay", "type": "Duration" }, { "name": "expiry", "type": "Option<Timepoint>" }, { "name": "expiration_ledger", "type": "u32" }], "args": ["admin", "user1", "1000", "86400", null, 1000], "signer": "admin" },
+                { "fn": "deposit", "params": [{ "name": "funder", "type": "Address" }, { "name": "claimant", "type": "Address" }, { "name": "amount", "type": "i128" }, { "name": "delay", "type": "Duration" }, { "name": "expiry", "type": "Option<Timepoint>" }, { "name": "expiration_ledger", "type": "u32" }], "args": ["admin", "user2", "500", "86400", "1000", 1000], "signer": "admin" },
                 { "fn": "balance_of", "params": [{ "name": "balance_id", "type": "u64" }], "args": [0] },
                 { "fn": "is_claimable", "params": [{ "name": "balance_id", "type": "u64" }], "args": [0] },
                 { "fn": "expiry", "params": [{ "name": "balance_id", "type": "u64" }], "args": [1] },
