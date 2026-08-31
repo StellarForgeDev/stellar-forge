@@ -27,8 +27,8 @@ const lifecycleSteps = [
 
 export default function TransactionsPage() {
   return (
-    <main className="flex-1">
-      <section className="mx-auto max-w-6xl px-6 py-16">
+    <main className="min-w-0 flex-1">
+      <section className="mx-auto min-w-0 max-w-6xl px-6 py-16">
         <div className="max-w-3xl">
           <p className="mb-4 font-mono text-xs tracking-[0.18em] text-accent-stellar">
             STELLAR-FORGE / TRANSACTIONS
