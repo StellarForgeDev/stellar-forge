@@ -448,7 +448,7 @@ async function checkSubmissionStatus() {
   const submissionPending = submission.status === "PENDING";
 
   return (
-    <div className="mt-10 grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+    <div className="mt-10 grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
       <div className="min-w-0 space-y-6">
         <Card>
           <div className="flex items-center justify-between gap-3">
