@@ -479,6 +479,9 @@ sequence of contract calls. It has two execution paths:
 3. Resolves the WASM via `resolveWasm()` (local build first, then prebuilt).
 4. Spawns the runner with `execFile` (fixed path, no shell), pipes the request
    JSON over stdin, enforces a 10s timeout + 1MB output cap.
+   Playground execution admission is limited to two active runners per Node.js
+   process. This is process-local protection; deployment-wide rate limits,
+   quotas, and abuse controls remain responsibilities of the hosting platform.
 5. Parses the runner's JSON stdout and returns it.
 
 ### How WASM is resolved

@@ -144,16 +144,22 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
-  const raw = await request.text();
-  if (raw.length === 0) {
-    return apiErrorResponse(inputError("request body must be a JSON object"));
+  let bodyRead: Awaited<ReturnType<typeof readRequestBody>>;
+  try {
+    bodyRead = await readRequestBody(request);
+  } catch {
+    return apiErrorResponse(inputError("request body could not be read"));
   }
-  if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) {
+  if (bodyRead.tooLarge) {
     return apiErrorResponse({
       kind: "input",
       message: `request body exceeds ${MAX_BODY_BYTES} bytes`,
       status: 413,
     });
+  }
+  const raw = bodyRead.raw;
+  if (raw.length === 0) {
+    return apiErrorResponse(inputError("request body must be a JSON object"));
   }
 
   let body: unknown;
@@ -758,6 +764,32 @@ function runRunner(
     );
     child.stdin?.end(input);
   });
+}
+
+async function readRequestBody(
+  request: Request,
+): Promise<{ raw: string; tooLarge?: false } | { tooLarge: true }> {
+  if (!request.body) return { raw: "" };
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return { tooLarge: true };
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return { raw: Buffer.concat(chunks).toString("utf8") };
 }
 
 function parseRunnerStdout(stdout: string): unknown {

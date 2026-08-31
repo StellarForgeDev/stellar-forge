@@ -98,6 +98,32 @@ describe("POST /api/playground", () => {
       expect(harness.execFile).not.toHaveBeenCalled();
     });
 
+    it("stops reading a request stream after the body limit", async () => {
+      let reads = 0;
+      let cancelled = false;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          reads += 1;
+          controller.enqueue(new Uint8Array(65_537));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+      const response = await POST(
+        new Request("http://localhost/api/playground", {
+          method: "POST",
+          body: stream,
+          duplex: "half",
+        } as RequestInit & { duplex: "half" }),
+      );
+
+      expect(response.status).toBe(413);
+      expect(reads).toBe(1);
+      expect(cancelled).toBe(true);
+      expect(harness.execFile).not.toHaveBeenCalled();
+    });
+
     it("rejects an unknown component slug", async () => {
       const response = await POST(request(payload({ componentSlug: "missing" })));
       expect(response.status).toBe(400);
