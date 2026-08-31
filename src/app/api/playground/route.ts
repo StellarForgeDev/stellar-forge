@@ -136,6 +136,7 @@ interface RunnerDependency {
 export async function POST(request: Request): Promise<Response> {
   const runner = resolveRunner();
   if (!runner) {
+    logPlaygroundEvent("runner_unavailable");
     return apiErrorResponse({
       kind: "api",
       message:
@@ -148,9 +149,11 @@ export async function POST(request: Request): Promise<Response> {
   try {
     bodyRead = await readRequestBody(request);
   } catch {
+    logPlaygroundEvent("request_body_read_failed");
     return apiErrorResponse(inputError("request body could not be read"));
   }
   if (bodyRead.tooLarge) {
+    logPlaygroundEvent("request_body_too_large");
     return apiErrorResponse({
       kind: "input",
       message: `request body exceeds ${MAX_BODY_BYTES} bytes`,
@@ -177,6 +180,7 @@ export async function POST(request: Request): Promise<Response> {
   const component = validated.value.component;
   const wasm = resolveWasm(component);
   if (!wasm) {
+    logPlaygroundEvent("artifact_unavailable", { component: component.slug });
     return apiErrorResponse({
       kind: "api",
       message: `contract wasm artifact not found for component "${component.slug}". Build it with \`pnpm sandbox:build\` (locally) or restore the prebuilt artifact in contracts/prebuilt/`,
@@ -199,6 +203,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const releaseExecution = tryAcquirePlaygroundExecution();
   if (!releaseExecution) {
+    logPlaygroundEvent("admission_rejected", { component: component.slug });
     return apiErrorResponse({
       kind: "runner",
       message: "sandbox is busy; try again shortly",
@@ -206,14 +211,29 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
+  const executionStartedAt = Date.now();
   let result: Awaited<ReturnType<typeof runRunner>>;
   try {
     result = await runRunner(JSON.stringify(runnerRequest));
+  } catch {
+    logPlaygroundEvent("runner_unexpected_failure", {
+      component: component.slug,
+      durationMs: Date.now() - executionStartedAt,
+    });
+    return apiErrorResponse({
+      kind: "runner",
+      message: "sandbox execution failed; check the request and try again",
+      status: 502,
+    });
   } finally {
     releaseExecution();
   }
 
   if (result.killed) {
+    logPlaygroundEvent("runner_timeout", {
+      component: component.slug,
+      durationMs: Date.now() - executionStartedAt,
+    });
     return apiErrorResponse({
       kind: "runner",
       message: `sandbox-runner timed out after ${RUNNER_TIMEOUT_MS / 1000}s`,
@@ -224,6 +244,10 @@ export async function POST(request: Request): Promise<Response> {
   if (result.exitCode !== 0) {
     // Runner output may contain filesystem paths or host diagnostics. Keep
     // those details out of the public response and return a stable error.
+    logPlaygroundEvent(result.failure === "spawn" ? "runner_spawn_failed" : "runner_exit_failed", {
+      component: component.slug,
+      durationMs: Date.now() - executionStartedAt,
+    });
     return apiErrorResponse({
       kind: "runner",
       message: "sandbox execution failed; check the request and try again",
@@ -232,13 +256,22 @@ export async function POST(request: Request): Promise<Response> {
   }
   const parsed = parseRunnerStdout(result.stdout);
   if (parsed === undefined) {
-    console.error("[playground] sandbox runner returned invalid output");
+    logPlaygroundEvent("runner_output_invalid", {
+      component: component.slug,
+      durationMs: Date.now() - executionStartedAt,
+    });
     return apiErrorResponse({
       kind: "runner",
       message: "sandbox execution returned an invalid result",
       status: 502,
     });
   }
+  logPlaygroundEvent("execution_succeeded", {
+    component: component.slug,
+    durationMs: Date.now() - executionStartedAt,
+    callCount: validated.value.calls.length,
+    dependencyCount: validated.value.dependencies.length,
+  });
   return Response.json(parsed, { status: 200 });
 }
 
@@ -737,7 +770,12 @@ function isBoundedString(value: unknown, max: number): boolean {
 
 function runRunner(
   input: string,
-): Promise<{ exitCode: number; stdout: string; killed: boolean }> {
+): Promise<{
+  exitCode: number;
+  stdout: string;
+  killed: boolean;
+  failure?: "spawn" | "exit";
+}> {
   const runner = resolveRunner();
   if (!runner) {
     return Promise.resolve({ exitCode: 1, stdout: "", killed: false });
@@ -755,8 +793,14 @@ function runRunner(
       },
       (error, stdout) => {
         if (error) {
+          const killed = error.killed === true;
           const exitCode = typeof error.code === "number" ? error.code : 1;
-          resolve({ exitCode, stdout, killed: error.killed === true });
+          resolve({
+            exitCode,
+            stdout,
+            killed,
+            failure: killed || typeof error.code === "number" ? "exit" : "spawn",
+          });
         } else {
           resolve({ exitCode: 0, stdout, killed: false });
         }
@@ -764,6 +808,15 @@ function runRunner(
     );
     child.stdin?.end(input);
   });
+}
+
+function logPlaygroundEvent(
+  event: string,
+  details: Record<string, string | number> = {},
+): void {
+  // Keep diagnostics metadata-only. Never include request bodies, identities,
+  // runner output, exception messages, executable paths, or artifact paths.
+  console.error("[playground]", { event, ...details });
 }
 
 async function readRequestBody(

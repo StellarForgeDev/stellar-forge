@@ -244,6 +244,7 @@ describe("POST /api/playground", () => {
 
   describe("runner failures", () => {
     it("redacts diagnostics from a non-zero runner exit", async () => {
+      const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const responsePromise = POST(request(payload()));
       await flushRouteProgress();
       completeNextRunner(
@@ -265,6 +266,26 @@ describe("POST /api/playground", () => {
       );
       expect(JSON.stringify(body)).not.toContain("secret.wasm");
       expect(JSON.stringify(body)).not.toContain("/srv/runner");
+      expect(JSON.stringify(logSpy.mock.calls)).not.toContain("secret.wasm");
+      expect(JSON.stringify(logSpy.mock.calls)).not.toContain("/srv/runner");
+      logSpy.mockRestore();
+    });
+
+    it("redacts unexpected runner invocation errors", async () => {
+      const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      harness.execFile.mockImplementationOnce(() => {
+        throw new Error("spawn failed at C:\\private\\runner");
+      });
+
+      const response = await POST(request(payload()));
+      const body = await response.json();
+      expect(response.status).toBe(502);
+      expect(body.error.message).toBe(
+        "sandbox execution failed; check the request and try again",
+      );
+      expect(JSON.stringify(body)).not.toContain("private");
+      expect(JSON.stringify(logSpy.mock.calls)).not.toContain("private");
+      logSpy.mockRestore();
     });
 
     it("returns a stable error for empty or invalid runner output", async () => {
