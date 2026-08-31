@@ -134,6 +134,21 @@ interface RunnerDependency {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  try {
+    return await handlePlaygroundPost(request);
+  } catch {
+    // Keep unexpected route failures safe for callers. The detailed exception
+    // is intentionally not logged because it may contain paths or host data.
+    logPlaygroundEvent("unexpected_route_failure");
+    return apiErrorResponse({
+      kind: "api",
+      message: "sandbox service encountered an unexpected error",
+      status: 500,
+    });
+  }
+}
+
+async function handlePlaygroundPost(request: Request): Promise<Response> {
   const runner = resolveRunner();
   if (!runner) {
     logPlaygroundEvent("runner_unavailable");

@@ -228,6 +228,28 @@ describe("POST /api/playground", () => {
     expect(harness.execFile).not.toHaveBeenCalled();
   });
 
+  it("normalizes unexpected route failures without exposing exception details", async () => {
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    harness.resolveWasm.mockImplementation(() => {
+      throw new Error("unexpected failure at C:\\private\\artifact.wasm");
+    });
+
+    const response = await POST(request(payload()));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      ok: false,
+      error: {
+        kind: "api",
+        message: "sandbox service encountered an unexpected error",
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain("artifact.wasm");
+    expect(JSON.stringify(logSpy.mock.calls)).not.toContain("artifact.wasm");
+    logSpy.mockRestore();
+  });
+
   it("maps a successful runner response through the HTTP boundary", async () => {
     const responsePromise = POST(request(payload()));
     await flushRouteProgress();
