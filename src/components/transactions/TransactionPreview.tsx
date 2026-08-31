@@ -349,8 +349,11 @@ export function TransactionPreview({ preview }: TransactionPreviewProps) {
 
           {preview.signingPhase === "signed" && (
             <>
-              <p className="mt-2 font-sans text-xs leading-relaxed text-text-secondary">
-                Signed by {preview.signerAddress}
+              <p className="mt-2 min-w-0 max-w-full whitespace-normal font-sans text-xs leading-relaxed text-text-secondary">
+                Signed by{" "}
+                <span className="break-all font-mono text-[11px] text-text-secondary">
+                  {preview.signerAddress}
+                </span>
                 {preview.signedAt && (
                   <>
                     {" "}
