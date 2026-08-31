@@ -496,8 +496,10 @@ and is what backs Vercel deployments.
 The runner (`contracts/contracts/sandbox-runner/src/main.rs`) reads the WASM
 from disk, creates a default `Env`, builds constructor args from the schema
 provided by the API route, uploads the WASM, deploys the contract (constructor
-auth mocked), then for each call builds args by type, applies `mock_auths` when a
-signer is supplied, and invokes the function. Results are ScVal→JSON.
+auth mocked), then for each call builds args by type and invokes the function.
+The request `signer` is retained as a UI/API execution hint, but is not a
+cryptographic credential and is not currently enforced as a signer-specific
+authorization entry. Results are ScVal→JSON.
 
 Before the main contract is deployed, the runner provisions every declared
 `dependency` with a unique salt: it deploys the dependency WASM, runs its
@@ -507,7 +509,8 @@ component's own calls resolve that alias to the dependency address. Every
 invocation runs under `mock_all_auths_allowing_non_root_auth`, so nested
 cross-contract authorization (e.g. Payment calling the asset's `transfer`) is
 satisfied generically — without any component-specific auth wiring in the
-runner.
+runner. This is a simulation convenience, not a signer-specific security
+boundary; on-chain authorization must be tested through the transaction flow.
 
 ### What is local vs network-based
 
@@ -524,9 +527,10 @@ runner.
   all sandbox runs share the same address space.
 - Only components with `implementation` + `interface` can run in the sandbox.
   All **15** catalog components now satisfy this and run locally; none are documentation-only.
-- Admin-only methods (`mint`, `set_admin`) cannot be exercised by a visitor
-  because the deployed token's admin key is held outside the repository; the
-  sandbox is the only place a visitor can observe state changes.
+- Sandbox authorization is mocked for deterministic exploration. The
+  Playground's signer label describes the intended authorization role but does
+  not prove possession of that identity or enforce a signer-specific auth tree.
+  Network transactions remain responsible for real authorization enforcement.
 
 ## Transaction Architecture
 

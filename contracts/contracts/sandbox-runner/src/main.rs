@@ -281,11 +281,12 @@ fn execute_call(
         Err(e) => return call_error(Some(fn_name), e),
     };
 
-    // The sandbox assumes host-level mock authorization (see ARCHITECTURE.md).
-    // `mock_all_auths_allowing_non_root_auth` covers both the invoked function
-    // and any nested cross-contract calls (e.g. a payment contract invoking an
-    // asset's `transfer`), so components can be exercised generically without
-    // per-component auth wiring.
+    // The sandbox uses host-level mock authorization. The request's `signer`
+    // field is an execution hint used by the UI/API, not a cryptographic
+    // authorization credential: the generic runner cannot safely construct
+    // every component's nested authorization tree from the catalog alone.
+    // Keep this limitation explicit rather than presenting mocked auth as a
+    // signer-specific security boundary.
     env.mock_all_auths_allowing_non_root_auth();
 
     let result: Result<Result<Val, _>, _> =

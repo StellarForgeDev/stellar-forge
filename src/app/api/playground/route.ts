@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { Keypair } from "@stellar/stellar-sdk";
+import { Keypair, StrKey } from "@stellar/stellar-sdk";
 import {
   resolveRunner,
   resolveWasm,
@@ -23,6 +23,7 @@ import {
 export const runtime = "nodejs";
 
 const RUNNER_TIMEOUT_MS = 10_000;
+const MAX_CONCURRENT_EXECUTIONS = 2;
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_CALLS = 20;
 const MAX_IDENTITIES = 20;
@@ -35,8 +36,6 @@ const DEFAULT_IDENTITIES: ReadonlySet<string> = new Set([
   "user2",
   "deployer",
 ]);
-const ACCOUNT_STRKEY = /^[GC][A-Z2-7]{55}$/;
-const MUXED_STRKEY = /^[GCM][A-Z2-7]{55}$/;
 const INTEGER_STRING = /^-?\d+$/;
 const DECIMAL_STRING = /^\d+$/;
 const HEX_STRING = /^(0x)?[0-9a-fA-F]*$/;
@@ -44,6 +43,24 @@ const I128_MIN = BigInt("-170141183460469231731687303715884105728");
 const I128_MAX = BigInt("170141183460469231731687303715884105727");
 const U32_MAX = BigInt("4294967295");
 const U64_MAX = BigInt(2) ** BigInt(64) - BigInt(1);
+const I64_MIN = BigInt("-9223372036854775808");
+const I64_MAX = BigInt("9223372036854775807");
+
+// This is intentionally process-local. It protects one Node.js instance from
+// launching an unbounded number of native runners; deployment-wide admission
+// control still belongs to the hosting layer.
+let activeExecutions = 0;
+
+export function tryAcquirePlaygroundExecution(): (() => void) | null {
+  if (activeExecutions >= MAX_CONCURRENT_EXECUTIONS) return null;
+  activeExecutions += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    activeExecutions -= 1;
+  };
+}
 
 // Maps a declared parameter type to its Playground API argument category.
 // Composite types (Vec/Map/Option) are supported generically via the shared
@@ -131,7 +148,7 @@ export async function POST(request: Request): Promise<Response> {
   if (raw.length === 0) {
     return apiErrorResponse(inputError("request body must be a JSON object"));
   }
-  if (raw.length > MAX_BODY_BYTES) {
+  if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) {
     return apiErrorResponse({
       kind: "input",
       message: `request body exceeds ${MAX_BODY_BYTES} bytes`,
@@ -174,7 +191,21 @@ export async function POST(request: Request): Promise<Response> {
       : {}),
   };
 
-  const result = await runRunner(JSON.stringify(runnerRequest));
+  const releaseExecution = tryAcquirePlaygroundExecution();
+  if (!releaseExecution) {
+    return apiErrorResponse({
+      kind: "runner",
+      message: "sandbox is busy; try again shortly",
+      status: 429,
+    });
+  }
+
+  let result: Awaited<ReturnType<typeof runRunner>>;
+  try {
+    result = await runRunner(JSON.stringify(runnerRequest));
+  } finally {
+    releaseExecution();
+  }
 
   if (result.killed) {
     return apiErrorResponse({
@@ -184,25 +215,21 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
-  const parsed = parseRunnerStdout(result.stdout);
   if (result.exitCode !== 0) {
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      (parsed as { ok?: unknown }).ok === false
-    ) {
-      return Response.json(parsed as PlaygroundResponse, { status: 502 });
-    }
+    // Runner output may contain filesystem paths or host diagnostics. Keep
+    // those details out of the public response and return a stable error.
     return apiErrorResponse({
       kind: "runner",
-      message: `sandbox-runner exited with code ${result.exitCode}`,
+      message: "sandbox execution failed; check the request and try again",
       status: 502,
     });
   }
+  const parsed = parseRunnerStdout(result.stdout);
   if (parsed === undefined) {
+    console.error("[playground] sandbox runner returned invalid output");
     return apiErrorResponse({
       kind: "runner",
-      message: "sandbox-runner returned an empty or invalid JSON response",
+      message: "sandbox execution returned an invalid result",
       status: 502,
     });
   }
@@ -435,7 +462,7 @@ function deterministicAddress(name: string): string {
   return Keypair.fromRawEd25519Seed(seed).publicKey();
 }
 
-function validateIdentities(
+export function validateIdentities(
   value: unknown,
 ): { value: Record<string, string> } | { error: PlaygroundApiError } {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -456,7 +483,7 @@ function validateIdentities(
     if (name.length === 0 || name.length > 32) {
       return { error: inputError(`invalid identity name: ${name}`) };
     }
-    if (typeof key !== "string" || !MUXED_STRKEY.test(key)) {
+    if (typeof key !== "string" || !isAddressRef(key, new Set(), true)) {
       return { error: inputError(`identity ${name} must be a G/C/M strkey`) };
     }
     result[name] = key;
@@ -610,7 +637,11 @@ function isValidArg(
 
 function isU64(value: unknown): boolean {
   if (typeof value === "number") {
-    return Number.isInteger(value) && value >= 0;
+    return (
+      Number.isSafeInteger(value) &&
+      value >= 0 &&
+      value <= Number.MAX_SAFE_INTEGER
+    );
   }
   if (typeof value === "string" && DECIMAL_STRING.test(value)) {
     try {
@@ -624,9 +655,19 @@ function isU64(value: unknown): boolean {
 
 function isI64(value: unknown): boolean {
   if (typeof value === "number") {
-    return Number.isInteger(value);
+    return (
+      Number.isSafeInteger(value) &&
+      BigInt(value) >= I64_MIN &&
+      BigInt(value) <= I64_MAX
+    );
   }
-  return typeof value === "string" && INTEGER_STRING.test(value);
+  if (typeof value !== "string" || !INTEGER_STRING.test(value)) return false;
+  try {
+    const n = BigInt(value);
+    return n >= I64_MIN && n <= I64_MAX;
+  } catch {
+    return false;
+  }
 }
 
 function isAddressRef(
@@ -636,7 +677,16 @@ function isAddressRef(
 ): boolean {
   if (typeof value !== "string" || value.length === 0) return false;
   if (knownNames.has(value)) return true;
-  return muxed ? MUXED_STRKEY.test(value) : ACCOUNT_STRKEY.test(value);
+  if (muxed) {
+    return (
+      StrKey.isValidEd25519PublicKey(value) ||
+      StrKey.isValidContract(value) ||
+      StrKey.isValidMed25519PublicKey(value)
+    );
+  }
+  return (
+    StrKey.isValidEd25519PublicKey(value) || StrKey.isValidContract(value)
+  );
 }
 
 function isI128(value: unknown): boolean {
