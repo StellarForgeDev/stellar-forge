@@ -394,15 +394,14 @@ Community-ready
 
 Meaning of each level:
 
-- **Concept** — a documented pattern with no contract. (As of Phase 20, all
-  eight catalog components are implemented; this level is no longer occupied by
-  any current component — Escrow, Access Control, Subscription, Multi-signature,
-  Vesting, and Staking are all implemented alongside Token and Payment.)
+- **Concept** — a documented pattern with no contract. All 15 current catalog
+  components are implemented; this level is no longer occupied by a current
+  component.
 - **Specified** — the interface, configuration, and expected behavior are
   written down (in the catalog record and docs), even before the contract
   exists.
 - **Implemented** — a real contract exists in `contracts/` with a passing test
-  suite. (Today `token` is at least this far; it is also further along.)
+  suite. All 15 current catalog components meet this level.
 - **Sandbox-ready** — the WASM is built and the local sandbox-runner can execute
   it, so the Playground can run it without a network.
 - **Testnet-ready** — a deployment address is registered and the transaction
@@ -412,10 +411,10 @@ Meaning of each level:
 - **Community-ready** — the component has contribution guidelines, stable
   interfaces, and is safe for external reuse.
 
-The `token` component declares `capabilities: { implemented: true, sandbox: true,
-testnet: true }`, so it is *Implemented*, *Sandbox-ready*, and *Testnet-ready*
-in the terms below; the catalog now distinguishes these via the capability
-flags rather than a single status string.
+The catalog declares these capabilities per component. At the current baseline,
+all 15 catalog components are *Implemented*, *Sandbox-ready*, and
+*Testnet-ready*; the catalog distinguishes these via capability flags rather
+than a single status string.
 
 ## Component Standard — Direction
 
@@ -484,12 +483,12 @@ sequence of contract calls. It has two execution paths:
 
 ### How WASM is resolved
 
-`src/lib/playground/artifacts.ts` computes candidate WASM paths in order:
-the locally built artifact
+`src/lib/playground/artifacts.ts` computes candidate WASM paths in this order:
+an explicitly supplied `prebuiltDir`, the locally built artifact
 (`contracts/target/wasm32v1-none/release/<package>.wasm`, via
-`componentWasmPath`) first, then the committed prebuilt copy
-(`contracts/prebuilt/<package>.wasm`). The prebuilt copy is platform-independent
-and is what backs Vercel deployments.
+`componentWasmPath`), `PREBUILT_WASM_DIR`, and finally the committed prebuilt
+copy (`contracts/prebuilt/<package>.wasm`). The prebuilt copy is
+platform-independent and is what backs Vercel deployments.
 
 ### How the sandbox executes contracts
 

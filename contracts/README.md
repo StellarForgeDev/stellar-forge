@@ -35,6 +35,13 @@ contract in this workspace.
 
 ## Components
 
+The workspace currently contains 15 production catalog packages:
+`access-control`, `allowance`, `atomic-swap`, `claimable-balance`, `crowdfund`,
+`escrow`, `merkle-airdrop`, `multi-signature`, `oracle`, `payment`, `staking`,
+`subscription`, `timelock`, `token`, and `vesting`. The workspace also contains
+the non-production `sandbox-runner`, `greeter`, and `test-asset` packages; these
+are excluded from the production prebuilt artifact set where appropriate.
+
 ### token
 
 A standard fungible token contract implementing the SEP-41 token

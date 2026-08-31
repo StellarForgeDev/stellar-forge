@@ -128,7 +128,7 @@ pnpm lint           # run ESLint
 pnpm vercel-build   # Vercel build entry point (see Deployment)
 ```
 
-`pnpm sandbox:build` runs `cargo build -p sandbox-runner` and `stellar contract build`, then refreshes local WASM artifacts. The **native `sandbox-runner` binary is required by the Playground API** (`/api/playground`); without it, the Playground returns a `503`. The committed `contracts/prebuilt/token.wasm` is used as a fallback for the WASM itself, but the runner must still be built locally.
+`pnpm sandbox:build` runs `cargo build -p sandbox-runner` and builds missing contract WASM with Cargo for the `wasm32v1-none` target. The **native `sandbox-runner` binary is required by the Playground API** (`/api/playground`); without it, the Playground returns a `503`. The committed `contracts/prebuilt/*.wasm` files are used as a fallback for the WASM itself, but the runner must still be built locally.
 
 ## Deployment
 
@@ -176,8 +176,13 @@ This setup is **not** a statement of production/mainnet readiness.
 
 ### Planned
 
+Phase 6 is production hardening within the existing modular monorepo. Repository
+extraction remains a future option only when independent maturity and release
+needs justify it; it is not the current Phase 6 scope.
+
 - **Phase 5.5** — Integration generator strengthening (additional languages, SDK/package considerations).
-- **Phase 6** — Repository splitting (monorepo → focused repos) when scaling justifies it.
+- **Phase 6** — Production hardening of the existing modular monorepo, including
+  artifact boundaries, Playground execution reliability, and documentation truth.
 - Continue expanding the catalog via the generic pipeline (no component-specific code).
 - Dedicated Transactions documentation section.
 - Automated test/CI hardening.
@@ -190,7 +195,7 @@ No features beyond the above are implied or promised.
 
 - **Network support:** `Testnet` is operational and supported (15 deployments); `Mainnet` is architecture-aware (config, deployment lookup, validation, generators, and UI are network-aware) but **no Mainnet contracts are deployed** (`mainnet:false` for all components, `getDeployment("mainnet",…)` correctly returns null, transactions are gated as “not deployed”); `Futurenet` plumbing is retained with no deployments. No Mainnet deployment occurs in this phase.
 - **Transactions documentation is incomplete.** There is no dedicated Transactions documentation page yet.
-- **Web application test suite is growing.** Vitest (29 files, ~292 tests) plus Rust contract tests (40 for the three authorization-stable contracts) cover catalog, identity, parameter, dependency, authorization, integration-generation, and network configuration; coverage continues to expand.
+- **Web application test suite is growing.** Run `pnpm test` for the Vitest suite and `cargo test -p sandbox-runner` for the native runner tests. The suites cover catalog, identity, parameter, dependency, authorization, integration-generation, network configuration, and route behavior.
 - **Vercel sandbox execution path requires end-to-end verification.**
 - **Admin-only Token methods cannot be exercised by visitors.** The token admin key is held outside the repository, so `mint`/`set_admin` cannot be run by a connected wallet; the local sandbox is the only place to observe state changes.
 
@@ -200,7 +205,21 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, verification commands, and
 
 ### Adding a component
 
+The generic execution pipeline currently handles address, integer, string,
+symbol, byte, collection, option, and time-related parameter values. The exact
+interface for each component remains defined by `src/data/components.ts`. This
+supersedes the older six-type summary below.
+
+The older six-type wording in the registration note below is retained only as
+historical context; the supported categories are the broader set described
+above.
+
+<!-- The legacy six-type wording below is intentionally retained in a hidden
+     historical note; use the current categories above. -->
+
 Adding a new reusable building block requires **no component-specific application code** — the catalog, identity resolution, dependency provisioning, authorization, configuration, transaction, and integration-code paths are all generic over the six supported parameter types (`Address`, `MuxedAddress`, `i128`, `u32`, `String`, `Symbol`). The registration steps are:
+
+-->
 
 1. **Contract crate** — add a Soroban contract under `contracts/contracts/<slug>/`. The workspace (`contracts/Cargo.toml`) uses a `contracts/*` glob and the build script (`scripts/sandbox-build.mjs`) discovers contract directories automatically, so no build-list edit is required.
 2. **Catalog entry** — add an entry to `src/data/components.ts` describing the component, its `interface`, `constructorArgs`, `dependencies`, `config`, `category`, and `testnet` flag. This single metadata object drives every part of the UI, sandbox, and generator.

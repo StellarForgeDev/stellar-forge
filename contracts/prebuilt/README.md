@@ -53,8 +53,8 @@ After changing a contract in the workspace:
 pnpm sandbox:build --prebuilt
 ```
 
-This rebuilds the wasm via the Stellar CLI and copies it here. Commit the
-updated file together with the contract source change.
+This rebuilds the WASM via Cargo for the `wasm32v1-none` target and copies it
+here. Commit the updated file together with the contract source change.
 
 ## Why this works on Vercel
 

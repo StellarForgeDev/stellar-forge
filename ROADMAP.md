@@ -153,44 +153,22 @@ movement to a SEP-41 asset declared as a generic `asset` dependency on `token`
 generically, so no Payment-specific code was added to the runner, route, or
 UI.
 
-**Testnet readiness (v1)** — the generic transaction machinery already supports
-Payment end-to-end: once a real `payment` deployment address is registered in
-`src/lib/transactions/deployments.ts` and `capabilities.testnet` is set to
-`true`, the existing builder / validate / prepare / submit flow discovers
-`pay` automatically with no component-specific branching. The plumbing is in
-place (a `deploy-testnet` Makefile target, a `payment.wasm` prebuilt artifact,
-and a registry comment documenting the registration step). The actual Testnet
-deployment is a **manual, credentialed step** (Stellar CLI + a funded
-`deployer` identity) that has **not** been performed in this environment, so
-`testnet` remains `false` and Payment is correctly excluded from Testnet
-transactions until the address exists. On Testnet the `asset` argument is
-supplied by the caller and should reuse the existing deployed `token` contract.
-See [Subsequent Milestones](#production-readiness).
+**Testnet readiness (v1)** — Payment is implemented, sandbox-executable, and
+registered for Testnet use. The generic builder / validate / prepare / submit
+flow discovers it from the catalog and deployment registry without
+component-specific branching. On Testnet the `asset` argument is supplied by
+the caller and can reuse the deployed `token` contract.
 
 ### Component Ecosystem
 
-All catalog components are implemented and sandbox-executable as of Phase 20.
-Two are deployed to Testnet (Token, Payment); the rest are sandbox-ready and
-await a public-network deployment:
+All 15 catalog components are implemented, sandbox-executable, and registered
+for Testnet use. Their current capability and deployment state is maintained in
+`src/data/components.ts` and `src/lib/transactions/deployments.ts`.
 
-- **Escrow** — *implemented (v1)*: stateful, constructor-driven, dependency-
-  composing, multi-role; sandbox-ready, not Testnet-deployed. Added to validate
-  the platform is generic (see Completed above).
-- **Access Control** — *implemented (v1)*: role-based authorization with a
-  single admin and `(role, account)` grants; sandbox-ready, not Testnet-deployed.
-  Added to validate that the `Symbol` argument type and `admin` authorization
-  model are generic (see Completed above).
-- **Subscription** — *implemented (v1)*: recurring subscription / billing
-  contract; sandbox-ready, not Testnet-deployed.
-- **Multi-signature** — *implemented (v1)*: threshold multisig approvals;
-  sandbox-ready, not Testnet-deployed.
-- **Vesting** — *implemented (v1)*: token vesting / unlock schedules;
-  sandbox-ready, not Testnet-deployed.
-- **Staking** — *implemented (v1)*: staking and rewards; sandbox-ready, not
-  Testnet-deployed.
-
-Treat these as planned work. Each should follow the same Component Standard
-pipeline rather than bespoke wiring.
+- **Escrow**, **Access Control**, **Subscription**, **Multi-signature**,
+  **Vesting**, and **Staking** are implemented v1 components with local sandbox
+  execution and Testnet registrations, following the same generic Component
+  Standard pipeline as Token and Payment.
 
 ### Developer Integration
 
@@ -224,7 +202,7 @@ Eventually consider, but do not promise dates for:
 - Production deployment beyond Testnet.
 - Testnet deployment of additional components (e.g. `escrow`, `access-control`,
   `subscription`, `multi-signature`, `vesting`, `staking`) beyond the
-  currently-deployed `token` and `payment`.
+  current Testnet deployment set.
 - Long-term maintenance ownership.
 
 ## Roadmap Rules

@@ -24,8 +24,9 @@ pnpm install        # install web dependencies
 pnpm sandbox:build  # build the native sandbox-runner + contract WASM
 ```
 
-`pnpm sandbox:build` runs `cargo build -p sandbox-runner` and
-`stellar contract build`, then refreshes local WASM artifacts. The native
+`pnpm sandbox:build` runs `cargo build -p sandbox-runner` and builds missing
+contract WASM with Cargo for the `wasm32v1-none` target, then refreshes local
+WASM artifacts. The native
 `sandbox-runner` binary is **required** by the Playground API
 (`/api/playground`); without it the Playground returns `503`. Committed
 `contracts/prebuilt/*.wasm` files are a fallback for the WASM itself so the
@@ -71,8 +72,9 @@ cargo fmt --all                         # format Rust
 - **Catalog data is the source of truth.** `src/data/components.ts` drives the
   UI, API routes, sandbox, transaction builder, and integration generator.
 - **Generic over component-specific.** The platform is data-driven across the
-  six supported parameter types (`Address`, `MuxedAddress`, `i128`, `u32`,
-  `String`, `Symbol`). **Do not introduce component-specific branching** in the
+  parameter types handled by the API and argument converters, including
+  addresses, integers, strings, symbols, bytes, collections, options, and
+  time-related values. **Do not introduce component-specific branching** in the
   UI, API, transaction, or integration code. New behavior should be expressed as
   catalog metadata, not bespoke wiring.
 - **Keep contracts and application logic separated** (Rust in `contracts/`,
@@ -150,9 +152,14 @@ integration generator are needed.
 
 ### No component-specific branching
 
+The generic execution pipeline currently handles address, integer, string,
+symbol, byte, collection, option, and time-related parameter values. The exact
+interface for each component remains defined by `src/data/components.ts`. This
+supersedes the older six-type summary below.
+
 The catalog, identity resolution, dependency provisioning, authorization,
 configuration, transaction, and integration-code paths are all generic over the
-six supported parameter types. If you find yourself adding `if (slug === "...")`
+supported parameter types. If you find yourself adding `if (slug === "...")`
 logic outside the catalog data, stop and express it as metadata instead.
 
 ## Pull request expectations
