@@ -616,8 +616,252 @@ readiness.
 
 ## Repository Boundary Strategy
 
-**Recommendation: keep the project as a modular monorepo unless an actual
-scaling requirement justifies extraction.**
+Stellar Forge follows this repository evolution strategy:
+
+```text
+PHASE A — NOW
+One repository
+Strong internal boundaries
+Minimal coupling
+Clear ownership
+
+        ↓
+
+PHASE B — GROWTH
+Packages/modules become mature
+Public APIs stabilize
+Independent release needs emerge
+
+        ↓
+
+PHASE C — EXTRACTION
+Move mature modules into independent repositories/packages
+
+        ↓
+
+PHASE D — ECOSYSTEM
+Multiple repositories
+Published packages
+Independent contributors
+Separate CI/CD
+```
+
+### Phase A — Current monorepo
+
+The project intentionally remains a unified repository while its modules,
+interfaces, and workflows are still evolving. The monorepo is the current
+development boundary, not a permanent architectural limitation. It keeps
+iteration fast and makes the relationships between catalog data, contracts,
+artifacts, sandbox execution, and the web application auditable.
+
+### Phase B — Internal growth
+
+As the project grows, internal modules should become increasingly independent:
+
+- Component catalog
+- Developer SDK
+- Artifact tooling
+- Playground core
+- Testing utilities
+- Contract tooling
+
+This phase establishes ownership, stable interfaces, independent tests, and
+real release requirements before any repository move is considered.
+
+### Phase C — Selective extraction
+
+A module should be extracted only when independence provides a measurable
+benefit. Extraction should relocate a mature boundary rather than discover the
+boundary during migration.
+
+### Phase D — Ecosystem
+
+The long-term ecosystem may contain independently maintained repositories and
+published packages with separate contributors, release processes, and CI/CD.
+Not every internal module needs to reach this phase.
+
+### Directional internal architecture
+
+The following is a proposed direction, not an immediate migration requirement:
+
+```text
+stellar-forge/
+│
+├── apps/
+│   └── web/
+│       ├── app/
+│       ├── components/
+│       └── API routes
+│
+├── packages/
+│   ├── catalog/
+│   │   └── Component definitions
+│   │
+│   ├── sdk/
+│   │   └── Future developer SDK
+│   │
+│   ├── artifacts/
+│   │   └── Artifact metadata + validation
+│   │
+│   ├── playground-core/
+│   │   └── Execution abstractions
+│   │
+│   └── testing/
+│       └── Test utilities
+│
+├── contracts/
+│   ├── contracts/
+│   │   ├── token/
+│   │   ├── escrow/
+│   │   ├── staking/
+│   │   └── ...
+│   │
+│   └── prebuilt/
+│       ├── *.wasm
+│       ├── metadata.json
+│       └── checksums.txt
+│
+├── scripts/
+│
+└── docs/
+```
+
+Existing code should move toward this separation only when doing so provides a
+concrete architectural benefit. The directories shown above are directional;
+they must not be created merely to match the diagram.
+
+### Internal boundary principles
+
+- Keep the current repository unified while the project is evolving rapidly.
+- Establish clear ownership boundaries inside the repository.
+- Keep coupling between modules minimal.
+- Prefer stable interfaces between major subsystems.
+- Avoid unnecessary cross-module dependencies.
+- Avoid prematurely publishing internal packages.
+- Place new functionality according to its architectural responsibility rather
+  than adding it to a large general-purpose directory.
+- Drive extraction by maturity and independence, not repository size alone.
+
+### Repository extraction criteria
+
+A module becomes a candidate for extraction when most of the following are
+true:
+
+- **Ownership** — it has a clear responsibility and ownership boundary.
+- **Stable API** — its public interface is stable enough to avoid constant
+  breaking changes during extraction.
+- **Independent usefulness** — it provides meaningful value outside the main
+  Stellar Forge application.
+- **Independent release requirements** — there is a real reason to version,
+  publish, or release it independently.
+- **Low coupling** — it does not depend heavily on private implementation
+  details of unrelated modules.
+- **Independent testing** — it has a meaningful test suite that does not
+  require the entire application.
+- **Independent CI/CD** — it can eventually be built, tested, and released
+  independently.
+- **Community contribution potential** — contributors can work on it without
+  understanding the entire codebase.
+
+> Repository extraction is an architectural optimization, not a milestone that
+> must happen simply because the repository becomes large.
+
+### Potential future repository boundaries
+
+The following are potential future extractions, not current commitments.
+
+#### Core platform — `stellar-forge`
+
+The primary repository would continue to own the web application,
+documentation, component catalog UI, Playground UI, developer portal, and the
+broader ecosystem entry point.
+
+#### Contracts — `stellar-forge-contracts`
+
+This could eventually contain `token`, `payment`, `escrow`, `access-control`,
+`subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`,
+`merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`, and
+`multi-signature`, together with Rust/Soroban tests, contract build tooling,
+and contract versioning. The current Cargo workspace already provides the
+appropriate internal seam, but this repository must not be extracted until
+contract development, versioning, and release workflows are genuinely
+independent.
+
+#### Developer SDK — `stellar-forge-sdk`
+
+This could eventually provide `@stellar-forge/sdk`, including component
+discovery, contract interfaces, transaction helpers, deployment utilities,
+artifact lookup, and developer abstractions. It should become independent only
+after its developer-facing API is sufficiently mature.
+
+#### Artifact distribution — `stellar-forge-artifacts`
+
+This could eventually contain WASM artifacts, metadata, checksums, release
+manifests, and artifact versions. The existing verified artifact boundary
+provides groundwork for this possibility; the eventual repository, release, or
+storage mechanism remains intentionally undecided.
+
+#### Sandbox infrastructure — `stellar-forge-sandbox`
+
+This could eventually contain the sandbox runner, execution engine, isolation,
+resource limits, execution API, and hosted execution infrastructure. The
+current `sandbox-runner` remains under `contracts/contracts/sandbox-runner` and
+must not be extracted until hosted execution creates a justified independent
+ownership and release boundary.
+
+### Current decision and migration progression
+
+**Stellar Forge will remain a monorepo during the current development stage.**
+The immediate priority is not repository splitting:
+
+```text
+Strong internal architecture
+        ↓
+Stable module boundaries
+        ↓
+Mature implementations
+        ↓
+Stable public APIs
+        ↓
+Evidence of independent usefulness
+        ↓
+Selective extraction
+```
+
+This progression allows rapid development while preserving a realistic path
+toward an ecosystem of independently maintained packages and repositories.
+
+The anti-pattern to avoid is:
+
+```text
+Large repository
+      ↓
+Immediately split everything
+      ↓
+Many repositories
+      ↓
+Cross-repository dependencies
+      ↓
+Versioning overhead
+      ↓
+CI/CD complexity
+      ↓
+Slower development
+```
+
+The preferred progression is:
+
+```text
+Monorepo
+   ↓
+Strong boundaries
+   ↓
+Mature modules
+   ↓
+Stable APIs
+   ↓
+Selective extraction
+```
 
 Rationale:
 
