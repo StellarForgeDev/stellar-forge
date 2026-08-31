@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/build-sandbox-runner.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -12,7 +12,7 @@
     "sandbox:build": "node scripts/sandbox-build.mjs",
     "verify:prebuilt": "node scripts/verify-prebuilt.mjs",
     "generate:prebuilt-metadata": "node scripts/verify-prebuilt.mjs --generate",
-    "vercel-build": "bash scripts/vercel-sandbox-build.sh && next build"
+    "vercel-build": "pnpm run build"
   },
   "dependencies": {
     "@stellar/freighter-api": "^6.0.1",
