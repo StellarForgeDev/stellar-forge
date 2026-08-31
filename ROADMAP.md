@@ -10,9 +10,9 @@ repository before being marked done.
 
 ## Current State
 
-> **Status note (Phase 5, 2026-08-30):** Phase 5 is **COMPLETE**. The catalog now has **15 reusable Soroban components**, all with passing Rust tests and local sandbox execution; all 15 are deployed to Stellar Testnet and registered in `src/lib/transactions/deployments.ts` with `testnet:true`. The transaction and integration pipelines are network-aware (`testnet` | `mainnet` | `futurenet`) via centralized `NetworkConfig` (`src/lib/transactions/networks.ts`): **Testnet is operational** (default, 15 deployments), **Mainnet is architecture-aware but unavailable** (0 deployments, all `mainnet:false`), **Futurenet** plumbing is retained (0 deployments). The generic pipeline (catalog → docs → sandbox → transactions) remains validated without component-specific branching.
+> **Status note (Phase 5, 2026-08-30):** Phase 5 is **COMPLETE**. The catalog has **15 reusable Soroban components**, all with passing Rust tests and local sandbox execution; all 15 have Testnet registry entries in `src/lib/transactions/deployments.ts` with `testnet:true`. Registry entries are not independent proof of every on-chain instance, expected behavior, or exact WASM hash parity. The Token `name` transaction has been manually verified end to end in production. The transaction and integration pipelines are network-aware (`testnet` | `mainnet` | `futurenet`) via centralized `NetworkConfig`: **Testnet is operational** (default), **Mainnet is architecture-aware but unavailable** (0 deployments, all `mainnet:false`), and **Futurenet** plumbing is retained (0 deployments).
 
-Stellar-Forge is at **release-candidate** maturity. The network model is centralized (`NetworkConfig` with `rpcUrl`, `passphrase`, `explorerUrl` and `STELLAR_RPC_*_URL` overrides). All 15 components are implemented and sandbox-executable and **all 15 are deployed to Stellar Testnet** (`testnet:true`); Mainnet and Futurenet have no deployments by design. The generic pipeline was validated across every component without component-specific branching.
+Stellar-Forge is at **release-candidate** maturity. The network model is centralized (`NetworkConfig` with `rpcUrl`, `passphrase`, `explorerUrl` and `STELLAR_RPC_*_URL` overrides). All 15 components are implemented and sandbox-executable and **all 15 are registered for Stellar Testnet** (`testnet:true`); Mainnet and Futurenet have no deployments by design. The generic pipeline is catalog-driven without component-specific branching; live transaction verification currently covers Token `name`.
 
 ### Completed (verified)
 
@@ -50,7 +50,7 @@ Stellar-Forge is at **release-candidate** maturity. The network model is central
 - **Vercel build architecture** — `vercel-build` script, Linux runner build
   (`scripts/vercel-sandbox-build.sh`), `outputFileTracingIncludes` in
   `next.config.ts`, committed prebuilt WASM. (End-to-end deployment is
-  configured but **not independently verified**.)
+  verified in production for the Playground with real Token WASM execution.)
 - **Escrow implementation (v1)** — stateful `escrow` contract
   (`__constructor(depositor, beneficiary, arbiter, asset)`, `deposit`,
   `release`, `refund`, `status`) with passing Rust tests and a cross-contract
@@ -61,9 +61,9 @@ Stellar-Forge is at **release-candidate** maturity. The network model is central
   through the generic dependency mechanism, and integration generation. No
   component-specific branching was added; only two small generic platform
   enhancements were required (`constructorArgs` catalog field and
-  `constructorArg` dependency-alias resolution). Testnet deployment is **not**
-  done (`testnet: false`); the generic transaction machinery will support it once
-  a deployment address is registered in `deployments.ts`.
+  `constructorArg` dependency-alias resolution). Its Testnet address is now
+  registered; registry status is configuration evidence and expected on-chain
+  behavior still requires independent verification.
 
 ## Phase 5 — Completed
 
@@ -75,11 +75,11 @@ Stellar-Forge is at **release-candidate** maturity. The network model is central
 
   **Phase 5.3B — Authorization-stable sequence** — `5.3B.18` TTL fixed but `auth/invalid_action` discovered (ledger-dependent `expiration_ledger` recomputed in contract caused simulation/execution mismatch); `5.3B.19` implemented caller-supplied stable `expiration_ledger` validated as `current < expiration ≤ current+1_000_000` for `crowdfund`, `allowance`, `claimable-balance` (+ tests + WASM 23227/10820/19465); `5.3B.20` real Testnet lifecycle validation succeeded (10 workflows: crowdfund contribute/withdraw/claim_refund, allowance approve/increase/decrease/transfer_from, claimable deposit/claim/cancel) with `latest+1000` strategy; `5.3B.21` replaced obsolete crowdfund deployment and enabled `allowance`/`claimable-balance` `testnet:true`; `5.3B.22` committed and pushed as `6b21f8e fix: stabilize token approval authorization on testnet` with working tree clean.
 
-- **Phase 5.4 — Configurable network support** — centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) with `rpcUrl`, `passphrase`, `explorerUrl` and `STELLAR_RPC_*_URL` overrides in `src/lib/transactions/networks.ts`; generic `getDeployment(network, slug)`, builder, validation, RPC selection, and integration generators are network-aware; `Testnet` operational (15 deployments, default), `Mainnet` architecture-aware but unavailable (0 deployments, all `mainnet:false`, correctly gated), `Futurenet` plumbing retained; committed as `f10764a feat: add configurable network support`.
+- **Phase 5.4 — Configurable network support** — centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) with `rpcUrl`, `passphrase`, `explorerUrl` and `STELLAR_RPC_*_URL` overrides in `src/lib/transactions/networks.ts`; generic `getDeployment(network, slug)`, builder, validation, RPC selection, and integration generators are network-aware; `Testnet` operational (15 registered deployments, default), `Mainnet` architecture-aware but unavailable (0 deployments, all `mainnet:false`, correctly gated), `Futurenet` plumbing retained; committed as `f10764a feat: add configurable network support`.
 
 - **Phase 5.5 — Integration generator strengthening** — TypeScript generators now include `pnpm add @stellar/stellar-sdk`, `STELLAR_RPC_*_URL` override guidance derived from `NetworkConfig`, and `explorerUrl` link; Rust generators include `soroban-sdk = "27"` guidance and local-host clarification; committed as `247decb feat: strengthen integration generators`. No new language, SDK package, or publishing system introduced.
 
-**Current network state:** `Testnet = operational (15 deployments)` / `Mainnet = architecture-aware but unavailable (0 deployments, all mainnet:false)` / `Futurenet = plumbing retained (0 deployments)`. No Mainnet deployment was performed.
+**Current network state:** `Testnet = operational (15 registered deployments; Token `name` independently verified)` / `Mainnet = architecture-aware but unavailable (0 deployments, all mainnet:false)` / `Futurenet = plumbing retained (0 deployments)`. No Mainnet deployment was performed. Token and Payment on-chain WASM hashes differ from the current repository prebuilt artifacts; registry presence and working behavior must not be treated as exact byte parity.
 
 ## Current Priority
 
@@ -200,9 +200,8 @@ Eventually consider, but do not promise dates for:
 - Stable versioning and compatibility guarantees.
 - Mainnet strategy (currently unsupported).
 - Production deployment beyond Testnet.
-- Testnet deployment of additional components (e.g. `escrow`, `access-control`,
-  `subscription`, `multi-signature`, `vesting`, `staking`) beyond the
-  current Testnet deployment set.
+- Independent verification of the remaining registered Testnet components and
+  their expected behavior.
 - Long-term maintenance ownership.
 
 ## Roadmap Rules

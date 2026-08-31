@@ -356,20 +356,14 @@ export default function TransactionsDocsPage() {
         </h2>
 
         <p className="mt-3 max-w-2xl font-sans text-sm leading-7 text-text-secondary">
-          The Transaction Builder only lists components that are deployed to a
-          public network. Today that is{" "}
-          <Link href="/docs/components/token" className="font-mono text-xs text-accent-stellar hover:underline">
-            Token
-          </Link>{" "}
-          and{" "}
-          <Link href="/docs/components/payment" className="font-mono text-xs text-accent-stellar hover:underline">
-            Payment
-          </Link>{" "}
-          on <strong>Stellar Testnet</strong>. All eight catalog components are
-          implemented and run in the local sandbox; the other six (Access
-          Control, Escrow, Multi-signature, Subscription, Vesting, Staking) are
-          not yet deployed to a public network, so they are not selectable in
-          the builder until a deployment address is registered.
+          The Transaction Builder lists components with a Testnet deployment
+          registration. Today that is all 15 catalog components on{" "}
+          <strong>Stellar Testnet</strong>. All 15 catalog components are
+          implemented and run in the local sandbox, and all 15 currently have
+          Testnet registry entries. Registry presence is not independent proof
+          of on-chain behavior or exact WASM hash parity for every component;
+          the Token <span className="font-mono text-xs">name</span> flow is the
+          manually verified end-to-end example.
         </p>
 
         <Callout>
@@ -379,9 +373,31 @@ export default function TransactionsDocsPage() {
         </Callout>
       </section>
 
+      <section id="verified-example" className="mt-16">
+        <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
+          10 / Verified Testnet example
+        </h2>
+
+        <p className="mt-3 max-w-2xl font-sans text-sm leading-7 text-text-secondary">
+          The production flow has been manually verified with a funded Testnet
+          account and Freighter: Token <span className="font-mono text-xs">name</span>
+          {" "}was built, signed, submitted through the application, and confirmed
+          as <span className="font-mono text-xs">SUCCESS</span> on the Stellar
+          Testnet explorer. The verified contract returned{" "}
+          <span className="font-mono text-xs">&quot;Forge Token&quot;</span>.
+        </p>
+
+        <p className="mt-3 max-w-2xl font-sans text-sm leading-7 text-text-secondary">
+          Verified transaction hash: <span className="break-all font-mono text-xs">bc11790b3eaed017a67e2192b762ba8ca02fe6b60c44e3af223913e9d2abae3b</span>.
+          This example proves the live path for this Token instance and method;
+          it does not independently verify every registered component or exact
+          repository-WASM hash parity.
+        </p>
+      </section>
+
       <section id="sandbox-vs-testnet" className="mt-16">
         <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
-          10 / Playground sandbox vs real Testnet
+          11 / Playground sandbox vs real Testnet
         </h2>
 
         <p className="mt-3 max-w-2xl font-sans text-sm leading-7 text-text-secondary">
@@ -421,7 +437,7 @@ export default function TransactionsDocsPage() {
 
       <section id="summary" className="mt-16">
         <h2 className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
-          11 / The on-chain step of the journey
+          12 / The on-chain step of the journey
         </h2>
 
         <p className="mt-3 max-w-2xl font-sans text-sm leading-7 text-text-secondary">

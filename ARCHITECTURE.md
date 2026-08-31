@@ -9,7 +9,7 @@ Everything in the *Current implementation* sections is verified against the
 repository at the time of writing. Do not treat proposed architecture as if it
 already exists.
 
-> **Status note (Phase 5, 2026-08-30):** All **15** catalog components are now implemented and sandbox-executable and **all 15 are deployed to Stellar Testnet** (`token`, `payment`, `access-control`, `escrow`, `multi-signature`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`). The transaction and integration pipelines are now **network-aware** via centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`): `Testnet` is operational (default, 15 deployments), `Mainnet` is architecture-aware but unavailable (0 deployments, all `mainnet:false`), `Futurenet` plumbing is retained. The authorization-stable `expiration_ledger` fix for `crowdfund`/`allowance`/`claimable-balance` is validated on Testnet.
+> **Status note (Phase 5, 2026-08-30):** All **15** catalog components are implemented and sandbox-executable, and 15 Testnet addresses are registered in `src/lib/transactions/deployments.ts`. Registration is configuration evidence, not independent verification of every on-chain instance, expected behavior, or exact WASM hash parity. The Token `name` transaction has since been manually verified end to end in production. The transaction and integration pipelines are **network-aware** via centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`): `Testnet` is operational (default), `Mainnet` is architecture-aware but unavailable (0 deployments, all `mainnet:false`), and `Futurenet` plumbing is retained. The authorization-stable `expiration_ledger` fix for `crowdfund`/`allowance`/`claimable-balance` is validated on Testnet.
 
 > **Status note (Stage 2B, 2026-08-28):** the product surface (global nav,
 > homepage, catalog, Playground, detail/docs, transactions) was made cohesive and
@@ -191,8 +191,8 @@ as a starting point, not a complete SDK.
 
 ### Deployment / Vercel architecture
 
-Stellar-Forge is configured for deployment on Vercel but the end-to-end path has
-**not been independently verified** in this repository. The committed
+Stellar-Forge is deployed on Vercel, and the production Playground path has
+been independently verified with real Token WASM execution. The committed
 configuration is:
 
 - `package.json` `vercel-build` runs `scripts/vercel-sandbox-build.sh` then
@@ -412,9 +412,9 @@ Meaning of each level:
   interfaces, and is safe for external reuse.
 
 The catalog declares these capabilities per component. At the current baseline,
-all 15 catalog components are *Implemented*, *Sandbox-ready*, and
-*Testnet-ready*; the catalog distinguishes these via capability flags rather
-than a single status string.
+all 15 catalog components are *Implemented* and *Sandbox-ready*. All 15 are
+marked *Testnet-ready* and have registry entries; that declaration does not
+independently verify every deployed instance or WASM-byte parity.
 
 ## Component Standard — Direction
 
@@ -536,7 +536,7 @@ boundary; on-chain authorization must be tested through the transaction flow.
 
 ## Transaction Architecture
 
-> **Phase 5.4 network model:** `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) centralized in `src/lib/transactions/networks.ts` (`rpcUrl`, `passphrase`, `explorerUrl`, `STELLAR_RPC_*_URL` overrides) is the single source for `getDeployment(network, slug)`, RPC selection, builder, validation, and integration generation. `Testnet` is operational (15 deployments, default), `Mainnet` is architecture-aware but has 0 deployments (all `mainnet:false`, correctly gated as “not deployed”), `Futurenet` plumbing is retained.
+> **Phase 5.4 network model:** `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) centralized in `src/lib/transactions/networks.ts` (`rpcUrl`, `passphrase`, `explorerUrl`, `STELLAR_RPC_*_URL` overrides) is the single source for `getDeployment(network, slug)`, RPC selection, builder, validation, and integration generation. `Testnet` is operational (15 registered deployments, default), `Mainnet` is architecture-aware but has 0 deployments (all `mainnet:false`, correctly gated as “not deployed”), `Futurenet` plumbing is retained.
 
 The actual current transaction flow:
 
@@ -595,17 +595,14 @@ placeholder instead of generated code. The supported languages are `rust` and
 
 ## Deployment Architecture
 
-> **Status note (Phase 5.2, 2026-08-30):** the `vercel-sandbox-build.sh` script was
+> **Status note (Phase 5.2, updated):** the `vercel-sandbox-build.sh` script was
 > corrected to build from the `contracts/` Cargo workspace (it previously `cd`'d to
 > the repo root, where no `Cargo.toml` exists, which would have failed the Vercel
 > build). The local runtime path — API route → `sandbox-runner` → prebuilt WASM →
-> structured JSON — is verified. An actual Vercel deployment has **not** been
-> reached in this environment (no credentialed access), so the cloud path remains
-> unverified; the primary residual cloud risk is whether Next.js output tracing
-> preserves the runner's executable bit (the build script now `chmod +x`s it as a
-> guard).
+> structured JSON is verified locally and in the production Vercel Playground.
+> The build script also preserves the runner's executable bit with `chmod +x`.
 
-Current arrangement (committed, **not verified end-to-end**):
+Current arrangement (committed and production-verified for the Playground):
 
 - Vercel invokes `vercel-build` (`scripts/vercel-sandbox-build.sh` then
   `next build`).
@@ -613,7 +610,8 @@ Current arrangement (committed, **not verified end-to-end**):
 - Contract WASM ships prebuilt in `contracts/prebuilt/`.
 - `next.config.ts` `outputFileTracingIncludes` ensures `/api/playground`'s
   bundle contains the WASM and runner.
-- `STELLAR_RPC_TESTNET_URL` / `STELLAR_RPC_FUTURENET_URL` are optional env
+- `STELLAR_RPC_TESTNET_URL` / `STELLAR_RPC_MAINNET_URL` /
+  `STELLAR_RPC_FUTURENET_URL` are optional env
   overrides with built-in defaults.
 
 No production/mainnet deployment, no multi-region, no database, and no

@@ -30,7 +30,10 @@ other and with the corresponding WASM bytes.
 
 Contract WASM is compiled once from the Rust source in
 `contracts/contracts/<package>` and is byte-identical on every OS, so the
-committed copy is the deployment artifact. The Playground API uses an
+committed copy is the repository's local/Playground artifact. It must not be
+assumed to match the WASM used by an already deployed Testnet instance:
+Token and Payment on-chain WASM hashes currently differ from the repository
+prebuilt hashes. The Playground API uses an
 explicitly supplied artifact directory first. With no explicit directory, it
 prefers the locally built wasm (`contracts/target/wasm32v1-none/release/`),
 then `PREBUILT_WASM_DIR`, then this directory. Runtime resolution checks paths

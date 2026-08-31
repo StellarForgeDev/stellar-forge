@@ -122,7 +122,13 @@ The resulting WASM is written to `target/wasm32v1-none/release/`.
 
 ## Testnet Deployment
 
-The `token` and `payment` contracts can both be deployed to Stellar Testnet.
+The `token` and `payment` contracts have Testnet registry entries and the
+deployment commands below document how to create fresh instances. A registry
+entry confirms configured address data, not independent verification of the
+instance's behavior or exact WASM hash parity. Token `name` has been manually
+verified end to end; Payment and the other registered components still require
+separate verification. Token and Payment on-chain WASM hashes currently differ
+from the repository prebuilt artifacts.
 Deployment uses the Stellar CLI only; no credentials live in this repository.
 
 One-time identity setup (stored in the CLI config directory, outside this

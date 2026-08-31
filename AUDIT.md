@@ -5,16 +5,17 @@
 >
 > Subsequent work (Phases 8–20, through the current release candidate) has
 > addressed, changed, or superseded a number of the findings below — for
-> example, the transaction system was completed, the `Token` and `Payment`
-> contracts were deployed to Stellar Testnet, all eight catalog components are
-> now implemented and sandbox-executable, a web test suite and CI were added, the
+> example, the transaction system was completed, 15 Testnet registry entries were
+> added, all 15 catalog components are now implemented and sandbox-executable,
+> a web test suite and CI were added, the
 > Playground/Vercel build path was added, and several reported bugs were
 > remediated.
 >
-> **Status as of Phase 20 (2026-08-27):** eight components are implemented
-> (Token, Payment, Access Control, Escrow, Multi-signature, Subscription,
-> Vesting, Staking); Token and Payment are deployed to Testnet; a web test
-> suite (`pnpm test`) and CI exist. Sections below that describe "1 of N
+> **Historical status as of Phase 20 (2026-08-27):** eight components were
+> implemented (Token, Payment, Access Control, Escrow, Multi-signature,
+> Subscription, Vesting, Staking); Token and Payment were the then-verified
+> Testnet deployments; a web test
+> suite (`pnpm test`) and CI existed. Sections below that describe "1 of N
 > components", "no app tests", or "no CI" reflect the Phase 7 state and no
 > longer apply. The original findings, bug IDs, and reasoning are retained
 > below as historical context.
