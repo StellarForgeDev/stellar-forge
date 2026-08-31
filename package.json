@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "sandbox:build": "node scripts/sandbox-build.mjs",
     "verify:prebuilt": "node scripts/verify-prebuilt.mjs",
+    "generate:prebuilt-metadata": "node scripts/verify-prebuilt.mjs --generate",
     "vercel-build": "bash scripts/vercel-sandbox-build.sh && next build"
   },
   "dependencies": {

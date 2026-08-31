@@ -253,7 +253,7 @@ src/
        test-asset/         Minimal SEP-41 fixture for payment tests
       greeter/            Example/sandbox test fixture (not a catalog component)
       sandbox-runner/     Native runner that executes contract WASM
-     prebuilt/             Committed contract WASM: token.wasm, payment.wasm, escrow.wasm, access-control.wasm, subscription.wasm, vesting.wasm, staking.wasm, multi-signature.wasm
+     prebuilt/             15 committed contract WASM artifacts plus metadata.json and checksums.txt
 
 scripts/
   sandbox-build.mjs     Local sandbox-runner + WASM build

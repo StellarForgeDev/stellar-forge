@@ -15,12 +15,27 @@ Playground works on Vercel without a Rust toolchain during deployment.
 | `subscription.wasm` | Soroban contract WASM executed inside the sandbox | platform-independent |
 | `vesting.wasm` | Soroban contract WASM executed inside the sandbox | platform-independent |
 | `staking.wasm` | Staking contract WASM executed inside the sandbox | platform-independent |
+| `atomic-swap.wasm` | Atomic swap contract WASM executed inside the sandbox | platform-independent |
+| `timelock.wasm` | Timelock contract WASM executed inside the sandbox | platform-independent |
+| `merkle-airdrop.wasm` | Merkle airdrop contract WASM executed inside the sandbox | platform-independent |
+| `oracle.wasm` | Oracle contract WASM executed inside the sandbox | platform-independent |
+| `crowdfund.wasm` | Crowdfund contract WASM executed inside the sandbox | platform-independent |
+| `allowance.wasm` | Allowance contract WASM executed inside the sandbox | platform-independent |
+| `claimable-balance.wasm` | Claimable balance contract WASM executed inside the sandbox | platform-independent |
+
+The directory also contains `metadata.json`, structured machine-readable
+artifact metadata, and `checksums.txt`, a conventional checksum verification
+interface. Both intentionally contain SHA-256 values and must agree with each
+other and with the corresponding WASM bytes.
 
 Contract WASM is compiled once from the Rust source in
 `contracts/contracts/<package>` and is byte-identical on every OS, so the
-committed copy is the deployment artifact. The Playground API prefers the
-locally built wasm (`contracts/target/wasm32v1-none/release/`) when present
-and falls back to this directory.
+committed copy is the deployment artifact. The Playground API uses an
+explicitly supplied artifact directory first. With no explicit directory, it
+prefers the locally built wasm (`contracts/target/wasm32v1-none/release/`),
+then `PREBUILT_WASM_DIR`, then this directory. Runtime resolution checks paths
+and existence only; checksum validation is an explicit CI/startup/deployment
+verification operation, not a per-request operation.
 
 The native `sandbox-runner` binary is **never** committed:
 
