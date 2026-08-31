@@ -124,12 +124,15 @@ describe("POST /api/playground", () => {
       expect(harness.execFile).not.toHaveBeenCalled();
     });
 
-    it("rejects an unknown component slug", async () => {
-      const response = await POST(request(payload({ componentSlug: "missing" })));
+    it.each(["missing", "../../evil", "C:\\private\\evil"]) (
+      "rejects an unknown or traversal-like component slug: %s",
+      async (componentSlug) => {
+      const response = await POST(request(payload({ componentSlug })));
       expect(response.status).toBe(400);
       expect((await response.json()).error.message).toContain("unknown component");
       expect(harness.execFile).not.toHaveBeenCalled();
-    });
+      },
+    );
 
     it("rejects an invalid method and parameter value", async () => {
       const invalidMethod = await POST(
@@ -197,6 +200,19 @@ describe("POST /api/playground", () => {
       expect(response.status).toBe(400);
       expect((await response.json()).error.message).toContain("wasmPath");
       expect(harness.execFile).not.toHaveBeenCalled();
+    });
+
+    it("ignores runner-path-shaped input and invokes only the resolved runner", async () => {
+      const responsePromise = POST(
+        request(payload({ runnerPath: "C:\\private\\evil.exe" })),
+      );
+      await flushRouteProgress();
+      expect(harness.execFile).toHaveBeenCalledTimes(1);
+      expect(harness.execFile.mock.calls[0]?.[0]).toBe("/runner");
+      completeNextRunner(successResponse);
+
+      const response = await responsePromise;
+      expect(response.status).toBe(200);
     });
   });
 
