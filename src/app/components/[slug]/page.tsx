@@ -39,7 +39,7 @@ export default async function ComponentDetailPage({
 
   return (
     <main className="flex-1">
-      <section className="mx-auto max-w-6xl px-6 py-16">
+      <section className="mx-auto max-w-7xl px-6 py-16">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/components"

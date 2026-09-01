@@ -43,7 +43,7 @@ export default function ComponentsPage() {
 
   return (
     <main className="flex-1">
-      <section className="mx-auto max-w-6xl px-6 py-16">
+      <section className="mx-auto max-w-7xl px-6 py-16">
         <p className="mb-4 font-mono text-xs tracking-wide text-accent-stellar">
           COMPONENT CATALOG
         </p>

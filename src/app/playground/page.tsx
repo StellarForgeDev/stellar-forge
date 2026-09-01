@@ -116,7 +116,7 @@ export default function PlaygroundPage() {
 
   return (
     <main className="flex-1 min-w-0">
-      <section className="mx-auto max-w-6xl px-6 py-16">
+      <section className="mx-auto max-w-7xl px-6 py-16">
         <div>
           <p className="mb-4 font-mono text-xs tracking-[0.18em] text-accent-stellar">
             STELLAR-FORGE / PLAYGROUND
