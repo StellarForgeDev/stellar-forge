@@ -12,6 +12,7 @@ import type { TransactionNetwork } from "@/lib/transactions/networks";
 export interface SubmitSignedTransactionInput {
   network: TransactionNetwork;
   signedXdr: string;
+  controlledDeployment?: boolean;
 }
 
 export type SubmitSignedTransactionResult =

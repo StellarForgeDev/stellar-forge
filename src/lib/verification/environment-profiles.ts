@@ -1,0 +1,33 @@
+import { stellarComponents } from "../../data/components";
+import type { EnvironmentProfile, AccountRequirement, AssetRequirement, AuthorizationRequirement, SpecialFixtureRequirement, TimeRequirement } from "./environment-types";
+
+const allComponentIds = ["access-control", "allowance", "atomic-swap", "claimable-balance", "crowdfund", "escrow", "merkle-airdrop", "multi-signature", "oracle", "payment", "staking", "subscription", "timelock", "token", "vesting"] as const;
+type ComponentId = (typeof allComponentIds)[number];
+const overrides: Record<ComponentId, { accounts: AccountRequirement[]; assets: AssetRequirement[]; authorization: AuthorizationRequirement[]; time: TimeRequirement; fixtures: SpecialFixtureRequirement[] }> = {
+  "access-control": { accounts: [{ role: "admin", required: true }, { role: "user1", required: true }], assets: [], authorization: ["admin"], time: { kind: "none" }, fixtures: [] },
+  allowance: { accounts: [{ role: "owner", required: true }, { role: "spender", required: true }, { role: "user2", required: true }], assets: [{ alias: "asset", type: "contract", source: "UNVERIFIED", artifactComponent: "token", minimumBalances: [{ accountRole: "owner", minimumAmount: "400" }] }], authorization: ["owner", "spender"], time: { kind: "deadline", description: "A future allowance expiration ledger is required." }, fixtures: [] },
+  "atomic-swap": { accounts: [{ role: "owner", required: true }, { role: "user1", required: true }], assets: [{ alias: "offer-asset", type: "contract", source: "UNVERIFIED", minimumBalances: [{ accountRole: "owner", minimumAmount: "100" }] }, { alias: "ask-asset", type: "contract", source: "UNVERIFIED", minimumBalances: [{ accountRole: "user1", minimumAmount: "200" }] }], authorization: ["owner"], time: { kind: "none" }, fixtures: ["two-assets"] },
+  "claimable-balance": { accounts: [{ role: "distributor", required: true }, { role: "claimant", required: true }], assets: [{ alias: "asset", type: "contract", source: "UNVERIFIED" }], authorization: ["claimant"], time: { kind: "none" }, fixtures: [] },
+  crowdfund: { accounts: [{ role: "admin", required: true }, { role: "contributor", required: true }], assets: [{ alias: "asset", type: "contract", source: "UNVERIFIED" }], authorization: ["admin", "owner"], time: { kind: "deadline", description: "Campaign end/deadline must use real Testnet ledger time." }, fixtures: [] },
+  escrow: { accounts: [{ role: "depositor", required: true }, { role: "beneficiary", required: true }, { role: "arbiter", required: true }], assets: [{ alias: "asset", type: "contract", source: "UNVERIFIED" }], authorization: ["owner"], time: { kind: "none" }, fixtures: [] },
+  "merkle-airdrop": { accounts: [{ role: "distributor", required: true }, { role: "claimant", required: true }], assets: [{ alias: "asset", type: "contract", source: "UNVERIFIED" }], authorization: ["claimant"], time: { kind: "none" }, fixtures: ["merkle"] },
+  "multi-signature": { accounts: [{ role: "signer1", required: true }, { role: "signer2", required: true }, { role: "signer3", required: true }], assets: [], authorization: ["multi-party"], time: { kind: "none" }, fixtures: ["multisig"] },
+  oracle: { accounts: [{ role: "admin", required: true }, { role: "signer1", required: true }], assets: [], authorization: ["admin", "external-cryptographic-signature"], time: { kind: "deadline", description: "Oracle observations require a fresh real Testnet timestamp." }, fixtures: ["oracle-signature"] },
+  payment: { accounts: [{ role: "user1", required: true }, { role: "user2", required: true }], assets: [{ alias: "asset", type: "contract", source: "BLOCKED_ARTIFACT", artifactComponent: "token" }], authorization: ["owner"], time: { kind: "none" }, fixtures: [] },
+  staking: { accounts: [{ role: "admin", required: true }, { role: "user1", required: true }], assets: [{ alias: "asset", type: "contract", source: "UNVERIFIED" }], authorization: ["owner"], time: { kind: "minimum-duration", description: "Rewards require a real Testnet elapsed-duration strategy." }, fixtures: [] },
+  subscription: { accounts: [{ role: "subscriber", required: true }, { role: "merchant", required: true }], assets: [{ alias: "asset", type: "contract", source: "UNVERIFIED" }], authorization: ["owner"], time: { kind: "minimum-duration", description: "Charges depend on real Testnet time intervals." }, fixtures: [] },
+  timelock: { accounts: [{ role: "beneficiary", required: true }, { role: "admin", required: true }], assets: [{ alias: "asset", type: "contract", source: "UNVERIFIED" }], authorization: ["owner"], time: { kind: "wait-until", description: "Unlock must wait for real Testnet ledger time." }, fixtures: [] },
+  token: { accounts: [{ role: "admin", required: true }, { role: "user1", required: true }, { role: "user2", required: true }], assets: [], authorization: ["admin", "owner"], time: { kind: "none" }, fixtures: [] },
+  vesting: { accounts: [{ role: "beneficiary", required: true }, { role: "admin", required: true }], assets: [{ alias: "asset", type: "contract", source: "UNVERIFIED" }], authorization: ["owner"], time: { kind: "minimum-duration", description: "Vesting claims require real Testnet elapsed time." }, fixtures: [] },
+};
+
+export const environmentProfiles: EnvironmentProfile[] = allComponentIds.map((componentId) => {
+  const component = stellarComponents.find((item) => item.slug === componentId)!;
+  const override = overrides[componentId];
+  const constructor = component.interface?.find((method) => method.name === "__constructor");
+  const contractDependencies = (component.dependencies ?? []).map((dependency) => ({ component: dependency.package, deploymentRequired: true, artifactStatusRequired: "VERIFIED_MATCH" as const }));
+  const inferredAssets = contractDependencies.filter((dependency) => dependency.component !== componentId).map((dependency) => ({ alias: "asset", type: "contract" as const, source: "UNVERIFIED" as const, artifactComponent: dependency.component }));
+  return { componentId, localWorkflowExists: true, contractDependency: { component: componentId, deploymentRequired: true, artifactStatusRequired: "VERIFIED_MATCH" }, accounts: override.accounts, assets: override.assets.length ? override.assets : inferredAssets, contractDependencies, constructorConfiguration: { required: Boolean(constructor), parameters: constructor?.params ?? [] }, authorization: override.authorization, time: override.time, fixtures: override.fixtures };
+});
+
+export function getEnvironmentProfile(componentId: string): EnvironmentProfile | null { return environmentProfiles.find((profile) => profile.componentId === componentId) ?? null; }

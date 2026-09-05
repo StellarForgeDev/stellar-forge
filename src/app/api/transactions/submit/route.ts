@@ -43,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
   const result = await submitTransaction(requestBody);
 
   if (!result.ok) {
-    return jsonError(result.error.message, 400, result.error.code, result.error.detail);
+    return jsonError(result.error.message, 400, result.error.code, result.error.detail, (result.error as { diagnostic?: unknown }).diagnostic as Record<string, unknown> | undefined);
   }
 
   return Response.json({ ok: true, submission: result.submission });
@@ -51,7 +51,7 @@ export async function POST(request: Request): Promise<Response> {
 
 function validateRequest(
   body: unknown,
-): { network: TransactionNetwork; signedXdr: string } | null {
+): { network: TransactionNetwork; signedXdr: string; controlledDeployment?: boolean } | null {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     return null;
   }
@@ -64,7 +64,7 @@ function validateRequest(
     if (field in candidate) return null;
   }
 
-  const allowedFields = new Set(["network", "signedXdr"]);
+  const allowedFields = new Set(["network", "signedXdr", "controlledDeployment"]);
   if (Object.keys(candidate).some((key) => !allowedFields.has(key))) {
     return null;
   }
@@ -77,10 +77,9 @@ function validateRequest(
     return null;
   }
 
-  return {
-    network: candidate.network,
-    signedXdr: candidate.signedXdr,
-  };
+  const controlledDeployment = candidate.controlledDeployment === true;
+  if (controlledDeployment && candidate.network !== "testnet") return null;
+  return { network: candidate.network, signedXdr: candidate.signedXdr, controlledDeployment };
 }
 
 function jsonError(
@@ -88,6 +87,7 @@ function jsonError(
   status: number,
   code = "input.invalid",
   detail?: string,
+  diagnostic?: Record<string, unknown>,
 ): Response {
   return Response.json(
     {
@@ -96,8 +96,31 @@ function jsonError(
         code,
         message,
         ...(detail ? { detail } : {}),
+        ...(diagnostic ? { diagnostic: sanitizeDiagnostic(diagnostic) } : {}),
       },
     },
     { status },
   );
+}
+
+function sanitizeDiagnostic(diagnostic: Record<string, unknown>): Record<string, unknown> {
+  const allowed = new Set([
+    "sendTransactionStatus",
+    "transactionResultCode",
+    "operationResultCodes",
+    "hostFunctionType",
+    "network",
+    "endpoint",
+    "transactionHash",
+  ]);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(diagnostic)) {
+    if (!allowed.has(k)) continue;
+    if (k === "transactionHash" && typeof v === "string" && !/^[a-f0-9]{64}$/i.test(v)) continue;
+    if (k === "endpoint" && typeof v === "string" && !v.startsWith("https://")) continue;
+    if (typeof v === "string") out[k] = v.slice(0, 100);
+    else if (Array.isArray(v)) out[k] = (v as unknown[]).slice(0, 5).map((e) => String(e).slice(0, 50));
+    else out[k] = v;
+  }
+  return out;
 }

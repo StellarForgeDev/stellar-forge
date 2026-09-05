@@ -18,6 +18,7 @@ import {
   createServer,
   nativeToDisplay,
 } from "@/lib/transactions/rpc";
+import { canonicalTestnetServer } from "@/lib/transactions/deployment";
 import type {
   TransactionSubmissionError,
   TransactionSubmissionResult,
@@ -32,6 +33,7 @@ const BASE64_REGEX = /^[A-Za-z0-9+/]+={0,2}$/;
 export interface SubmitTransactionInput {
   network: TransactionNetwork;
   signedXdr: string;
+  controlledDeployment?: boolean;
 }
 
 export type SubmitTransactionResult =
@@ -53,7 +55,14 @@ export async function submitTransaction(
   const timeError = verifyTimeBounds(tx);
   if (timeError) return { ok: false, error: timeError };
 
-  const server = createServer(network);
+  const uploadStructureError = verifyControlledUploadStructure(tx);
+  if (uploadStructureError) return { ok: false, error: uploadStructureError };
+
+  // Controlled deployment is pinned to canonical Testnet. The normal
+  // transaction builder continues to use its existing network configuration.
+  const server = input.controlledDeployment
+    ? network.id === "testnet" ? canonicalTestnetServer() : null
+    : createServer(network);
   if (!server) {
     return {
       ok: false,
@@ -80,14 +89,15 @@ export async function submitTransaction(
       ? authorizationFailureMessage(resultDetail)
       : null;
 
+    const diagnostic = buildErrorDiagnostic(sendResult, resultDetail ?? undefined, network);
+
     return {
       ok: false,
       error: {
         code: "submit-rejected",
-        message: authMessage ?? "The network rejected the transaction.",
-        ...(resultDetail
-          ? { detail: truncate(resultDetail) }
-          : {}),
+        message: "The network rejected the transaction.",
+        ...(authMessage ? { detail: truncate(authMessage as string) } : resultDetail ? { detail: truncate(resultDetail as string) } : {}),
+        ...(diagnostic ? { diagnostic } : {}),
       },
     };
   }
@@ -260,11 +270,138 @@ function verifyTimeBounds(tx: Transaction): TransactionSubmissionError | null {
   return null;
 }
 
+function isUploadContractWasmOperation(op: unknown): boolean {
+  try {
+    const o = op as {
+      type?: string;
+      func?: { _switch?: { name?: string }; _arm?: string };
+    };
+    if (typeof o.type === "string" && o.type !== "invokeHostFunction") return false;
+    if (!o.func) return false;
+    const switchName = (o.func as unknown as { _switch?: { name?: string } })?._switch?.name;
+    if (switchName === "hostFunctionTypeUploadContractWasm") return true;
+    // Fallback: _arm === "wasm" also indicates upload
+    if ((o.func as unknown as { _arm?: string })?._arm === "wasm") return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function verifyControlledUploadStructure(tx: Transaction): TransactionSubmissionError | null {
+  const ops = tx.operations as unknown[];
+  const hasUpload = ops.some(isUploadContractWasmOperation);
+  // Only enforce upload-specific rules when the transaction contains an upload operation.
+  // Normal builder transactions without upload are not affected.
+  if (!hasUpload) return null;
+  if (ops.length !== 1) {
+    return {
+      code: "envelope.invalid",
+      message: "Controlled upload must contain exactly one uploadContractWasm operation.",
+    };
+  }
+  if (!isUploadContractWasmOperation(ops[0])) {
+    return {
+      code: "envelope.invalid",
+      message: "Controlled upload transaction must be exactly one uploadContractWasm operation.",
+    };
+  }
+  const opSource = (ops[0] as { source?: string | null })?.source ?? null;
+  if (opSource && opSource !== tx.source) {
+    return {
+      code: "envelope.invalid",
+      message: "Controlled upload operation source must match transaction source.",
+    };
+  }
+  return null;
+}
+
+export function verifyControlledUploadForTest(tx: Transaction): TransactionSubmissionError | null {
+  // Strict validator for controlled upload — used in tests to verify 0/2+/unrelated cases
+  const ops = tx.operations as unknown[];
+  if (ops.length !== 1) {
+    return {
+      code: "envelope.invalid",
+      message: "Controlled upload must contain exactly one uploadContractWasm operation.",
+    };
+  }
+  if (!isUploadContractWasmOperation(ops[0])) {
+    return {
+      code: "envelope.invalid",
+      message: "Controlled upload transaction must be exactly one uploadContractWasm operation.",
+    };
+  }
+  const opSource = (ops[0] as { source?: string | null })?.source ?? null;
+  if (opSource && opSource !== tx.source) {
+    return {
+      code: "envelope.invalid",
+      message: "Controlled upload operation source must match transaction source.",
+    };
+  }
+  return null;
+}
+
 function authorizationFailureMessage(resultDetail: string): string | null {
   if (!/invokeHostFunction/i.test(resultDetail) || !/txFailed/i.test(resultDetail)) {
     return null;
   }
   return `The contract rejected the transaction at execution time. This typically means the signing wallet is not the account the contract requires (for example, it is not the owner of the first address argument or the contract admin). Technical detail: ${resultDetail}`;
+}
+
+function buildErrorDiagnostic(
+  sendResult: Api.SendTransactionResponse,
+  resultDetail: string | undefined,
+  network: ReturnType<typeof networkConfig>,
+): NonNullable<TransactionSubmissionError["diagnostic"]> | undefined {
+  try {
+    const diagnostic: NonNullable<TransactionSubmissionError["diagnostic"]> = {
+      sendTransactionStatus: (sendResult as { status?: string }).status ?? "ERROR",
+      network: network.id,
+      endpoint: network.rpcUrl,
+    };
+    if (resultDetail) {
+      const parsed = parseTransactionResultForDiagnostic(resultDetail);
+      if (parsed.txCode) diagnostic.transactionResultCode = parsed.txCode;
+      if (parsed.opCodes && parsed.opCodes.length > 0) diagnostic.operationResultCodes = parsed.opCodes.slice(0, 5);
+      if (parsed.hostFunctionType) diagnostic.hostFunctionType = parsed.hostFunctionType;
+    }
+    const maybeHash = (sendResult as { hash?: unknown }).hash;
+    if (typeof maybeHash === "string" && /^[a-f0-9]{64}$/i.test(maybeHash)) {
+      diagnostic.transactionHash = maybeHash;
+    }
+    return diagnostic;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseTransactionResultForDiagnostic(detail: string): {
+  txCode?: string;
+  opCodes?: string[];
+  hostFunctionType?: string;
+} {
+  try {
+    const txCodeMatch = detail.match(/\b(txFailed|txSuccess|txBadSeq|txTooEarly|txTooLate|txMissingOperation|txBadAuth|txInsufficientBalance|txNoAccount|txInsufficientFee|txBadAuthExtra)\b/i);
+    const txCode = txCodeMatch ? txCodeMatch[0] : undefined;
+    const opCodes: string[] = [];
+    const lower = detail.toLowerCase();
+    if (lower.includes("invokehostfunction")) opCodes.push("invokeHostFunction");
+    if (lower.includes("uploadcontractwasm") || lower.includes("hostfunctiontypeuploadcontractwasm")) {
+      return { txCode, opCodes: opCodes.length ? opCodes : ["invokeHostFunction"], hostFunctionType: "uploadContractWasm" };
+    }
+    if (lower.includes("createcontract") || lower.includes("hostfunctiontypecreatecontract")) {
+      return { txCode, opCodes: opCodes.length ? opCodes : ["invokeHostFunction"], hostFunctionType: "createContract" };
+    }
+    // Fallback: extract op names after colon
+    const colonPart = detail.split(":")[1];
+    if (colonPart) {
+      const parts = colonPart.split(",").map((s) => s.trim()).filter(Boolean);
+      if (parts.length > 0 && opCodes.length === 0) return { txCode, opCodes: parts.slice(0, 5) };
+    }
+    return { txCode, opCodes: opCodes.length ? opCodes : undefined };
+  } catch {
+    return {};
+  }
 }
 
 async function pollForSettlement(

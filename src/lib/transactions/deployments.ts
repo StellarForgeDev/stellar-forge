@@ -1,4 +1,4 @@
-import type { TransactionNetwork } from "@/lib/transactions/networks";
+import type { TransactionNetwork } from "./networks.ts";
 
 export interface ContractDeployment {
   network: TransactionNetwork;
@@ -13,7 +13,7 @@ export interface ContractDeployment {
 // an entry here with the printed `C...` address. The registry validates the
 // address before it is used, and the generic transaction flow discovers the
 // component automatically once its catalog `capabilities.testnet` is true.
-const DEPLOYMENTS: ContractDeployment[] = [
+export const DEPLOYMENTS: ContractDeployment[] = [
   {
     network: "testnet",
     componentSlug: "token",

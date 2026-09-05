@@ -20,6 +20,7 @@ const disconnectedState: WalletState = {
 
 export function useWallet(
   adapter: WalletAdapter = freighterAdapter,
+  options: { autoRestore?: boolean } = {},
 ): {
   state: WalletState;
   connect: () => Promise<void>;
@@ -29,7 +30,7 @@ export function useWallet(
     expectedSourceAccount: string,
   ) => Promise<WalletSignResult>;
 } {
-  const [state, setState] = useState<WalletState>({
+  const [state, setState] = useState<WalletState>(() => options.autoRestore === false ? disconnectedState : {
     status: "checking",
     address: null,
     networkName: null,
@@ -38,6 +39,9 @@ export function useWallet(
   });
 
   useEffect(() => {
+    if (options.autoRestore === false) {
+      return;
+    }
     let cancelled = false;
 
     async function restoreConnection() {
@@ -92,7 +96,7 @@ export function useWallet(
       cancelled = true;
       unsubscribe();
     };
-  }, [adapter]);
+  }, [adapter, options.autoRestore]);
 
   const connect = useCallback(async () => {
     setState((previous) => ({ ...previous, status: "connecting", error: null }));

@@ -278,6 +278,15 @@ export interface TransactionSubmissionError {
   code: TransactionSubmissionErrorCode;
   message: string;
   detail?: string;
+  diagnostic?: {
+    sendTransactionStatus?: string;
+    transactionResultCode?: string;
+    operationResultCodes?: string[];
+    hostFunctionType?: string;
+    network?: TransactionNetwork;
+    endpoint?: string;
+    transactionHash?: string;
+  };
 }
 
 export interface TransactionSubmissionResult {
