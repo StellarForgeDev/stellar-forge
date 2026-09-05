@@ -1,0 +1,21 @@
+[
+  {
+    "componentId": "access-control",
+    "network": "testnet",
+    "contractId": "CDQLJ6YAPI4JSIYRHLIKJFC6636ZEQUXHNDINQFPBXSWKMZVCJ7EXFBR",
+    "localArtifactHash": "dbc9527173eb86ad1ba2d155a14910062f8c33a871fe59b871aaa83148f0abfd",
+    "deployedArtifactHash": "dbc9527173eb86ad1ba2d155a14910062f8c33a871fe59b871aaa83148f0abfd",
+    "artifactVerified": true,
+    "uploadTransactionHash": "90815740a9375927880e4bda136681cefea58cbc5fa3a77bfc6f38938bbd0742",
+    "deploymentTransactionHash": "0f501f49d7a1a0fafdeb2f49e49194858dc484d96fec1c4cada773811e353deb",
+    "deployer": "GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW",
+    "constructorArguments": {
+      "admin": "GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW"
+    },
+    "confirmationTimestamp": "2026-09-05T04:39:57.064Z",
+    "verificationTimestamp": "2026-09-05T04:39:57.064Z",
+    "constructorVerification": "NOT_QUERYABLE",
+    "status": "RECORDED",
+    "verificationPurpose": "controlled-testnet-workflow"
+  }
+]
