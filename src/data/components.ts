@@ -382,6 +382,7 @@ export const stellarComponents: StellarComponent[] = [
         },
         setup: [
           { fn: "mint", args: ["admin", "1000000"], signer: "admin" },
+          { fn: "mint", args: ["user1", "1000"], signer: "admin" },
         ],
       },
     ],

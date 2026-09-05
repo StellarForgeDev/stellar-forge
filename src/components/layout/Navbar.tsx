@@ -9,6 +9,7 @@ const navLinks = [
   { href: "/components", label: "Components" },
   { href: "/playground", label: "Playground" },
   { href: "/transactions", label: "Transactions" },
+  { href: "/testnet/deploy", label: "Testnet Deploy" },
   { href: "/docs", label: "Docs" },
 ];
 

@@ -29,6 +29,7 @@ const MAX_CALLS = 20;
 const MAX_IDENTITIES = 20;
 const MAX_STRING_LENGTH = 100;
 const MAX_SYMBOL_LENGTH = 32;
+const MAX_CLOCK_ADVANCE_SECONDS = 31_536_000;
 
 const DEFAULT_IDENTITIES: ReadonlySet<string> = new Set([
   "admin",
@@ -112,10 +113,18 @@ function argKindForAST(t: ParameterType): string {
 interface ValidatedRequest {
   component: StellarComponent;
   identities?: Record<string, string>;
+  fixtureIdentities?: string[];
   constructorParams: { name: string; type: string }[];
   constructor: Record<string, unknown>;
   calls: Record<string, unknown>[];
   dependencies: RunnerDependency[];
+  clock?: RunnerClock;
+}
+
+interface RunnerClock {
+  initialLedgerTimestamp?: string | number;
+  initialLedgerSequence?: string | number;
+  advances: { beforeCall: number; seconds: string | number }[];
 }
 
 interface RunnerDependencySetup {
@@ -211,6 +220,7 @@ async function handlePlaygroundPost(request: Request): Promise<Response> {
     constructorParams: validated.value.constructorParams,
     constructor: validated.value.constructor,
     calls: validated.value.calls,
+    ...(validated.value.clock ? { clock: validated.value.clock } : {}),
     ...(validated.value.dependencies.length > 0
       ? { dependencies: validated.value.dependencies }
       : {}),
@@ -333,6 +343,14 @@ function validateRequest(
     if ("error" in checked) return checked;
     identities = checked.value;
   }
+  let fixtureIdentities: string[] | undefined;
+  if ("fixtureIdentities" in request) {
+    if (!Array.isArray(request.fixtureIdentities) || request.fixtureIdentities.length > MAX_IDENTITIES || request.fixtureIdentities.some((name) => typeof name !== "string" || name.length === 0 || name.length > 32)) {
+      return { error: inputError("fixtureIdentities must contain at most 20 valid names") };
+    }
+    if (new Set(request.fixtureIdentities).size !== request.fixtureIdentities.length) return { error: inputError("fixtureIdentities must be unique") };
+    fixtureIdentities = request.fixtureIdentities;
+  }
 
   // Derive the full identity context generically from catalog metadata: the
   // base default identities (backwards compatibility) plus any identity names
@@ -342,6 +360,7 @@ function validateRequest(
   const { knownNames, identities: resolvedIdentities } = resolveIdentityContext(
     component,
     identities,
+    fixtureIdentities,
   );
 
   const constructor = validateConstructor(
@@ -373,6 +392,9 @@ function validateRequest(
     });
   }
 
+  const clock = validateClock(request.clock, calls.length);
+  if ("error" in clock) return clock;
+
   const dependencies = buildRunnerDependencies(component, knownNames);
   if ("error" in dependencies) return dependencies;
 
@@ -389,8 +411,47 @@ function validateRequest(
       constructor: constructor.value,
       calls: checkedCalls,
       dependencies: dependencies.value,
+      ...(clock.value ? { clock: clock.value } : {}),
     },
   };
+}
+
+function validateClock(
+  value: unknown,
+  callCount: number,
+): { value?: RunnerClock } | { error: PlaygroundApiError } {
+  if (value === undefined) return {};
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return { error: inputError("clock must be an object") };
+  }
+  const clock = value as Record<string, unknown>;
+  const initialLedgerTimestamp = clock.initialLedgerTimestamp;
+  const initialLedgerSequence = clock.initialLedgerSequence;
+  for (const [name, candidate] of [["initialLedgerTimestamp", initialLedgerTimestamp], ["initialLedgerSequence", initialLedgerSequence]] as const) {
+    if (candidate !== undefined && !isBoundedUnsigned(candidate, name === "initialLedgerSequence" ? 4_294_967_295 : Number.MAX_SAFE_INTEGER)) {
+      return { error: inputError(`clock.${name} must be a non-negative integer`) };
+    }
+  }
+  const advances = clock.advances;
+  if (!Array.isArray(advances)) return { error: inputError("clock.advances must be an array") };
+  let total = BigInt(0);
+  const checked = [];
+  for (const advance of advances) {
+    if (typeof advance !== "object" || advance === null || Array.isArray(advance)) return { error: inputError("each clock advance must be an object") };
+    const item = advance as Record<string, unknown>;
+    if (!Number.isInteger(item.beforeCall) || Number(item.beforeCall) < 0 || Number(item.beforeCall) > callCount) return { error: inputError("clock advance beforeCall is out of range") };
+    if (!isBoundedUnsigned(item.seconds, MAX_CLOCK_ADVANCE_SECONDS)) return { error: inputError("clock advance must be bounded and non-negative") };
+    total += BigInt(String(item.seconds));
+    if (total > BigInt(MAX_CLOCK_ADVANCE_SECONDS)) return { error: inputError(`total clock advancement exceeds ${MAX_CLOCK_ADVANCE_SECONDS} seconds`) };
+    checked.push({ beforeCall: Number(item.beforeCall), seconds: item.seconds as string | number });
+  }
+  return { value: { ...(initialLedgerTimestamp !== undefined ? { initialLedgerTimestamp: initialLedgerTimestamp as string | number } : {}), ...(initialLedgerSequence !== undefined ? { initialLedgerSequence: initialLedgerSequence as string | number } : {}), advances: checked } };
+}
+
+function isBoundedUnsigned(value: unknown, max: number): boolean {
+  if (typeof value === "number") return Number.isSafeInteger(value) && value >= 0 && value <= max;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return false;
+  try { return BigInt(value) <= BigInt(max); } catch { return false; }
 }
 
 function apiError(message: string): PlaygroundApiError {
@@ -483,12 +544,14 @@ function buildRunnerDependencies(
 export function resolveIdentityContext(
   component: StellarComponent,
   requestIdentities?: Record<string, string>,
+  fixtureIdentities: readonly string[] = [],
 ): { knownNames: Set<string>; identities: Record<string, string> } {
   const discovered = discoverIdentityNames(component);
   const knownNames = new Set<string>([
     ...DEFAULT_IDENTITIES,
     ...discovered,
     ...(component.dependencies ?? []).map((d) => d.alias),
+    ...fixtureIdentities,
   ]);
 
   const identities: Record<string, string> = {};
@@ -497,7 +560,7 @@ export function resolveIdentityContext(
       identities[name] = key;
     }
   }
-  for (const name of discovered) {
+  for (const name of [...discovered, ...fixtureIdentities]) {
     if (name in identities) continue;
     if (DEFAULT_IDENTITIES.has(name)) continue;
     identities[name] = deterministicAddress(name);
@@ -507,15 +570,13 @@ export function resolveIdentityContext(
   return { knownNames, identities };
 }
 
-// Deterministic, valid G-strkey derived from an identity name. The same name
-// always yields the same address, so sandbox executions are reproducible.
 function deterministicAddress(name: string): string {
-  const seed = createHash("sha256")
-    .update(`stellar-forge-identity:${name}`)
-    .digest();
+  const seed = createHash("sha256").update(`stellar-forge-identity:${name}`).digest();
   return Keypair.fromRawEd25519Seed(seed).publicKey();
 }
 
+// Deterministic, valid G-strkey derived from an identity name. The same name
+// always yields the same address, so sandbox executions are reproducible.
 export function validateIdentities(
   value: unknown,
 ): { value: Record<string, string> } | { error: PlaygroundApiError } {

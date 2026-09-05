@@ -7,11 +7,14 @@ import type {
   ExecutionStatus,
   ExecutionStep,
   PlaygroundResult,
+  PlaygroundClock,
 } from "@/lib/playground/types";
+import type { PlaygroundScenario, ScenarioFixtures } from "@/lib/playground/scenario-types";
 
 export const ADMIN_IDENTITY = "admin";
 export const IDENTITY_OPTIONS = ["admin", "user1", "user2"] as const;
 export const ADDRESS_TYPES = new Set(["Address", "MuxedAddress"]);
+
 
 // A valid Stellar strkey (account/contract/muxed). Used to tell identity-name
 // references apart from literal addresses that may appear in constructor args.
@@ -92,21 +95,22 @@ export function defaultArgValue(
 
 export function signerFor(
   fn: FunctionSpec,
-  args: string[],
+  args: readonly unknown[],
 ): string | undefined {
   if (fn.authorization === "admin") return ADMIN_IDENTITY;
   if (fn.authorization === "first-address") {
     const index = fn.params.findIndex((param) => ADDRESS_TYPES.has(param.type));
-    return index >= 0 ? args[index] : undefined;
+    const value = index >= 0 ? args[index] : undefined;
+    return typeof value === "string" ? value : undefined;
   }
   return undefined;
 }
 
-export function callRequestFor(fn: FunctionSpec, args: string[]): CallRequest {
+export function callRequestFor(fn: FunctionSpec, args: readonly unknown[]): CallRequest {
   const signer = signerFor(fn, args);
   return signer
-    ? { fn: fn.name, args, signer }
-    : { fn: fn.name, args };
+    ? { fn: fn.name, args: [...args], signer }
+    : { fn: fn.name, args: [...args] };
 }
 
 /**
@@ -139,6 +143,7 @@ export function authorizationSummary(
 export function buildConstructorRequest(
   component: StellarComponent,
   configValues: Record<string, string>,
+  fixtures?: ScenarioFixtures,
 ): ConstructorRequest {
   const constructor = (component.interface ?? []).find(
     (fn) => fn.name === "__constructor",
@@ -161,6 +166,7 @@ export function buildConstructorRequest(
       args[param.name] = configValueForParam(param.name, configValues);
     }
   }
+  Object.assign(args, fixtures?.constructorValues ?? {});
   return args;
 }
 
@@ -192,6 +198,28 @@ export function callsForSteps(
         ? callRequestFor(fn, step.args)
         : { fn: step.fn, args: step.args };
     });
+}
+
+/** Converts an ordered scenario prefix into generic runner clock events. */
+export function clockForScenarioPrefix(
+  scenario: PlaygroundScenario,
+  inclusiveStep: number,
+): PlaygroundClock | undefined {
+  const advances: { beforeCall: number; seconds: string | number }[] = [];
+  let callCount = 0;
+  for (const step of scenario.steps.slice(0, inclusiveStep + 1)) {
+    if (step.kind === "clock") {
+      if (step.clock) advances.push({ beforeCall: callCount, seconds: step.clock.advanceBySeconds });
+    } else {
+      callCount += 1;
+    }
+  }
+  if (!scenario.clock && advances.length === 0) return undefined;
+  return {
+    ...(scenario.clock?.initialLedgerTimestamp !== undefined ? { initialLedgerTimestamp: scenario.clock.initialLedgerTimestamp } : {}),
+    ...(scenario.clock?.initialLedgerSequence !== undefined ? { initialLedgerSequence: scenario.clock.initialLedgerSequence } : {}),
+    advances,
+  };
 }
 
 export function errorStatus(error: ExecutionError): ExecutionStatus {

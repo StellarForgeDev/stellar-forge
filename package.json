@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "sandbox:build": "node scripts/sandbox-build.mjs",
     "verify:prebuilt": "node scripts/verify-prebuilt.mjs",
+    "verify:testnet": "node --experimental-strip-types scripts/verify-testnet-artifacts.ts",
     "generate:prebuilt-metadata": "node scripts/verify-prebuilt.mjs --generate",
     "vercel-build": "pnpm run build"
   },

@@ -8,6 +8,7 @@ use soroban_sdk::{
     Address, Bytes, Duration, Env, IntoVal, MuxedAddress, String as SdkString, Symbol,
     Timepoint, TryFromVal, Val, Vec as SdkVec,
 };
+use soroban_sdk::testutils::Ledger;
 
 /// Default location of the built contract wasm, relative to the repository
 /// root. Overridable via the `wasmPath` request field.
@@ -31,6 +32,17 @@ const DEFAULT_IDENTITIES: &[(&str, &str)] = &[
 struct ParamSpec {
     name: String,
     type_name: String,
+}
+
+struct ClockAdvance {
+    before_call: usize,
+    seconds: u64,
+}
+
+struct ClockConfig {
+    initial_timestamp: Option<u64>,
+    initial_sequence: Option<u32>,
+    advances: Vec<ClockAdvance>,
 }
 
 fn main() {
@@ -95,7 +107,18 @@ fn execute(request: Value) -> Value {
         None => return runner_error("request is missing the 'calls' array".to_string()),
     };
 
+    let clock = match parse_clock(request.get("clock"), calls.len()) {
+        Ok(clock) => clock,
+        Err(e) => return runner_error(e),
+    };
+
     let env = Env::default();
+    if let Some(timestamp) = clock.initial_timestamp {
+        env.ledger().set_timestamp(timestamp);
+    }
+    if let Some(sequence) = clock.initial_sequence {
+        env.ledger().set_sequence_number(sequence);
+    }
 
     // Provision declared dependencies first so the component (and its calls) can
     // reference them by alias. This is fully data-driven: every dependency is
@@ -147,8 +170,18 @@ fn execute(request: Value) -> Value {
     env.set_auths(&[]);
 
     let mut results = Vec::with_capacity(calls.len());
-    for call in calls {
+    for (call_index, call) in calls.iter().enumerate() {
+        for advance in clock.advances.iter().filter(|advance| advance.before_call == call_index) {
+            let timestamp = env.ledger().timestamp().checked_add(advance.seconds)
+                .unwrap_or_else(|| panic!("local clock timestamp overflow"));
+            env.ledger().set_timestamp(timestamp);
+        }
         results.push(execute_call(&env, &contract, &identities, call));
+    }
+    for advance in clock.advances.iter().filter(|advance| advance.before_call == calls.len()) {
+        let timestamp = env.ledger().timestamp().checked_add(advance.seconds)
+            .unwrap_or_else(|| panic!("local clock timestamp overflow"));
+        env.ledger().set_timestamp(timestamp);
     }
 
     let deployed_strkey =
@@ -161,6 +194,32 @@ fn execute(request: Value) -> Value {
         "deployedDependencies": deployed_dependencies,
         "calls": results,
     })
+}
+
+fn parse_clock(value: Option<&Value>, call_count: usize) -> Result<ClockConfig, String> {
+    let Some(value) = value else {
+        return Ok(ClockConfig { initial_timestamp: None, initial_sequence: None, advances: Vec::new() });
+    };
+    let object = value.as_object().ok_or_else(|| "clock must be an object".to_string())?;
+    let initial_timestamp = object.get("initialLedgerTimestamp").map(parse_u64).transpose()?;
+    let initial_sequence = object.get("initialLedgerSequence").map(parse_u64).transpose()?
+        .map(|value| u32::try_from(value).map_err(|_| "clock initial sequence exceeds u32"))
+        .transpose()?;
+    let entries = object.get("advances").and_then(Value::as_array)
+        .ok_or_else(|| "clock.advances must be an array".to_string())?;
+    let mut total = 0u64;
+    let mut advances = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let item = entry.as_object().ok_or_else(|| "each clock advance must be an object".to_string())?;
+        let before_call = item.get("beforeCall").and_then(Value::as_u64)
+            .ok_or_else(|| "clock advance beforeCall must be an integer".to_string())? as usize;
+        if before_call > call_count { return Err("clock advance beforeCall is out of range".to_string()); }
+        let seconds = item.get("seconds").map(parse_u64).transpose()?.ok_or_else(|| "clock advance seconds is required".to_string())?;
+        total = total.checked_add(seconds).ok_or_else(|| "clock advancement overflow".to_string())?;
+        if total > 31_536_000 { return Err("total clock advancement exceeds 31536000 seconds".to_string()); }
+        advances.push(ClockAdvance { before_call, seconds });
+    }
+    Ok(ClockConfig { initial_timestamp, initial_sequence, advances })
 }
 
 /// Deploys a single dependency contract, records its alias -> address in the

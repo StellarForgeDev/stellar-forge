@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { ExecutionTimeline } from "@/components/playground/ExecutionTimeline";
+import { GuidedWorkflowPanel } from "@/components/playground/GuidedWorkflowPanel";
 import type { FunctionSpec, StellarComponent } from "@/data/components";
 import { postPlaygroundRequest } from "@/lib/playground/client";
 import {
@@ -17,6 +18,7 @@ import {
   playgroundIdentityOptions,
   signerFor,
 } from "@/lib/playground/execution";
+import { getScenariosForComponent } from "@/lib/playground/scenarios";
 import type { ExecutionStep, PlaygroundResult } from "@/lib/playground/types";
 
 const INTEGER_PATTERN = /^-?\d+$/;
@@ -91,6 +93,8 @@ export function SandboxPanel({
   const [lastAction, setLastAction] = useState<"init" | "execute" | null>(
     null,
   );
+  const [mode, setMode] = useState<"generic" | "guided">("generic");
+  const guidedScenarios = getScenariosForComponent(component.slug);
 
   if (ops.length === 0) return null;
 
@@ -258,6 +262,45 @@ export function SandboxPanel({
 
   return (
     <Card>
+      {guidedScenarios.length > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-5" role="tablist" aria-label="Playground mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "generic"}
+            onClick={() => setMode("generic")}
+            className={`rounded-default border px-3 py-2 font-mono text-xs transition-colors ${
+              mode === "generic"
+                ? "border-accent-stellar text-accent-stellar"
+                : "border-border text-text-secondary hover:border-accent-stellar/60"
+            }`}
+          >
+            Generic
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "guided"}
+            onClick={() => setMode("guided")}
+            className={`rounded-default border px-3 py-2 font-mono text-xs transition-colors ${
+              mode === "guided"
+                ? "border-accent-stellar text-accent-stellar"
+                : "border-border text-text-secondary hover:border-accent-stellar/60"
+            }`}
+          >
+            Guided Workflows
+          </button>
+        </div>
+      )}
+
+      {mode === "guided" && guidedScenarios.length > 0 ? (
+        <GuidedWorkflowPanel
+          component={component}
+          configValues={configValues}
+          scenarios={guidedScenarios}
+        />
+      ) : (
+        <>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="font-mono text-xs uppercase tracking-wide text-accent-stellar">
@@ -383,6 +426,8 @@ export function SandboxPanel({
         lastResponse={lastResult}
         onRetry={retry}
       />
+        </>
+      )}
     </Card>
   );
 }

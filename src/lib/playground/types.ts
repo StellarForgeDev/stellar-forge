@@ -44,7 +44,7 @@ export type ConstructorRequest = Record<string, unknown>;
 
 export interface CallRequest {
   fn: string;
-  args: string[];
+  args: unknown[];
   signer?: string;
 }
 
@@ -53,6 +53,14 @@ export interface PlaygroundRequest {
   constructor: ConstructorRequest;
   calls: CallRequest[];
   identities?: Record<string, string>;
+  fixtureIdentities?: string[];
+  clock?: PlaygroundClock;
+}
+
+export interface PlaygroundClock {
+  initialLedgerTimestamp?: string | number;
+  initialLedgerSequence?: string | number;
+  advances?: { beforeCall: number; seconds: string | number }[];
 }
 
 export interface CallOutcome {
