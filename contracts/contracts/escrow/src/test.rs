@@ -2,10 +2,7 @@
 extern crate std;
 
 use crate::{Escrow, EscrowClient};
-use soroban_sdk::{
-    testutils::Address as _,
-    Address, Env, String,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 use test_asset::{TestAsset, TestAssetClient};
 
 fn create_asset<'a>(e: &Env, admin: &Address) -> (Address, TestAssetClient<'a>) {
@@ -52,8 +49,7 @@ fn rejects_non_positive_deposit() {
     let beneficiary = Address::generate(&e);
     let arbiter = Address::generate(&e);
     let (asset, _) = create_asset(&e, &admin);
-    let (_escrow_address, escrow) =
-        create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
+    let (_escrow_address, escrow) = create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
     escrow.deposit(&depositor, &-1);
 }
 
@@ -67,8 +63,7 @@ fn deposit_moves_funds_into_escrow() {
     let arbiter = Address::generate(&e);
     let (asset, asset_client) = create_asset(&e, &admin);
     asset_client.mint(&depositor, &1000);
-    let (escrow_address, escrow) =
-        create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
+    let (escrow_address, escrow) = create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
 
     escrow.deposit(&depositor, &400);
 
@@ -87,8 +82,7 @@ fn release_transfers_to_beneficiary() {
     let admin = Address::generate(&e);
     let (asset, asset_client) = create_asset(&e, &admin);
     asset_client.mint(&depositor, &1000);
-    let (escrow_address, escrow) =
-        create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
+    let (escrow_address, escrow) = create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
 
     escrow.deposit(&depositor, &400);
     escrow.release(&arbiter);
@@ -109,8 +103,7 @@ fn refund_transfers_to_depositor() {
     let admin = Address::generate(&e);
     let (asset, asset_client) = create_asset(&e, &admin);
     asset_client.mint(&depositor, &1000);
-    let (escrow_address, escrow) =
-        create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
+    let (escrow_address, escrow) = create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
 
     escrow.deposit(&depositor, &400);
     escrow.refund(&arbiter);
@@ -130,8 +123,7 @@ fn rejects_release_before_deposit() {
     let arbiter = Address::generate(&e);
     let admin = Address::generate(&e);
     let (asset, _) = create_asset(&e, &admin);
-    let (_escrow_address, escrow) =
-        create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
+    let (_escrow_address, escrow) = create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
     escrow.release(&arbiter);
 }
 
@@ -146,8 +138,7 @@ fn rejects_release_by_wrong_party() {
     let admin = Address::generate(&e);
     let (asset, asset_client) = create_asset(&e, &admin);
     asset_client.mint(&depositor, &1000);
-    let (_escrow_address, escrow) =
-        create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
+    let (_escrow_address, escrow) = create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
     escrow.deposit(&depositor, &400);
     // Auth is mocked, so the requirement is satisfied, but the role check must
     // still reject a non-arbiter caller.
@@ -166,8 +157,7 @@ fn rejects_double_release() {
     let admin = Address::generate(&e);
     let (asset, asset_client) = create_asset(&e, &admin);
     asset_client.mint(&depositor, &1000);
-    let (_escrow_address, escrow) =
-        create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
+    let (_escrow_address, escrow) = create_escrow(&e, &depositor, &beneficiary, &arbiter, &asset);
     escrow.deposit(&depositor, &400);
     escrow.release(&arbiter);
     escrow.release(&arbiter);

@@ -2,10 +2,7 @@
 extern crate std;
 
 use crate::{AllowanceManager, AllowanceManagerClient};
-use soroban_sdk::{
-    testutils::Address as _,
-    Address, Env, String,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 use token::{Token, TokenClient};
 
 fn create_token<'a>(e: &Env, admin: &Address) -> (Address, TokenClient<'a>) {

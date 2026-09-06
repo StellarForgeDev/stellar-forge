@@ -2,17 +2,18 @@
 extern crate std;
 
 use crate::{Staking, StakingClient};
-use soroban_sdk::{
-    testutils::Address as _,
-    testutils::Ledger as _,
-    Address, Env, String,
-};
+use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Address, Env, String};
 use test_asset::{TestAsset, TestAssetClient};
 
 fn register_asset<'a>(e: &Env, admin: &Address) -> (Address, TestAssetClient<'a>) {
     let address = e.register(
         TestAsset,
-        (admin.clone(), 7u32, String::from_str(e, "Stake Asset"), String::from_str(e, "STK")),
+        (
+            admin.clone(),
+            7u32,
+            String::from_str(e, "Stake Asset"),
+            String::from_str(e, "STK"),
+        ),
     );
     (address.clone(), TestAssetClient::new(e, &address))
 }

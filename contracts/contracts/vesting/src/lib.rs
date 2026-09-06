@@ -9,11 +9,7 @@
 //! separate SEP-41 contract; Vesting delegates balance movement to it, exactly
 //! like the Escrow and Payment components do.
 
-use soroban_sdk::{
-    contract, contractimpl,
-    token::TokenClient,
-    Address, Env, Symbol, Timepoint,
-};
+use soroban_sdk::{contract, contractimpl, token::TokenClient, Address, Env, Symbol, Timepoint};
 
 const BENEFICIARY: &str = "beneficiary";
 const ASSET: &str = "asset";
@@ -64,10 +60,10 @@ impl Vesting {
         e.storage()
             .instance()
             .set(&Symbol::new(e, CLIFF), &cliff_time);
+        e.storage().instance().set(&Symbol::new(e, END), &end_time);
         e.storage()
             .instance()
-            .set(&Symbol::new(e, END), &end_time);
-        e.storage().instance().set(&Symbol::new(e, RELEASED), &0i128);
+            .set(&Symbol::new(e, RELEASED), &0i128);
     }
 
     fn beneficiary(e: &Env) -> Address {
@@ -78,38 +74,23 @@ impl Vesting {
     }
 
     fn asset(e: &Env) -> Address {
-        e.storage()
-            .instance()
-            .get(&Symbol::new(e, ASSET))
-            .unwrap()
+        e.storage().instance().get(&Symbol::new(e, ASSET)).unwrap()
     }
 
     fn total(e: &Env) -> i128 {
-        e.storage()
-            .instance()
-            .get(&Symbol::new(e, TOTAL))
-            .unwrap()
+        e.storage().instance().get(&Symbol::new(e, TOTAL)).unwrap()
     }
 
     fn start_time(e: &Env) -> Timepoint {
-        e.storage()
-            .instance()
-            .get(&Symbol::new(e, START))
-            .unwrap()
+        e.storage().instance().get(&Symbol::new(e, START)).unwrap()
     }
 
     fn cliff_time(e: &Env) -> Timepoint {
-        e.storage()
-            .instance()
-            .get(&Symbol::new(e, CLIFF))
-            .unwrap()
+        e.storage().instance().get(&Symbol::new(e, CLIFF)).unwrap()
     }
 
     fn end_time(e: &Env) -> Timepoint {
-        e.storage()
-            .instance()
-            .get(&Symbol::new(e, END))
-            .unwrap()
+        e.storage().instance().get(&Symbol::new(e, END)).unwrap()
     }
 
     fn released_amount(e: &Env) -> i128 {
@@ -135,7 +116,7 @@ impl Vesting {
         }
         from.require_auth();
         let token = TokenClient::new(e, &Self::asset(e));
-        token.transfer(&from, &e.current_contract_address(), &amount);
+        token.transfer(&from, e.current_contract_address(), &amount);
     }
 
     /// Releases the currently vested (and unclaimed) amount to the beneficiary.

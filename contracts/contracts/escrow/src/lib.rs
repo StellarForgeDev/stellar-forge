@@ -8,11 +8,7 @@
 //! separate SEP-41 contract; Escrow simply delegates balance movement to it,
 //! exactly like the Payment primitive does.
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    token::TokenClient,
-    Address, Env, Symbol,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token::TokenClient, Address, Env, Symbol};
 
 #[contract]
 pub struct Escrow;
@@ -47,7 +43,9 @@ impl Escrow {
             .instance()
             .set(&Symbol::new(e, "arbiter"), &arbiter);
         e.storage().instance().set(&Symbol::new(e, "asset"), &asset);
-        e.storage().instance().set(&Symbol::new(e, "amount"), &0i128);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(e, "amount"), &0i128);
         e.storage()
             .instance()
             .set(&Symbol::new(e, "state"), &State::Active);
@@ -82,7 +80,10 @@ impl Escrow {
     }
 
     fn held(e: &Env) -> i128 {
-        e.storage().instance().get(&Symbol::new(e, "amount")).unwrap()
+        e.storage()
+            .instance()
+            .get(&Symbol::new(e, "amount"))
+            .unwrap()
     }
 
     fn state(e: &Env) -> State {
@@ -109,11 +110,7 @@ impl Escrow {
         }
         let asset = Self::asset(e);
         let token = TokenClient::new(e, &asset);
-        token.transfer(
-            &depositor,
-            &e.current_contract_address(),
-            &amount,
-        );
+        token.transfer(&depositor, e.current_contract_address(), &amount);
         let new_held = Self::held(e) + amount;
         e.storage()
             .instance()
@@ -138,15 +135,13 @@ impl Escrow {
         }
         let asset = Self::asset(e);
         let token = TokenClient::new(e, &asset);
-        token.transfer(
-            &e.current_contract_address(),
-            &Self::beneficiary(e),
-            &amount,
-        );
+        token.transfer(&e.current_contract_address(), Self::beneficiary(e), &amount);
         e.storage()
             .instance()
             .set(&Symbol::new(e, "state"), &State::Released);
-        e.storage().instance().set(&Symbol::new(e, "amount"), &0i128);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(e, "amount"), &0i128);
     }
 
     /// Returns the held asset to the depositor. Authorized by the arbiter.
@@ -166,15 +161,13 @@ impl Escrow {
         }
         let asset = Self::asset(e);
         let token = TokenClient::new(e, &asset);
-        token.transfer(
-            &e.current_contract_address(),
-            &Self::depositor(e),
-            &amount,
-        );
+        token.transfer(&e.current_contract_address(), Self::depositor(e), &amount);
         e.storage()
             .instance()
             .set(&Symbol::new(e, "state"), &State::Refunded);
-        e.storage().instance().set(&Symbol::new(e, "amount"), &0i128);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(e, "amount"), &0i128);
     }
 
     /// Returns the escrow state: 0 = active, 1 = released, 2 = refunded.

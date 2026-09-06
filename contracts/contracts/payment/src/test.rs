@@ -2,10 +2,7 @@
 extern crate std;
 
 use crate::{Payment, PaymentClient};
-use soroban_sdk::{
-    testutils::Address as _,
-    Address, Env, String,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 use test_asset::{TestAsset, TestAssetClient};
 
 fn create_asset<'a>(e: &Env, admin: &Address) -> (Address, TestAssetClient<'a>) {

@@ -1,9 +1,9 @@
 #![no_std]
 
+use soroban_sdk::token::TokenClient;
 use soroban_sdk::{
     contract, contractimpl, contracttype, Address, Duration, Env, Map, Symbol, Timepoint,
 };
-use soroban_sdk::token::TokenClient;
 
 const ADMIN_KEY: &str = "admin";
 const ASSET_KEY: &str = "asset";
@@ -69,10 +69,7 @@ fn save_balances(e: &Env, balances: &Map<u64, Balance>) {
     e.storage().instance().set(&balances_key(e), balances);
 }
 fn next_id(e: &Env) -> u64 {
-    e.storage()
-        .instance()
-        .get(&next_id_key(e))
-        .unwrap_or(0u64)
+    e.storage().instance().get(&next_id_key(e)).unwrap_or(0u64)
 }
 fn bump_next_id(e: &Env, id: u64) {
     e.storage().instance().set(&next_id_key(e), &id);

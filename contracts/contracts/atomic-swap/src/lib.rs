@@ -16,9 +16,7 @@
 //! redirect the exchange to a different asset than the one stored on the offer.
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    token::Client as TokenClient,
-    Address, Env, Map, Symbol,
+    contract, contractimpl, contracttype, token::Client as TokenClient, Address, Env, Map, Symbol,
 };
 
 #[contracttype]
@@ -127,7 +125,12 @@ impl AtomicSwap {
         }
         let contract = e.current_contract_address();
         // Let the contract pull the ask asset from the entrant at execution.
-        TokenClient::new(e, &offer.ask_asset).approve(&entrant, &contract, &offer.ask_amount, &live(e));
+        TokenClient::new(e, &offer.ask_asset).approve(
+            &entrant,
+            &contract,
+            &offer.ask_amount,
+            &live(e),
+        );
         // Atomic pulls: both happen, or the whole call reverts.
         TokenClient::new(e, &offer.ask_asset).transfer_from(
             &contract,

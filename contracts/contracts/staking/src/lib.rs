@@ -15,9 +15,7 @@
 //! → Playground → sandbox → integration pipeline exactly like Vesting.
 
 use soroban_sdk::{
-    contract, contractimpl,
-    token::TokenClient,
-    Address, Env, Map, Symbol, Timepoint,
+    contract, contractimpl, token::TokenClient, Address, Env, Map, Symbol, Timepoint,
 };
 
 /// Precision multiplier used to keep the fractional reward-per-token rate exact
@@ -222,7 +220,7 @@ impl Staking {
         Self::update_reward(e, &from);
 
         let token = TokenClient::new(e, &Self::asset(e));
-        token.transfer(&from, &e.current_contract_address(), &amount);
+        token.transfer(&from, e.current_contract_address(), &amount);
 
         let now = e.ledger().timestamp();
         let dur = Self::duration(e) as i128;
@@ -251,7 +249,7 @@ impl Staking {
         Self::update_reward(e, &from);
 
         let token = TokenClient::new(e, &Self::asset(e));
-        token.transfer(&from, &e.current_contract_address(), &amount);
+        token.transfer(&from, e.current_contract_address(), &amount);
 
         let mut balances = Self::balances(e);
         let new_balance = balances.get(from.clone()).unwrap_or(0) + amount;

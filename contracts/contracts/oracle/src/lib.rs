@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, Address, Bytes, BytesN, Env, Symbol, Timepoint,
-};
+use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, Symbol, Timepoint};
 
 // Domain separator for the signed price-observation message. The message binds
 // the price and timestamp unambiguously, so a signature cannot be reused across

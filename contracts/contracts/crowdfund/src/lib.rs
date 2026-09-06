@@ -15,9 +15,8 @@
 //! failure. Withdrawals and refunds are each single-use.
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    token::Client as TokenClient,
-    Address, Env, Map, Symbol, Vec,
+    contract, contractimpl, contracttype, token::Client as TokenClient, Address, Env, Map, Symbol,
+    Vec,
 };
 
 #[contracttype]
@@ -125,7 +124,13 @@ impl Crowdfund {
     /// and the TTL stays below the network max.
     ///
     /// Authorization: `caller` (the contributor) must authorize.
-    pub fn contribute(e: &Env, campaign_id: u64, contributor: Address, amount: i128, expiration_ledger: u32) {
+    pub fn contribute(
+        e: &Env,
+        campaign_id: u64,
+        contributor: Address,
+        amount: i128,
+        expiration_ledger: u32,
+    ) {
         if amount <= 0 {
             panic!("amount must be positive");
         }
@@ -141,7 +146,9 @@ impl Crowdfund {
         token.approve(&contributor, &contract, &amount, &expiration_ledger);
         token.transfer_from(&contract, &contributor, &contract, &amount);
         let so_far = campaign.contributions.get(contributor.clone()).unwrap_or(0);
-        campaign.contributions.set(contributor.clone(), so_far + amount);
+        campaign
+            .contributions
+            .set(contributor.clone(), so_far + amount);
         campaign.total += amount;
         campaigns.set(campaign_id, campaign);
         save_campaigns(e, &campaigns);

@@ -1,13 +1,13 @@
 #![cfg(test)]
 extern crate std;
 
+use crate::{ClaimableBalance, ClaimableBalanceClient};
 use core::option::Option as SOption;
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     token::{StellarAssetClient, TokenClient},
     Address, Duration, Env, Timepoint,
 };
-use crate::{ClaimableBalance, ClaimableBalanceClient};
 
 fn create_token<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, StellarAssetClient<'a>) {
     let addr = e.register_stellar_asset_contract(admin.clone());
@@ -261,8 +261,8 @@ fn zero_amount_rejected() {
                 &0,
                 &Duration::from_seconds(&e, 10),
                 &SOption::None,
-            &live(e),
-        )
+                &live(e),
+            )
             .is_err());
     });
 }
@@ -278,8 +278,8 @@ fn insufficient_funds_rejected() {
                 &1_000_000_000_000_000_000_000_000,
                 &Duration::from_seconds(&e, 10),
                 &SOption::None,
-            &live(e),
-        )
+                &live(e),
+            )
             .is_err());
     });
 }
@@ -333,8 +333,8 @@ fn funder_must_authorize_deposit() {
                 &1_000,
                 &Duration::from_seconds(&e, 10),
                 &SOption::None,
-            &live(e),
-        )
+                &live(e),
+            )
             .is_err());
     });
 }

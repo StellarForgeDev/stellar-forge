@@ -2,11 +2,7 @@
 extern crate std;
 
 use crate::{Crowdfund, CrowdfundClient};
-use soroban_sdk::{
-    testutils::Address as _,
-    testutils::Ledger as _,
-    Address, Env, String,
-};
+use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Address, Env, String};
 use token::{Token, TokenClient};
 
 fn create_token<'a>(e: &Env, admin: &Address) -> (Address, TokenClient<'a>) {

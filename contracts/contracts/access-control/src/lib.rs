@@ -19,9 +19,7 @@ impl AccessControl {
     /// deploy time (like every other component), so no caller check is needed
     /// here.
     pub fn __constructor(e: &Env, admin: Address) {
-        e.storage()
-            .instance()
-            .set(&Symbol::new(e, "admin"), &admin);
+        e.storage().instance().set(&Symbol::new(e, "admin"), &admin);
         Self::set_roles(e, &Map::new(e));
     }
 

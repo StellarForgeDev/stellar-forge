@@ -3,11 +3,7 @@ extern crate std;
 
 use crate::{Oracle, OracleClient};
 use ed25519_dalek::{Signer, SigningKey};
-use soroban_sdk::{
-    symbol_short,
-    testutils::Address as _,
-    Address, Bytes, Env, Timepoint,
-};
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, Bytes, Env, Timepoint};
 
 const MESSAGE_PREFIX: &[u8] = b"ORACLE-V1";
 
@@ -17,10 +13,7 @@ fn deploy() -> TestFixture {
     let sec = SigningKey::from_bytes(&[0x42u8; 32]);
     let sec2 = SigningKey::from_bytes(&[0x24u8; 32]);
     let signer = Bytes::from_array(&e, sec.verifying_key().as_bytes());
-    let contract_id = e.register(
-        Oracle,
-        (admin.clone(), signer, symbol_short!("USD")),
-    );
+    let contract_id = e.register(Oracle, (admin.clone(), signer, symbol_short!("USD")));
     let contract = OracleClient::new(&e, &contract_id);
     TestFixture {
         e,
@@ -49,7 +42,10 @@ fn message_bytes(price: i64, timestamp: u64) -> std::vec::Vec<u8> {
 }
 
 fn sign(secret: &SigningKey, price: i64, timestamp: u64) -> std::vec::Vec<u8> {
-    secret.sign(&message_bytes(price, timestamp)).to_bytes().to_vec()
+    secret
+        .sign(&message_bytes(price, timestamp))
+        .to_bytes()
+        .to_vec()
 }
 
 fn sig(e: &Env, raw: &[u8]) -> Bytes {
@@ -131,7 +127,7 @@ fn tampered_price_rejected() {
     let client = &f.contract;
     let t = 1_700_000_000u64;
     let s = sign(&f.sec, 100, t); // signed for price 100
-    // Tampered price invalidates the signature -> invocation fails (outer Err).
+                                  // Tampered price invalidates the signature -> invocation fails (outer Err).
     let res = client.try_publish(&101, &ts(&f.e, t), &sig(&f.e, &s));
     assert!(res.is_err());
 }
@@ -142,7 +138,7 @@ fn tampered_timestamp_rejected() {
     let client = &f.contract;
     let t = 1_700_000_000u64;
     let s = sign(&f.sec, 100, t); // signed for timestamp t
-    // Tampered timestamp invalidates the signature -> invocation fails (outer Err).
+                                  // Tampered timestamp invalidates the signature -> invocation fails (outer Err).
     let res = client.try_publish(&100, &ts(&f.e, t + 1), &sig(&f.e, &s));
     assert!(res.is_err());
 }

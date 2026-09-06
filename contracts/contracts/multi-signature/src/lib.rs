@@ -88,8 +88,7 @@ impl MultiSignature {
             panic!("not an authorized signer");
         }
         let mut approvals = Self::approvals(e);
-        let mut proposal_approvals =
-            approvals.get(proposal_id.clone()).unwrap_or(Map::new(e));
+        let mut proposal_approvals = approvals.get(proposal_id.clone()).unwrap_or(Map::new(e));
         if proposal_approvals.get(signer.clone()).is_none() {
             proposal_approvals.set(signer, true);
             approvals.set(proposal_id, proposal_approvals);

@@ -1,7 +1,7 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, Map, Symbol};
 use soroban_sdk::token::TokenClient;
+use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, Map, Symbol};
 
 /// Domain separator for leaf commits. Keeps a Merkle leaf unambiguously bound to
 /// this contract so a leaf from another system cannot be replayed here.
@@ -88,7 +88,7 @@ pub fn leaf_hash(e: &Env, index: u32, claimant: &Address, amount: i128) -> Bytes
 /// Verifies a `proof` (a concatenation of 32-byte sibling hashes) against `leaf`
 /// and the stored `root`. Returns false on malformed proof length or mismatch.
 pub fn verify_proof(e: &Env, leaf: &Bytes, proof: &Bytes, root: &Bytes) -> bool {
-    if proof.len() % 32 != 0 {
+    if !proof.len().is_multiple_of(32) {
         return false;
     }
     let count = proof.len() / 32;

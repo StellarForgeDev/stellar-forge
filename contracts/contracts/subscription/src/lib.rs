@@ -12,11 +12,7 @@
 //! contract state: `next_charge` is a Soroban `Timepoint`, but it never enters
 //! or leaves as a platform parameter type, so no F2 type expansion is needed.
 
-use soroban_sdk::{
-    contract, contractimpl,
-    token::TokenClient,
-    Address, Env, Symbol, Timepoint,
-};
+use soroban_sdk::{contract, contractimpl, token::TokenClient, Address, Env, Symbol, Timepoint};
 
 const SUBSCRIBER: &str = "subscriber";
 const MERCHANT: &str = "merchant";
@@ -44,21 +40,35 @@ impl Subscription {
     ) {
         let now = e.ledger().timestamp();
         let next_charge = Timepoint::from_unix(e, now + interval as u64);
-        e.storage().instance().set(&Symbol::new(e, SUBSCRIBER), &subscriber);
-        e.storage().instance().set(&Symbol::new(e, MERCHANT), &merchant);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(e, SUBSCRIBER), &subscriber);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(e, MERCHANT), &merchant);
         e.storage().instance().set(&Symbol::new(e, ASSET), &asset);
         e.storage().instance().set(&Symbol::new(e, AMOUNT), &amount);
-        e.storage().instance().set(&Symbol::new(e, INTERVAL), &interval);
-        e.storage().instance().set(&Symbol::new(e, NEXT_CHARGE), &next_charge);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(e, INTERVAL), &interval);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(e, NEXT_CHARGE), &next_charge);
         e.storage().instance().set(&Symbol::new(e, ACTIVE), &true);
     }
 
     fn subscriber(e: &Env) -> Address {
-        e.storage().instance().get(&Symbol::new(e, SUBSCRIBER)).unwrap()
+        e.storage()
+            .instance()
+            .get(&Symbol::new(e, SUBSCRIBER))
+            .unwrap()
     }
 
     fn merchant(e: &Env) -> Address {
-        e.storage().instance().get(&Symbol::new(e, MERCHANT)).unwrap()
+        e.storage()
+            .instance()
+            .get(&Symbol::new(e, MERCHANT))
+            .unwrap()
     }
 
     fn asset(e: &Env) -> Address {
@@ -70,19 +80,30 @@ impl Subscription {
     }
 
     fn interval(e: &Env) -> u32 {
-        e.storage().instance().get(&Symbol::new(e, INTERVAL)).unwrap()
+        e.storage()
+            .instance()
+            .get(&Symbol::new(e, INTERVAL))
+            .unwrap()
     }
 
     fn next_charge(e: &Env) -> Timepoint {
-        e.storage().instance().get(&Symbol::new(e, NEXT_CHARGE)).unwrap()
+        e.storage()
+            .instance()
+            .get(&Symbol::new(e, NEXT_CHARGE))
+            .unwrap()
     }
 
     fn set_next_charge(e: &Env, value: Timepoint) {
-        e.storage().instance().set(&Symbol::new(e, NEXT_CHARGE), &value);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(e, NEXT_CHARGE), &value);
     }
 
     fn active(e: &Env) -> bool {
-        e.storage().instance().get(&Symbol::new(e, ACTIVE)).unwrap_or(false)
+        e.storage()
+            .instance()
+            .get(&Symbol::new(e, ACTIVE))
+            .unwrap_or(false)
     }
 
     fn set_active(e: &Env, value: bool) {
@@ -106,7 +127,7 @@ impl Subscription {
             return false;
         }
         let token = TokenClient::new(e, &Self::asset(e));
-        token.transfer(&subscriber, &Self::merchant(e), &Self::amount(e));
+        token.transfer(&subscriber, Self::merchant(e), &Self::amount(e));
         let interval = Self::interval(e);
         let advanced = Self::next_charge(e).to_unix() + interval as u64;
         Self::set_next_charge(e, Timepoint::from_unix(e, advanced));

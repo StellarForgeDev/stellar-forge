@@ -2,11 +2,7 @@
 extern crate std;
 
 use crate::{Vesting, VestingClient};
-use soroban_sdk::{
-    testutils::Address as _,
-    testutils::Ledger as _,
-    Address, Env, String,
-};
+use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Address, Env, String};
 use test_asset::{TestAsset, TestAssetClient};
 
 fn register_asset<'a>(e: &Env, admin: &Address) -> (Address, TestAssetClient<'a>) {

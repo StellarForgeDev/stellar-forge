@@ -7,9 +7,7 @@
 //! the production `token` component.
 
 use soroban_sdk::{
-    contract, contractimpl,
-    token::TokenInterface,
-    Address, Env, Map, MuxedAddress, String, Symbol,
+    contract, contractimpl, token::TokenInterface, Address, Env, Map, MuxedAddress, String, Symbol,
 };
 
 #[contract]
@@ -17,23 +15,23 @@ pub struct TestAsset;
 
 #[contractimpl]
 impl TestAsset {
-    pub fn __constructor(
-        e: &Env,
-        admin: Address,
-        _decimal: u32,
-        _name: String,
-        _symbol: String,
-    ) {
+    pub fn __constructor(e: &Env, admin: Address, _decimal: u32, _name: String, _symbol: String) {
         e.storage().instance().set(&Symbol::new(e, "admin"), &admin);
     }
 
     pub fn mint(e: &Env, to: Address, amount: i128) {
-        let admin: Address = e.storage().instance().get(&Symbol::new(e, "admin")).unwrap();
+        let admin: Address = e
+            .storage()
+            .instance()
+            .get(&Symbol::new(e, "admin"))
+            .unwrap();
         admin.require_auth();
         let mut balances = Self::balances(e);
         let current = balances.get(to.clone()).unwrap_or(0);
         balances.set(to, current + amount);
-        e.storage().instance().set(&Symbol::new(e, "balances"), &balances);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(e, "balances"), &balances);
     }
 
     fn balances(e: &Env) -> Map<Address, i128> {
@@ -67,7 +65,9 @@ impl TokenInterface for TestAsset {
         let to_balance = balances.get(recipient.clone()).unwrap_or(0);
         balances.set(from, from_balance - amount);
         balances.set(recipient, to_balance + amount);
-        e.storage().instance().set(&Symbol::new(&e, "balances"), &balances);
+        e.storage()
+            .instance()
+            .set(&Symbol::new(&e, "balances"), &balances);
     }
 
     fn transfer_from(_e: Env, _spender: Address, _from: Address, _to: Address, _amount: i128) {}

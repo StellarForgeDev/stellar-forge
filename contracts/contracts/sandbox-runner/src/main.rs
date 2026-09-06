@@ -3,12 +3,12 @@ use std::io::Read;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use serde_json::{json, Value};
+use soroban_sdk::testutils::Ledger;
 use soroban_sdk::{
     xdr::{ScError, ScVal},
-    Address, Bytes, Duration, Env, IntoVal, MuxedAddress, String as SdkString, Symbol,
-    Timepoint, TryFromVal, Val, Vec as SdkVec,
+    Address, Bytes, Duration, Env, IntoVal, MuxedAddress, String as SdkString, Symbol, Timepoint,
+    TryFromVal, Val, Vec as SdkVec,
 };
-use soroban_sdk::testutils::Ledger;
 
 /// Default location of the built contract wasm, relative to the repository
 /// root. Overridable via the `wasmPath` request field.
@@ -20,10 +20,22 @@ const DEPLOY_SALT: [u8; 32] = [0u8; 32];
 /// Deterministic throwaway identities. Fixed strkeys so every execution is
 /// reproducible; the request may override or add identities.
 const DEFAULT_IDENTITIES: &[(&str, &str)] = &[
-    ("admin", "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"),
-    ("user1", "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"),
-    ("user2", "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"),
-    ("deployer", "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"),
+    (
+        "admin",
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+    ),
+    (
+        "user1",
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+    ),
+    (
+        "user2",
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+    ),
+    (
+        "deployer",
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+    ),
 ];
 
 /// A single typed parameter declaration. The schema is provided by the
@@ -51,18 +63,23 @@ fn main() {
         Err(e) => runner_error(format!("failed to read request from stdin: {e}")),
         Ok(_) => match serde_json::from_str::<Value>(&input) {
             Err(e) => runner_error(format!("request is not valid JSON: {e}")),
-            Ok(request) => catch_unwind(AssertUnwindSafe(|| execute(request))).unwrap_or_else(
-                |panic| match panic.downcast_ref::<&str>() {
-                    Some(msg) => runner_error(format!("internal error: {msg}")),
-                    None => match panic.downcast_ref::<String>() {
+            Ok(request) => {
+                catch_unwind(AssertUnwindSafe(|| execute(request))).unwrap_or_else(|panic| {
+                    match panic.downcast_ref::<&str>() {
                         Some(msg) => runner_error(format!("internal error: {msg}")),
-                        None => runner_error("internal error".to_string()),
-                    },
-                },
-            ),
+                        None => match panic.downcast_ref::<String>() {
+                            Some(msg) => runner_error(format!("internal error: {msg}")),
+                            None => runner_error("internal error".to_string()),
+                        },
+                    }
+                })
+            }
         },
     };
-    println!("{}", serde_json::to_string(&response).expect("response serializes"));
+    println!(
+        "{}",
+        serde_json::to_string(&response).expect("response serializes")
+    );
     if response.get("ok").and_then(Value::as_bool) != Some(true) {
         std::process::exit(1);
     }
@@ -96,7 +113,9 @@ fn execute(request: Value) -> Value {
             Ok(params) => params,
             Err(e) => return runner_error(format!("constructorParams: {e}")),
         },
-        None => return runner_error("request is missing the 'constructorParams' array".to_string()),
+        None => {
+            return runner_error("request is missing the 'constructorParams' array".to_string())
+        }
     };
     let constructor = match request.get("constructor") {
         Some(c) => c,
@@ -171,15 +190,29 @@ fn execute(request: Value) -> Value {
 
     let mut results = Vec::with_capacity(calls.len());
     for (call_index, call) in calls.iter().enumerate() {
-        for advance in clock.advances.iter().filter(|advance| advance.before_call == call_index) {
-            let timestamp = env.ledger().timestamp().checked_add(advance.seconds)
+        for advance in clock
+            .advances
+            .iter()
+            .filter(|advance| advance.before_call == call_index)
+        {
+            let timestamp = env
+                .ledger()
+                .timestamp()
+                .checked_add(advance.seconds)
                 .unwrap_or_else(|| panic!("local clock timestamp overflow"));
             env.ledger().set_timestamp(timestamp);
         }
         results.push(execute_call(&env, &contract, &identities, call));
     }
-    for advance in clock.advances.iter().filter(|advance| advance.before_call == calls.len()) {
-        let timestamp = env.ledger().timestamp().checked_add(advance.seconds)
+    for advance in clock
+        .advances
+        .iter()
+        .filter(|advance| advance.before_call == calls.len())
+    {
+        let timestamp = env
+            .ledger()
+            .timestamp()
+            .checked_add(advance.seconds)
             .unwrap_or_else(|| panic!("local clock timestamp overflow"));
         env.ledger().set_timestamp(timestamp);
     }
@@ -198,28 +231,64 @@ fn execute(request: Value) -> Value {
 
 fn parse_clock(value: Option<&Value>, call_count: usize) -> Result<ClockConfig, String> {
     let Some(value) = value else {
-        return Ok(ClockConfig { initial_timestamp: None, initial_sequence: None, advances: Vec::new() });
+        return Ok(ClockConfig {
+            initial_timestamp: None,
+            initial_sequence: None,
+            advances: Vec::new(),
+        });
     };
-    let object = value.as_object().ok_or_else(|| "clock must be an object".to_string())?;
-    let initial_timestamp = object.get("initialLedgerTimestamp").map(parse_u64).transpose()?;
-    let initial_sequence = object.get("initialLedgerSequence").map(parse_u64).transpose()?
+    let object = value
+        .as_object()
+        .ok_or_else(|| "clock must be an object".to_string())?;
+    let initial_timestamp = object
+        .get("initialLedgerTimestamp")
+        .map(parse_u64)
+        .transpose()?;
+    let initial_sequence = object
+        .get("initialLedgerSequence")
+        .map(parse_u64)
+        .transpose()?
         .map(|value| u32::try_from(value).map_err(|_| "clock initial sequence exceeds u32"))
         .transpose()?;
-    let entries = object.get("advances").and_then(Value::as_array)
+    let entries = object
+        .get("advances")
+        .and_then(Value::as_array)
         .ok_or_else(|| "clock.advances must be an array".to_string())?;
     let mut total = 0u64;
     let mut advances = Vec::with_capacity(entries.len());
     for entry in entries {
-        let item = entry.as_object().ok_or_else(|| "each clock advance must be an object".to_string())?;
-        let before_call = item.get("beforeCall").and_then(Value::as_u64)
-            .ok_or_else(|| "clock advance beforeCall must be an integer".to_string())? as usize;
-        if before_call > call_count { return Err("clock advance beforeCall is out of range".to_string()); }
-        let seconds = item.get("seconds").map(parse_u64).transpose()?.ok_or_else(|| "clock advance seconds is required".to_string())?;
-        total = total.checked_add(seconds).ok_or_else(|| "clock advancement overflow".to_string())?;
-        if total > 31_536_000 { return Err("total clock advancement exceeds 31536000 seconds".to_string()); }
-        advances.push(ClockAdvance { before_call, seconds });
+        let item = entry
+            .as_object()
+            .ok_or_else(|| "each clock advance must be an object".to_string())?;
+        let before_call = item
+            .get("beforeCall")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| "clock advance beforeCall must be an integer".to_string())?
+            as usize;
+        if before_call > call_count {
+            return Err("clock advance beforeCall is out of range".to_string());
+        }
+        let seconds = item
+            .get("seconds")
+            .map(parse_u64)
+            .transpose()?
+            .ok_or_else(|| "clock advance seconds is required".to_string())?;
+        total = total
+            .checked_add(seconds)
+            .ok_or_else(|| "clock advancement overflow".to_string())?;
+        if total > 31_536_000 {
+            return Err("total clock advancement exceeds 31536000 seconds".to_string());
+        }
+        advances.push(ClockAdvance {
+            before_call,
+            seconds,
+        });
     }
-    Ok(ClockConfig { initial_timestamp, initial_sequence, advances })
+    Ok(ClockConfig {
+        initial_timestamp,
+        initial_sequence,
+        advances,
+    })
 }
 
 /// Deploys a single dependency contract, records its alias -> address in the
@@ -291,10 +360,7 @@ fn deploy_dependency(
         for call in setup {
             let outcome = execute_call(env, &contract, identities, call);
             if outcome.get("ok").and_then(Value::as_bool) != Some(true) {
-                return Err(format!(
-                    "dependency {alias} setup failed: {}",
-                    outcome.to_string()
-                ));
+                return Err(format!("dependency {alias} setup failed: {}", outcome));
             }
         }
     }
@@ -332,7 +398,12 @@ fn execute_call(
             Ok(params) => params,
             Err(e) => return call_error(Some(fn_name), format!("params: {e}")),
         },
-        None => return call_error(Some(fn_name), "call is missing the 'params' array".to_string()),
+        None => {
+            return call_error(
+                Some(fn_name),
+                "call is missing the 'params' array".to_string(),
+            )
+        }
     };
     let args = call.get("args").cloned().unwrap_or(Value::Null);
     let arg_vals = match build_args(env, fn_name, &params, &args, identities) {
@@ -349,7 +420,7 @@ fn execute_call(
     env.mock_all_auths_allowing_non_root_auth();
 
     let result: Result<Result<Val, _>, _> =
-        env.try_invoke_contract(&contract, &Symbol::new(env, fn_name), arg_vals);
+        env.try_invoke_contract(contract, &Symbol::new(env, fn_name), arg_vals);
     match result {
         Ok(Ok(val)) => json!({
             "fn": fn_name,
@@ -545,7 +616,7 @@ fn parse_i64(value: &Value) -> Result<i64, String> {
 /// Decodes a hex string (lower- or upper-case, optional `0x` prefix) into bytes.
 fn hex_decode(s: &str) -> Result<Vec<u8>, String> {
     let s = s.strip_prefix("0x").unwrap_or(s);
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return Err(format!("hex string has an odd length: {s}"));
     }
     let bytes = s.as_bytes();
@@ -598,30 +669,26 @@ fn scval_to_json(env: &Env, scval: ScVal) -> Value {
         )),
         ScVal::String(s) => json!(std::string::String::from_utf8_lossy(&s.0).to_string()),
         ScVal::Symbol(s) => json!(std::string::String::from_utf8_lossy(&s.0).to_string()),
-        ScVal::Vec(Some(items)) => json!(
-            items
-                .0
-                .iter()
-                .map(|v| scval_to_json(env, v.clone()))
-                .collect::<Vec<_>>()
-        ),
+        ScVal::Vec(Some(items)) => json!(items
+            .0
+            .iter()
+            .map(|v| scval_to_json(env, v.clone()))
+            .collect::<Vec<_>>()),
         ScVal::Vec(None) => json!([]),
-        ScVal::Map(Some(pairs)) => json!(
-            pairs
-                .0
-                .iter()
-                .map(|entry| json!({
-                    "key": scval_to_json(env, entry.key.clone()),
-                    "value": scval_to_json(env, entry.val.clone()),
-                }))
-                .collect::<Vec<_>>()
-        ),
+        ScVal::Map(Some(pairs)) => json!(pairs
+            .0
+            .iter()
+            .map(|entry| json!({
+                "key": scval_to_json(env, entry.key.clone()),
+                "value": scval_to_json(env, entry.val.clone()),
+            }))
+            .collect::<Vec<_>>()),
         ScVal::Map(None) => json!({}),
         ScVal::Address(sc_address) => match Address::try_from_val(env, &sc_address) {
-            Ok(address) => json!(
-                std::string::String::from_utf8(address.to_string().to_bytes().to_alloc_vec())
-                    .unwrap_or_default()
-            ),
+            Ok(address) => json!(std::string::String::from_utf8(
+                address.to_string().to_bytes().to_alloc_vec()
+            )
+            .unwrap_or_default()),
             Err(_) => json!(format!("{sc_address:?}")),
         },
         other => json!(format!("{other:?}")),
@@ -712,7 +779,10 @@ mod tests {
             val_to_json(&env, &vals.get(1).unwrap()),
             json!("CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4")
         );
-        assert_eq!(val_to_json(&env, &vals.get(2).unwrap()), json!(9007199254740993i64));
+        assert_eq!(
+            val_to_json(&env, &vals.get(2).unwrap()),
+            json!(9007199254740993i64)
+        );
         assert_eq!(val_to_json(&env, &vals.get(3).unwrap()), json!(42));
         assert_eq!(val_to_json(&env, &vals.get(4).unwrap()), json!("Hello"));
         assert_eq!(val_to_json(&env, &vals.get(5).unwrap()), json!("FORGE"));
@@ -752,7 +822,10 @@ mod tests {
     fn decodes_scvals_to_json() {
         let env = Env::default();
         assert_eq!(val_to_json(&env, &Val::from_void().to_val()), Value::Null);
-        assert_eq!(val_to_json(&env, &Val::from_bool(true).to_val()), json!(true));
+        assert_eq!(
+            val_to_json(&env, &Val::from_bool(true).to_val()),
+            json!(true)
+        );
         assert_eq!(val_to_json(&env, &(42u32).into_val(&env)), json!(42));
         assert_eq!(
             val_to_json(&env, &SdkString::from_str(&env, "hello").to_val()),
@@ -840,7 +913,10 @@ mod tests {
         assert_eq!(deps.len(), 1);
         assert_eq!(deps[0].get("alias").and_then(Value::as_str), Some("asset"));
         let address = deps[0].get("address").and_then(Value::as_str).unwrap_or("");
-        assert!(address.starts_with('C'), "unexpected dependency address: {address}");
+        assert!(
+            address.starts_with('C'),
+            "unexpected dependency address: {address}"
+        );
 
         let calls = response.get("calls").and_then(Value::as_array).unwrap();
         assert_eq!(calls.len(), 1);
@@ -863,7 +939,9 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../target/wasm32v1-none/release/token.wasm"
         );
-        if !std::path::Path::new(payment_wasm).exists() || !std::path::Path::new(token_wasm).exists() {
+        if !std::path::Path::new(payment_wasm).exists()
+            || !std::path::Path::new(token_wasm).exists()
+        {
             return;
         }
         let request = json!({
@@ -951,8 +1029,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../target/wasm32v1-none/release/token.wasm"
         );
-        if !std::path::Path::new(escrow_wasm).exists()
-            || !std::path::Path::new(token_wasm).exists()
+        if !std::path::Path::new(escrow_wasm).exists() || !std::path::Path::new(token_wasm).exists()
         {
             return;
         }
@@ -1301,8 +1378,7 @@ mod tests {
         let s2 = Address::generate(&env);
         let s3 = Address::generate(&env);
         let strkey = |a: &Address| -> std::string::String {
-            std::string::String::from_utf8(a.to_string().to_bytes().to_alloc_vec())
-                .unwrap()
+            std::string::String::from_utf8(a.to_string().to_bytes().to_alloc_vec()).unwrap()
         };
         let request = json!({
             "wasmPath": multi_wasm,
@@ -1425,8 +1501,7 @@ mod tests {
         let subscriber = Address::generate(&env);
         let merchant = Address::generate(&env);
         let strkey = |a: &Address| -> std::string::String {
-            std::string::String::from_utf8(a.to_string().to_bytes().to_alloc_vec())
-                .unwrap()
+            std::string::String::from_utf8(a.to_string().to_bytes().to_alloc_vec()).unwrap()
         };
         let request = json!({
             "wasmPath": sub_wasm,
@@ -1514,28 +1589,16 @@ mod tests {
         assert_eq!(calls.len(), 4);
         // charge before interval: time gate not reached -> ok, but result false
         assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[0].get("result").and_then(Value::as_bool),
-            Some(false)
-        );
+        assert_eq!(calls[0].get("result").and_then(Value::as_bool), Some(false));
         // cancel: succeeds
         assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[1].get("result").and_then(Value::as_bool),
-            Some(true)
-        );
+        assert_eq!(calls[1].get("result").and_then(Value::as_bool), Some(true));
         // is_active after cancel: false
         assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[2].get("result").and_then(Value::as_bool),
-            Some(false)
-        );
+        assert_eq!(calls[2].get("result").and_then(Value::as_bool), Some(false));
         // charge after cancel: inactive -> false
         assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[3].get("result").and_then(Value::as_bool),
-            Some(false)
-        );
+        assert_eq!(calls[3].get("result").and_then(Value::as_bool), Some(false));
     }
 
     #[test]
@@ -1671,22 +1734,13 @@ mod tests {
         assert_eq!(calls[0].get("ok").and_then(Value::as_bool), Some(true));
         // claimable before cliff: 0.
         assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[1].get("result").and_then(Value::as_i64),
-            Some(0)
-        );
+        assert_eq!(calls[1].get("result").and_then(Value::as_i64), Some(0));
         // released before any claim: 0.
         assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[2].get("result").and_then(Value::as_i64),
-            Some(0)
-        );
+        assert_eq!(calls[2].get("result").and_then(Value::as_i64), Some(0));
         // claim by the beneficiary before cliff: returns 0 (no transfer).
         assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[3].get("result").and_then(Value::as_i64),
-            Some(0)
-        );
+        assert_eq!(calls[3].get("result").and_then(Value::as_i64), Some(0));
         // claim by an intruder: rejected by the stored-beneficiary check.
         assert_eq!(calls[4].get("ok").and_then(Value::as_bool), Some(false));
     }
@@ -1854,16 +1908,10 @@ mod tests {
         assert_eq!(calls[1].get("ok").and_then(Value::as_bool), Some(true));
         // staked_balance(user1): 100000 after staking.
         assert_eq!(calls[2].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[2].get("result").and_then(Value::as_i64),
-            Some(100000)
-        );
+        assert_eq!(calls[2].get("result").and_then(Value::as_i64), Some(100000));
         // total_staked: 100000.
         assert_eq!(calls[3].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[3].get("result").and_then(Value::as_i64),
-            Some(100000)
-        );
+        assert_eq!(calls[3].get("result").and_then(Value::as_i64), Some(100000));
         // earned(user1): 0 before any ledger time advances.
         assert_eq!(calls[4].get("ok").and_then(Value::as_bool), Some(true));
         assert_eq!(calls[4].get("result").and_then(Value::as_i64), Some(0));
@@ -1871,10 +1919,7 @@ mod tests {
         assert_eq!(calls[5].get("ok").and_then(Value::as_bool), Some(true));
         // staked_balance(user1): 50000 after partial unstake.
         assert_eq!(calls[6].get("ok").and_then(Value::as_bool), Some(true));
-        assert_eq!(
-            calls[6].get("result").and_then(Value::as_i64),
-            Some(50000)
-        );
+        assert_eq!(calls[6].get("result").and_then(Value::as_i64), Some(50000));
         // claim(user1): 0 rewards before any time passes.
         assert_eq!(calls[7].get("ok").and_then(Value::as_bool), Some(true));
         assert_eq!(calls[7].get("result").and_then(Value::as_i64), Some(0));

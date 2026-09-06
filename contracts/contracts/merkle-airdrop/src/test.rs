@@ -3,12 +3,12 @@ extern crate std;
 
 use std::vec::Vec;
 
+use crate::{combine, leaf_hash, MerkleAirdrop, MerkleAirdropClient};
 use soroban_sdk::{
     testutils::Address as _,
     token::{StellarAssetClient, TokenClient},
     Address, Bytes, Env,
 };
-use crate::{combine, leaf_hash, MerkleAirdrop, MerkleAirdropClient};
 
 fn create_token<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, StellarAssetClient<'a>) {
     let addr = e.register_stellar_asset_contract(admin.clone());
@@ -109,10 +109,7 @@ fn deploy_tree(n: usize, amounts: &[i128]) -> Tree {
         claimants.push(Address::generate(&e));
     }
     let (root, proofs) = build_tree(&e, &claimants, amounts);
-    let contract_id = e.register(
-        MerkleAirdrop,
-        (admin, token.address.clone(), root.clone()),
-    );
+    let contract_id = e.register(MerkleAirdrop, (admin, token.address.clone(), root.clone()));
     Tree {
         e,
         claimants,
@@ -204,7 +201,12 @@ fn wrong_amount_rejected() {
     c.deposit(&tree.amounts[0]);
 
     assert!(c
-        .try_claim(&0u32, &tree.claimants[0], &(tree.amounts[0] + 1), &tree.proofs[0])
+        .try_claim(
+            &0u32,
+            &tree.claimants[0],
+            &(tree.amounts[0] + 1),
+            &tree.proofs[0]
+        )
         .is_err());
 }
 
@@ -352,8 +354,5 @@ fn combine_is_order_independent() {
     let a = Bytes::from_slice(&e, &[0x01; 32]);
     let b = Bytes::from_slice(&e, &[0x02; 32]);
     // Sorted-pair hashing must yield the same parent regardless of argument order.
-    assert!(crate::bytes_eq(
-        &combine(&e, &a, &b),
-        &combine(&e, &b, &a)
-    ));
+    assert!(crate::bytes_eq(&combine(&e, &a, &b), &combine(&e, &b, &a)));
 }

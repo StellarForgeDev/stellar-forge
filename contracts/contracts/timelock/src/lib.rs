@@ -8,9 +8,7 @@
 //! the beneficiary authorizes the call.
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    token::TokenClient,
-    Address, Env, Map, Symbol, Timepoint,
+    contract, contractimpl, contracttype, token::TokenClient, Address, Env, Map, Symbol, Timepoint,
 };
 
 #[contract]
@@ -103,7 +101,11 @@ const LOCKS: &str = "locks";
 const NEXT_ID: &str = "next_id";
 
 fn next_id(e: &Env) -> u64 {
-    let id: u64 = e.storage().instance().get(&Symbol::new(e, NEXT_ID)).unwrap_or(0);
+    let id: u64 = e
+        .storage()
+        .instance()
+        .get(&Symbol::new(e, NEXT_ID))
+        .unwrap_or(0);
     e.storage()
         .instance()
         .set(&Symbol::new(e, NEXT_ID), &(id + 1));

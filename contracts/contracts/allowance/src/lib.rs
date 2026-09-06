@@ -14,11 +14,7 @@
 //! limit. A spender cannot bypass the manager, because the token allowance is
 //! granted to the manager contract, not to the spender.
 
-use soroban_sdk::{
-    contract, contractimpl,
-    token::Client as TokenClient,
-    Address, Env,
-};
+use soroban_sdk::{contract, contractimpl, token::Client as TokenClient, Address, Env};
 
 #[contract]
 pub struct AllowanceManager;
@@ -40,7 +36,14 @@ impl AllowanceManager {
     /// simulation and execution and the TTL stays below the network max.
     ///
     /// Authorization: `owner` must authorize.
-    pub fn approve(e: &Env, owner: Address, asset: Address, spender: Address, amount: i128, expiration_ledger: u32) {
+    pub fn approve(
+        e: &Env,
+        owner: Address,
+        asset: Address,
+        spender: Address,
+        amount: i128,
+        expiration_ledger: u32,
+    ) {
         if amount < 0 {
             panic!("allowance amount must be non-negative");
         }
@@ -148,7 +151,11 @@ impl AllowanceManager {
     }
 }
 
-fn allowance_key(owner: &Address, asset: &Address, spender: &Address) -> (Address, Address, Address) {
+fn allowance_key(
+    owner: &Address,
+    asset: &Address,
+    spender: &Address,
+) -> (Address, Address, Address) {
     (owner.clone(), asset.clone(), spender.clone())
 }
 
@@ -169,7 +176,13 @@ fn check_expiration(e: &Env, expiration_ledger: u32) {
 /// manager method into this nested token call. The caller-supplied
 /// `expiration_ledger` is forwarded verbatim so simulation and execution use
 /// the identical authorized value.
-fn sync_token_allowance(e: &Env, asset: &Address, owner: &Address, amount: i128, expiration_ledger: u32) {
+fn sync_token_allowance(
+    e: &Env,
+    asset: &Address,
+    owner: &Address,
+    amount: i128,
+    expiration_ledger: u32,
+) {
     let manager = e.current_contract_address();
     let client = TokenClient::new(e, asset);
     client.approve(owner, &manager, &amount, &expiration_ledger);
