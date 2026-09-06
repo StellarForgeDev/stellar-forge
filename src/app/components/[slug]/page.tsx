@@ -348,7 +348,7 @@ export default async function ComponentDetailPage({
                 </dt>
 
                 <dd className="mt-1 font-mono text-xs text-text-secondary">
-                  {component.capabilities.testnet ? "Available" : "Not deployed"}
+                  {component.capabilities.testnet ? "Registered" : "Not deployed"}
                 </dd>
               </div>
             </dl>

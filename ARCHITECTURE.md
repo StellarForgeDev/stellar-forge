@@ -195,7 +195,8 @@ Stellar-Forge is deployed on Vercel, and the production Playground path has
 been independently verified with real Token WASM execution. The committed
 configuration is:
 
-- `package.json` `vercel-build` runs `scripts/vercel-sandbox-build.sh` then
+- `package.json` `vercel-build` runs `pnpm run build`, which compiles the
+  sandbox-runner via `scripts/build-sandbox-runner.mjs` and then runs
   `next build`.
 - `scripts/vercel-sandbox-build.sh` installs the Rust toolchain if needed and
   compiles `sandbox-runner` for **Linux** (release). Contract WASM is

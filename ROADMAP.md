@@ -118,8 +118,8 @@ components as part of this milestone unless separately instructed.
 
 ### Engineering Foundation
 
-- **Automated testing** — a web/app test runner and test suite (none exists
-  today beyond Rust contract unit tests).
+- **Automated testing** — Vitest test suite for web/application domain logic
+  and `cargo test` for Rust contracts (both exist and run in CI).
 - **CI** — continuous integration running lint, typecheck, build, and tests on
   every change.
 - **Contract test strategy** — standardize and document `cargo test` for every
@@ -173,7 +173,7 @@ for Testnet use. Their current capability and deployment state is maintained in
 ### Developer Integration
 
 - Stronger integration generation (more languages, more accurate generated
-  code). TypeScript generation was added in Phase 21; Rust remains the default
+  code). TypeScript generators were strengthened in Phase 5.5; Rust remains the default
   and is behaviorally unchanged.
 - Reusable client libraries.
 - **SDK/package extraction** — only if justified by reuse needs (no SDK exists

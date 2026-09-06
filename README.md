@@ -1,13 +1,16 @@
 # Stellar-Forge
 
+[![CI](https://github.com/StellarForgeDev/stellar-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/StellarForgeDev/stellar-forge/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 A developer platform for discovering, understanding, experimenting with, and reusing Stellar/Soroban building blocks. Stellar-Forge catalogs reusable components, documents how they work, and provides an interactive playground plus a transaction workflow that operates against Stellar Testnet.
 
 ## Current Status
 
 - **Release Candidate.**
 - **15 implemented components**, all registered for Stellar Testnet and runnable in the local sandbox: `token`, `payment`, `access-control`, `escrow`, `multi-signature`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`. Registry presence is not, by itself, independent proof of on-chain behavior or WASM hash parity.
-- **Network model:** centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) with `rpcUrl`, `passphrase`, `explorerUrl` and env overrides (`STELLAR_RPC_*_URL`). `Testnet` is operational and the default; `Mainnet` is architecture-aware (config, deployment lookup, validation, and integration generation are network-aware) but has no deployments and no `mainnet:true` capabilities — it correctly reports “not deployed” and will not submit; `Futurenet` plumbing is retained with no deployments.
-- Transaction flows run against real Testnet RPC via the generic pipeline (builder → simulation → Freighter signing → submission). The Token `name` flow has been manually verified end to end in production; the remaining registry entries are not independently verified by that test. The project is **not production/mainnet ready**.
+- **Network model:** centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) with `rpcUrl`, `passphrase`, `explorerUrl` and env overrides (`STELLAR_RPC_*_URL`). `Testnet` is operational and the default; `Mainnet` is architecture-aware (config, deployment lookup, validation, and integration generation are network-aware) but has no deployments and no `mainnet:true` capabilities -- it correctly reports "not deployed" and will not submit; `Futurenet` plumbing is retained with no deployments.
+- Transaction flows run against real Testnet RPC via the generic pipeline (builder -> simulation -> Freighter signing -> submission). The Token `name` flow has been manually verified end to end in production; the remaining registry entries are not independently verified by that test. The project is **not production/mainnet ready**.
 
 All components in the catalog are fully implemented contracts, documented throughout this document and in the [Component Catalog Status](#component-catalog-status) section.
 
@@ -15,19 +18,19 @@ All components in the catalog are fully implemented contracts, documented throug
 
 Functionality that currently exists in the repository:
 
-- **Component catalog** — a searchable, filterable list of Stellar/Soroban building blocks (`src/data/components.ts`).
-- **Interactive component documentation** — per-component catalog pages and a documentation hub with getting-started, component library, playground, and integration sections.
-- **Local Soroban Playground** — configure a component and inspect the structure it produces.
-- **Real local sandbox execution** — the Playground executes the real contract WASM for all 15 components (including `token.wasm`, `crowdfund.wasm`, `allowance.wasm`, `claimable-balance.wasm` and 11 others) in an isolated Soroban host, with deterministic execution and no network, wallet, or gas costs.
-- **Transaction builder** — network-aware assembly, simulation, signing, and submission (Testnet operational, Mainnet architecture-ready, Futurenet plumbing).
-- **Stellar transaction simulation** — preparation calls the selected network’s RPC (Testnet by default) to simulate operations.
-- **Freighter wallet integration** — connect Freighter to provide a signing account.
-- **Transaction signing/submission** — signed transactions are submitted to the selected network.
-- **Friendbot funding for Testnet** — a built-in action to fund a Testnet account via Friendbot.
-- **Integration code generator** — network-aware Rust and TypeScript examples from a component’s interface and the current configuration.
-- **Documentation hub** — `src/app/docs` covering getting started, the component library, the Playground, and Integration.
+- **Component catalog** -- a searchable, filterable list of Stellar/Soroban building blocks (`src/data/components.ts`).
+- **Interactive component documentation** -- per-component catalog pages and a documentation hub with getting-started, component library, playground, and integration sections.
+- **Local Soroban Playground** -- configure a component and inspect the structure it produces.
+- **Real local sandbox execution** -- the Playground executes the real contract WASM for all 15 components (including `token.wasm`, `crowdfund.wasm`, `allowance.wasm`, `claimable-balance.wasm` and 11 others) in an isolated Soroban host, with deterministic execution and no network, wallet, or gas costs.
+- **Transaction builder** -- network-aware assembly, simulation, signing, and submission (Testnet operational, Mainnet architecture-ready, Futurenet plumbing).
+- **Stellar transaction simulation** -- preparation calls the selected network's RPC (Testnet by default) to simulate operations.
+- **Freighter wallet integration** -- connect Freighter to provide a signing account.
+- **Transaction signing/submission** -- signed transactions are submitted to the selected network.
+- **Friendbot funding for Testnet** -- a built-in action to fund a Testnet account via Friendbot.
+- **Integration code generator** -- network-aware Rust and TypeScript examples from a component's interface and the current configuration.
+- **Documentation hub** -- `src/app/docs` covering getting started, the component library, the Playground, and Integration.
 
-All fifteen components are implemented contracts with a live local sandbox and Testnet deployment registrations. The generic pipeline (catalog → playground → transactions → integration) is network-aware; the live Testnet transaction path is independently verified for Token `name`, while the other registered entries remain to be verified individually. Mainnet remains architecture-ready but undeployed.
+All fifteen components are implemented contracts with a live local sandbox and Testnet deployment registrations. The generic pipeline (catalog -> playground -> transactions -> integration) is network-aware; the live Testnet transaction path is independently verified for Token `name`, while the other registered entries remain to be verified individually. Mainnet remains architecture-ready but undeployed.
 
 ## Tech Stack
 
@@ -38,9 +41,9 @@ Verified from `package.json` and the repository:
 - **TypeScript** `^5`
 - **Tailwind CSS** `^4`
 - **pnpm** `11.21.0` (package manager)
-- **Rust / Cargo** — used for the Soroban contracts and the native `sandbox-runner`
-- **Soroban SDK** — Rust contract development
-- **Stellar CLI** (`stellar`) — builds contract WASM artifacts
+- **Rust / Cargo** -- used for the Soroban contracts and the native `sandbox-runner`
+- **Soroban SDK** -- Rust contract development
+- **Stellar CLI** (`stellar`) -- builds contract WASM artifacts
 
 ## Project Structure
 
@@ -91,7 +94,7 @@ stellar-forge/
 │   │   ├── claimable-balance/  Time-locked claimable balance (implemented, Testnet-deployed)
 │   │   ├── greeter/            Example contract used by the generic sandbox
 │   │   └── sandbox-runner/     Native runner that executes contract WASM
-│   └── prebuilt/               Committed contract WASM (15 × *.wasm)
+│   └── prebuilt/               Committed contract WASM (15 x *.wasm)
 ├── scripts/                    Build/deploy helpers
 │   ├── sandbox-build.mjs       Local sandbox-runner + WASM build
 │   └── vercel-sandbox-build.sh Vercel Linux sandbox-runner build
@@ -122,10 +125,10 @@ Generated/ignored directories (`node_modules/`, `.next/`, `contracts/target/`) a
 pnpm install        # install dependencies
 pnpm sandbox:build  # build the native sandbox-runner and contract WASM
 pnpm dev            # start the development server (http://localhost:3000)
-pnpm build          # create a production build
+pnpm build          # create a production build (compiles sandbox-runner, then Next.js)
 pnpm start          # serve the production build
 pnpm lint           # run ESLint
-pnpm vercel-build   # Vercel build entry point (see Deployment)
+pnpm vercel-build   # Vercel build entry point (runs pnpm build)
 ```
 
 `pnpm sandbox:build` runs `cargo build -p sandbox-runner` and builds missing contract WASM with Cargo for the `wasm32v1-none` target. The **native `sandbox-runner` binary is required by the Playground API** (`/api/playground`); without it, the Playground returns a `503`. The committed `contracts/prebuilt/*.wasm` files are used as a fallback for the WASM itself, but the runner must still be built locally.
@@ -134,21 +137,37 @@ pnpm vercel-build   # Vercel build entry point (see Deployment)
 
 Stellar-Forge is deployed on Vercel. The production Playground path has been independently verified: the deployed Linux runner executes trusted Token WASM and returns a successful real result.
 
-- **`vercel-build`** — the `package.json` build script Vercel runs instead of `next build`. It invokes `scripts/vercel-sandbox-build.sh` and then `next build`.
-- **`scripts/vercel-sandbox-build.sh`** — installs the Rust toolchain if needed and compiles `sandbox-runner` for **Linux** (release). Contract WASM is platform-independent and ships prebuilt in `contracts/prebuilt/`.
-- **Next.js output tracing** — `next.config.ts` sets `outputFileTracingIncludes` for `/api/playground` so the serverless function bundle contains the WASM artifacts and the runner binary.
-- **Artifact resolution** — at runtime (`src/lib/playground/artifacts.ts`), the Playground resolves the runner from local build directories and the WASM from either the local build or the committed prebuilt copy.
- - **Optional environment variables** (with built-in defaults; override only if needed):
-   - `STELLAR_RPC_TESTNET_URL`
-   - `STELLAR_RPC_MAINNET_URL`
-   - `STELLAR_RPC_FUTURENET_URL`
+- **`vercel-build`** -- the `package.json` build script Vercel runs. It delegates to `pnpm run build`, which compiles the sandbox-runner via `scripts/build-sandbox-runner.mjs` and then runs `next build`.
+- **`scripts/build-sandbox-runner.mjs`** -- compiles the native sandbox-runner binary for the current platform.
+- **`scripts/vercel-sandbox-build.sh`** -- installs the Rust toolchain if needed and compiles `sandbox-runner` for **Linux** (release). Contract WASM is platform-independent and ships prebuilt in `contracts/prebuilt/`.
+- **Next.js output tracing** -- `next.config.ts` sets `outputFileTracingIncludes` for `/api/playground` so the serverless function bundle contains the WASM artifacts and the runner binary.
+- **Artifact resolution** -- at runtime (`src/lib/playground/artifacts.ts`), the Playground resolves the runner from local build directories and the WASM from either the local build or the committed prebuilt copy.
+- **Optional environment variables** (with built-in defaults; override only if needed):
+  - `STELLAR_RPC_TESTNET_URL`
+  - `STELLAR_RPC_MAINNET_URL`
+  - `STELLAR_RPC_FUTURENET_URL`
 
 This setup is **not** a statement of production/mainnet readiness.
 
 ## Component Catalog Status
 
-- **15 implemented components**, all **registered for Stellar Testnet** in `src/lib/transactions/deployments.ts`: `token`, `payment`, `access-control`, `multi-signature`, `escrow`, `oracle`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `crowdfund`, `allowance`, `claimable-balance`. All support local sandbox execution; the Token `name` transaction was manually verified through production, while the other registry entries are not independently verified here. Contract instance existence, expected behavior, and exact WASM-byte/hash parity are separate claims. The generic transaction pipeline is network-aware: `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) centralizes `rpcUrl`, `passphrase`, and `explorerUrl`; `Testnet` is operational (default), `Mainnet` is architecture-ready but has no deployments (`mainnet:false` for all components) and correctly reports “not deployed” without submitting, `Futurenet` plumbing is retained with no deployments.
-  - Every catalog entry is an implemented contract; the catalog also documents each component's patterns, use cases, and configuration. The authorization-stable `expiration_ledger` fix (Phase 5.3B) ensures `token.approve` via an intermediate contract remains valid across ledgers (`current < expiration ≤ current+1_000_000`).
+- **15 implemented components**, all **registered for Stellar Testnet** in `src/lib/transactions/deployments.ts`: `token`, `payment`, `access-control`, `multi-signature`, `escrow`, `oracle`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `crowdfund`, `allowance`, `claimable-balance`. All support local sandbox execution; the Token `name` transaction was manually verified through production, while the other registry entries are not independently verified here. Contract instance existence, expected behavior, and exact WASM-byte/hash parity are separate claims. The generic transaction pipeline is network-aware: `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) centralizes `rpcUrl`, `passphrase`, and `explorerUrl`; `Testnet` is operational (default), `Mainnet` is architecture-ready but has no deployments (`mainnet:false` for all components) and correctly reports "not deployed" without submitting, `Futurenet` plumbing is retained with no deployments.
+  - Every catalog entry is an implemented contract; the catalog also documents each component's patterns, use cases, and configuration. The authorization-stable `expiration_ledger` fix (Phase 5.3B) ensures `token.approve` via an intermediate contract remains valid across ledgers (`current < expiration <= current+1_000_000`).
+
+## Testnet Status
+
+Stellar-Forge is focused on **Stellar Testnet**. The Testnet section (`/testnet`) provides controlled Testnet deployment and verification infrastructure:
+
+- **Controlled deployment** -- the deployment flow requires explicit wallet confirmation and does not sign or submit automatically.
+- **Artifact verification** -- deployed WASM artifacts are verified against repository prebuilt checksums.
+- **Repository-authoritative evidence** -- deployment evidence is committed to the repository, not stored on a runtime server.
+
+**Current verified deployment:**
+
+- **Access Control** contract: `CDQLJ6YAPI4JSIYRHLIKJFC6636ZEQUXHNDINQFPBXSWKMZVCJ7EXFBR`
+- Artifact SHA verified against repository prebuilt.
+
+**Mainnet is not supported** by the controlled deployment path. No Mainnet deployment occurs in this project.
 
 ## Roadmap
 
@@ -160,8 +179,8 @@ This setup is **not** a statement of production/mainnet readiness.
 - Interactive Playground with real local Soroban sandbox execution for all 15 components.
 - Data-driven Playground and network-aware integration code generator (Rust + TypeScript).
 - Network-aware transaction system: centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`), generic `getDeployment(network, slug)`, RPC selection, builder, simulation, Freighter signing, submission, and Friendbot funding.
-- Testnet deployment registry — 15 component addresses are registered in `src/lib/transactions/deployments.ts`, with `capabilities.testnet:true`; this is not independent verification of every instance or exact WASM parity.
-- Authorization-stable `expiration_ledger` fix for `crowdfund`, `allowance`, `claimable-balance` (Phase 5.3B.19–5.3B.20): caller-supplied stable `expiration_ledger` validated as `current < expiration ≤ current+1_000_000`, eliminating the prior `auth/invalid_action` caused by ledger-dependent recomputation and the earlier `max_entry_ttl` failure (`SAFE_ALLOWANCE_TTL=1_000_000`).
+- Testnet deployment registry -- 15 component addresses are registered in `src/lib/transactions/deployments.ts`, with `capabilities.testnet:true`; this is not independent verification of every instance or exact WASM parity.
+- Authorization-stable `expiration_ledger` fix for `crowdfund`, `allowance`, `claimable-balance` (Phase 5.3B.19-5.3B.20): caller-supplied stable `expiration_ledger` validated as `current < expiration <= current+1_000_000`, eliminating the prior `auth/invalid_action` caused by ledger-dependent recomputation and the earlier `max_entry_ttl` failure (`SAFE_ALLOWANCE_TTL=1_000_000`).
 - Vercel build configuration (Linux `sandbox-runner` build, output tracing, prebuilt WASM).
 - Engineering audit and remediation work.
 
@@ -172,12 +191,12 @@ persistence.
 
 ### Phase History
 
-- **Phase 3** — Component expansion (8 → 15 reusable Soroban components, generic pipeline, local WASM sandbox).
-- **Phase 4** — CI, reproducibility, prebuilt WASM integrity, and E2E hardening.
-- **Phase 5.1** — Repository hygiene and contribution foundation.
-- **Phase 5.2** — Vercel/serverless build-path verification.
-- **Phase 5.3** — Testnet expansion and validation (5.3B.18 diagnostic, 5.3B.19 authorization-stable fix, 5.3B.20 Testnet lifecycle validation, 5.3B.21 registration, 5.3B.22 reconciliation — commit `6b21f8e`).
-- **Phase 5.4** — Configurable network support (Mainnet architecture-aware, not deployed).
+- **Phase 3** -- Component expansion (8 -> 15 reusable Soroban components, generic pipeline, local WASM sandbox).
+- **Phase 4** -- CI, reproducibility, prebuilt WASM integrity, and E2E hardening.
+- **Phase 5.1** -- Repository hygiene and contribution foundation.
+- **Phase 5.2** -- Vercel/serverless build-path verification.
+- **Phase 5.3** -- Testnet expansion and validation (5.3B.18 diagnostic, 5.3B.19 authorization-stable fix, 5.3B.20 Testnet lifecycle validation, 5.3B.21 registration, 5.3B.22 reconciliation -- commit `6b21f8e`).
+- **Phase 5.4** -- Configurable network support (Mainnet architecture-aware, not deployed).
 
 ### Planned
 
@@ -185,20 +204,20 @@ Phase 6 is production hardening within the existing modular monorepo. Repository
 extraction remains a future option only when independent maturity and release
 needs justify it; it is not the current Phase 6 scope.
 
-- **Phase 5.5** — Integration generator strengthening (additional languages, SDK/package considerations).
-- **Phase 6** — Production hardening of the existing modular monorepo, including
+- **Phase 5.5** -- Integration generator strengthening (additional languages, SDK/package considerations).
+- **Phase 6** -- Production hardening of the existing modular monorepo, including
   artifact boundaries, Playground execution reliability, and documentation truth.
 - Continue expanding the catalog via the generic pipeline (no component-specific code).
 - Maintain the dedicated Transactions documentation section as the transaction flow evolves.
 - Automated test/CI hardening.
 - Independent verification of the remaining registered Testnet deployments and their expected behavior.
-- Mainnet deployments (separate, credentialed future phase — not in 5.4).
+- Mainnet deployments (separate, credentialed future phase -- not in 5.4).
 
 No features beyond the above are implied or promised.
 
 ## Known Limitations
 
-- **Network support:** `Testnet` is operational and supported (15 registered deployments); `Mainnet` is architecture-aware (config, deployment lookup, validation, generators, and UI are network-aware) but **no Mainnet contracts are deployed** (`mainnet:false` for all components, `getDeployment("mainnet",…)` correctly returns null, transactions are gated as “not deployed”); `Futurenet` plumbing is retained with no deployments. No Mainnet deployment occurs in this phase.
+- **Network support:** `Testnet` is operational and supported (15 registered deployments); `Mainnet` is architecture-aware (config, deployment lookup, validation, generators, and UI are network-aware) but **no Mainnet contracts are deployed** (`mainnet:false` for all components, `getDeployment("mainnet",...)` correctly returns null, transactions are gated as "not deployed"); `Futurenet` plumbing is retained with no deployments. No Mainnet deployment occurs in this phase.
 - **Deployment evidence:** the Token `name` flow is independently verified end to end on Testnet. The other 14 registry entries are registered but not independently verified in this documentation. Token and Payment on-chain WASM hashes differ from the current repository prebuilt artifacts, so exact artifact parity must not be inferred from a working contract instance.
 - **Layout verification:** the transaction-builder overflow fix is present and covered by successful checks, but pixel-level browser viewport verification is not recorded in the repository.
 - **Web application test suite is growing.** Run `pnpm test` for the Vitest suite and `cargo test -p sandbox-runner` for the native runner tests. The suites cover catalog, identity, parameter, dependency, authorization, integration-generation, network configuration, and route behavior.
@@ -213,24 +232,14 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, verification commands, and
 
 The generic execution pipeline currently handles address, integer, string,
 symbol, byte, collection, option, and time-related parameter values. The exact
-interface for each component remains defined by `src/data/components.ts`. This
-supersedes the older six-type summary below.
+interface for each component remains defined by `src/data/components.ts`.
 
-The older six-type wording in the registration note below is retained only as
-historical context; the supported categories are the broader set described
-above.
+Adding a new reusable building block requires **no component-specific application code** -- the catalog, identity resolution, dependency provisioning, authorization, configuration, transaction, and integration-code paths are all generic over the supported parameter types. The registration steps are:
 
-<!-- The legacy six-type wording below is intentionally retained in a hidden
-     historical note; use the current categories above. -->
-
-Adding a new reusable building block requires **no component-specific application code** — the catalog, identity resolution, dependency provisioning, authorization, configuration, transaction, and integration-code paths are all generic over the six supported parameter types (`Address`, `MuxedAddress`, `i128`, `u32`, `String`, `Symbol`). The registration steps are:
-
--->
-
-1. **Contract crate** — add a Soroban contract under `contracts/contracts/<slug>/`. The workspace (`contracts/Cargo.toml`) uses a `contracts/*` glob and the build script (`scripts/sandbox-build.mjs`) discovers contract directories automatically, so no build-list edit is required.
-2. **Catalog entry** — add an entry to `src/data/components.ts` describing the component, its `interface`, `constructorArgs`, `dependencies`, `config`, `category`, and `testnet` flag. This single metadata object drives every part of the UI, sandbox, and generator.
-3. **Prebuilt WASM** — run `pnpm sandbox:build` (or `scripts/sandbox-build.mjs --prebuilt`) and commit the refreshed `contracts/prebuilt/<slug>.wasm` so the Playground works where WASM cannot be rebuilt. The native `sandbox-runner` is built locally and is not committed.
-4. **(Optional) Category** — if the component introduces a new `category`, add it to the `componentCategories` array in `src/data/components.ts` so it appears in the catalog filter.
+1. **Contract crate** -- add a Soroban contract under `contracts/contracts/<slug>/`. The workspace (`contracts/Cargo.toml`) uses a `contracts/*` glob and the build script (`scripts/sandbox-build.mjs`) discovers contract directories automatically, so no build-list edit is required.
+2. **Catalog entry** -- add an entry to `src/data/components.ts` describing the component, its `interface`, `constructorArgs`, `dependencies`, `config`, `category`, and `testnet` flag. This single metadata object drives every part of the UI, sandbox, and generator.
+3. **Prebuilt WASM** -- run `pnpm sandbox:build` (or `scripts/sandbox-build.mjs --prebuilt`) and commit the refreshed `contracts/prebuilt/<slug>.wasm` so the Playground works where WASM cannot be rebuilt. The native `sandbox-runner` is built locally and is not committed.
+4. **(Optional) Category** -- if the component introduces a new `category`, add it to the `componentCategories` array in `src/data/components.ts` so it appears in the catalog filter.
 
 No edits to `src/app`, the API routes, the transaction builder, or the integration generator are needed.
 
