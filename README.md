@@ -165,6 +165,11 @@ This setup is **not** a statement of production/mainnet readiness.
 - Vercel build configuration (Linux `sandbox-runner` build, output tracing, prebuilt WASM).
 - Engineering audit and remediation work.
 
+Deployment verification is repository-authoritative: runtime verification can
+report validated facts, but durable evidence is maintained by committing the
+repository evidence files. The Vercel filesystem is not used as shared runtime
+persistence.
+
 ### Phase History
 
 - **Phase 3** — Component expansion (8 → 15 reusable Soroban components, generic pipeline, local WASM sandbox).

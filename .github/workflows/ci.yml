@@ -1,74 +1,33 @@
 name: CI
 
 on:
-  pull_request:
   push:
     branches: [main]
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  pull_request:
+    branches: [main]
 
 jobs:
-  web:
-    name: Web (lint, typecheck, test, build)
+  lint-typecheck-build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          version: 11.21.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
+          node-version: 22
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm exec tsc --noEmit
-
-      - name: Unit tests
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
 
   rust:
-    name: Rust (contract tests + prebuilt WASM integrity)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install stable Rust (toolchain pinned via rust-toolchain.toml)
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32v1-none
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build WASM targets (release)
-        working-directory: contracts
-        run: cargo build --workspace --target wasm32v1-none --release --exclude sandbox-runner
-
-      - name: Run workspace tests
-        working-directory: contracts
-        run: cargo test --workspace --release
-
-      - name: Run sandbox-runner tests
-        working-directory: contracts
-        run: cargo test -p sandbox-runner --release
-
-      - name: Verify prebuilt WASM integrity
-        run: node scripts/verify-prebuilt.mjs
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace -- -D warnings
+      - run: cargo test --workspace

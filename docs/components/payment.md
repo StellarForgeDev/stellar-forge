@@ -11,10 +11,9 @@
 > deployment address is registered in `src/lib/transactions/deployments.ts`
 > and `capabilities.testnet` is `true`, so the existing
 > builder/validate/prepare/submit flow discovers `pay` automatically with **no**
-> component-specific code. The actual deployment is a manual step (Stellar CLI +
-> a funded `deployer` identity) that has **not** been performed in this
-> environment, so `testnet` remains `false` and Payment is correctly excluded
-> from Testnet transactions until the address exists.
+> component-specific code. Registry presence is configuration evidence;
+> independent verification of the on-chain instance behavior and exact WASM hash
+> parity are separate claims.
 
 ## Purpose
 
@@ -159,9 +158,8 @@ In `src/data/components.ts`, Payment is added as a `StellarComponent` record:
    `src/lib/transactions/deployments.ts`.
 
 `componentMaturity()` will report `Implemented` (since `implemented: true`).
-  The platform must not advertise Testnet availability it cannot honor — a
-  component's `testnet` flag stays `false` until a real deployment is registered.
-  Payment now satisfies this: it is deployed and its address is registered.
+  The platform must not advertise Testnet availability it cannot honor — Payment's
+  `testnet` flag is `true` because a real deployment is registered.
 
 ## Playground Integration
 
@@ -334,5 +332,7 @@ to support.
 - **Native XLM via SAC:** confirmed possible (pass the SAC address as `asset`),
   but the local sandbox needs that contract deployed too — same auxiliary-contract
   concern as above.
-- **`testnet: true` gating:** must remain `false` until a real deployment is
-  registered; the CI/process should not flip it speculatively.
+- **`testnet: true` gating:** a Testnet deployment address is registered and
+  `capabilities.testnet` is `true`. Registry presence is configuration evidence;
+  independent verification of the on-chain instance behavior and exact WASM hash
+  parity are separate claims.

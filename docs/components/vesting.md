@@ -1,16 +1,18 @@
 # Vesting Component Specification
 
-> Status: **Implemented (v1), sandbox-ready, NOT on Stellar Testnet.**
+> Status: **Implemented (v1), sandbox-ready, and registered for Stellar Testnet.**
 > The Vesting contract lives in `contracts/contracts/vesting`, builds
 > for `wasm32v1-none`, is registered in the catalog as
-> `implemented: true, sandbox: true, testnet: false`, runs in the local
+> `implemented: true, sandbox: true, testnet: true`, runs in the local
 > Playground sandbox (with its token dependency provisioned generically), and
 > ships with a passing Rust test suite.
 >
-> `capabilities.testnet` is **`false`** and there is **no** entry in
-> `src/lib/transactions/deployments.ts`. Vesting is therefore excluded from
-> the Testnet transaction flow. No Testnet interaction, deployment, or address
-> registration was performed.
+> A Testnet deployment address is registered in
+> `src/lib/transactions/deployments.ts` and `capabilities.testnet` is `true`, so
+> the existing builder/validate/prepare/submit flow discovers Vesting
+> automatically with **no** component-specific code. Registry presence is
+> configuration evidence; independent verification of the on-chain instance
+> behavior and exact WASM hash parity are separate claims.
 
 ## Purpose
 
@@ -189,11 +191,13 @@ In `src/data/components.ts`, Vesting is a `StellarComponent` record:
 
 - `implemented: true` — a real contract lives in `contracts/contracts/vesting`.
 - `sandbox: true` — its WASM runs in the local sandbox-runner.
-- `testnet: false` — no `deployments.ts` entry; excluded from Testnet flow.
+- `testnet: true` — a deployment address is registered in
+  `src/lib/transactions/deployments.ts`; included in Testnet flow.
 - `category: "Tokens"` — fits the existing category; no new category was added.
 
 `componentMaturity()` reports `Implemented`. The platform must not advertise
-Testnet availability it cannot honor, so `testnet` stays `false`.
+Testnet availability it cannot honor — Vesting's `testnet` flag is `true`
+because a real deployment is registered.
 
 ## Playground Integration
 
@@ -215,10 +219,12 @@ The Playground discovers Vesting purely from its catalog record:
 
 ## Transaction Integration
 
-Vesting is **not** in the Testnet flow: `capabilities.testnet` is `false`, so
-`validateTransactionRequest` rejects it and there is no `deployments.ts` entry. No
-change to `validate.ts`, `builder.ts`, `args.ts`, `rpc.ts`, `submit.ts`, or
-`freighter.ts` is required (they remain generic over `interface`/`capabilities`).
+Vesting is in the Testnet flow: `capabilities.testnet` is `true`
+and a `deployments.ts` entry exists. The existing
+builder/validate/prepare/submit flow discovers it automatically with **no**
+component-specific code. No change to `validate.ts`, `builder.ts`, `args.ts`,
+`rpc.ts`, `submit.ts`, or `freighter.ts` is required (they remain generic over
+`interface`/`capabilities`).
 
 ## Developer Integration
 

@@ -1,9 +1,9 @@
 # Escrow Component Specification
 
-> Status: **Implemented (v1), sandbox-ready; NOT deployed to Stellar Testnet.**
+> Status: **Implemented (v1), sandbox-ready, and registered for Stellar Testnet.**
 > The Escrow contract lives in `contracts/contracts/escrow`, builds for
 > `wasm32v1-none`, is registered in the catalog as
-> `implemented: true, sandbox: true, testnet: false`, runs in the local
+> `implemented: true, sandbox: true, testnet: true`, runs in the local
 > Playground sandbox (with its token dependency provisioned generically), and
 > ships with a passing Rust test suite plus a cross-contract sandbox execution
 > proof.
@@ -16,9 +16,12 @@
 > small catalog-driven platform enhancements — **no** Escrow-specific branching
 > anywhere in `src`.
 >
-> `testnet` stays `false` because no real Testnet deployment exists; Escrow is
-> correctly excluded from Testnet transactions until a deployment address is
-> registered in `src/lib/transactions/deployments.ts`.
+> A Testnet deployment address is registered in
+> `src/lib/transactions/deployments.ts` and `capabilities.testnet` is `true`, so
+> the existing builder/validate/prepare/submit flow discovers Escrow automatically
+> with **no** component-specific code. Registry presence is configuration
+> evidence; independent verification of the on-chain instance behavior and exact
+> WASM hash parity are separate claims.
 
 ## Purpose
 
@@ -197,8 +200,8 @@ In `src/data/components.ts`, Escrow is added as a `StellarComponent` record:
 
 - `implemented: true` — a real contract lives in `contracts/contracts/escrow`.
 - `sandbox: true` — its WASM runs in the local sandbox-runner.
-- `testnet: false` — no deployment address is registered in
-  `src/lib/transactions/deployments.ts`, so Escrow is excluded from Testnet
+- `testnet: true` — a deployment address is registered in
+  `src/lib/transactions/deployments.ts`, so Escrow is included in Testnet
   transactions.
 - `constructorArgs` — catalog-driven defaults for the primary constructor:
   `{ depositor: "user1", beneficiary: "user2", arbiter: "admin", asset: "asset" }`.
@@ -210,7 +213,7 @@ In `src/data/components.ts`, Escrow is added as a `StellarComponent` record:
 
 `componentMaturity()` reports `Implemented` (since `implemented: true`). The
 platform must not advertise Testnet availability it cannot honor — Escrow's
-`testnet` flag stays `false` until a real deployment is registered.
+`testnet` flag is `true` because a real deployment is registered.
 
 ## Platform changes required (all generic)
 
@@ -304,8 +307,8 @@ needs no Escrow-specific code.
   `release`/`refund`/`status` and an `EscrowClient` call; `constructorArg`
   resolves the `asset` alias.
 - **Transaction-readiness tests** (`tests/transactions/escrow-readiness.test.ts`):
-  confirms Escrow is `implemented` + `sandbox` but excluded from the Testnet
-  transaction component list (`testnet: false`).
+  confirms Escrow is `implemented` + `sandbox` + `testnet` and included in the
+  Testnet transaction component list.
 - **Sandbox-runner tests** (`cargo test -p sandbox-runner`): the escrow
   execution proof above, plus the existing payment/token proofs.
 
@@ -384,9 +387,10 @@ component-specific branching.
 
 ### Risks / unanswered questions
 
-- **Testnet deployment:** `testnet` must remain `false` until a real deployment
-  is registered in `deployments.ts`; the CI/process should not flip it
-  speculatively. The local sandbox proof already covers execution correctness.
+- **Testnet deployment:** a Testnet deployment address is registered in
+  `deployments.ts` and `capabilities.testnet` is `true`. Registry presence is
+  configuration evidence; independent verification of the on-chain instance
+  behavior and exact WASM hash parity are separate claims.
 - **Multi-role signer UX:** the Transaction Builder keys the signer off the
   `first-address` per method; for `deposit` that is the depositor, for
   `release`/`refund` the arbiter. This is correct but relies on the parameter

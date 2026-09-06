@@ -96,7 +96,7 @@ balance movement to the asset contract via `token::Client` (transfer in/out).
 - `dependencies`: a single token aliased `asset`, minted with
   `mint(admin, 1000000)`.
 - `constructorArgs`: `{ asset: "asset", duration: "86400" }`.
-- `capabilities`: `{ implemented: true, sandbox: true, testnet: false }`.
+- `capabilities`: `{ implemented: true, sandbox: true, testnet: true }`.
 
 Because the only constructor parameter types are `Address` and `u32`, Staking
 fits entirely within the supported scalar parameter catalog (`Address`, `i128`,
@@ -130,10 +130,11 @@ stakes through `user1`, and asserts the pool/token effects end-to-end.
 
 `Staking` generates Soroban transactions through the same generic pipeline as
 other components (`src/lib/transactions/*` and
-`src/lib/integration/generators.ts`). Because it is not yet deployed to Testnet,
-`capabilities.testnet` is `false` and the transaction builder keeps the network
-configuration local; the generated integration examples and request payloads are
-otherwise identical in shape to every other component.
+`src/lib/integration/generators.ts`). Because it is registered on Testnet
+(`capabilities.testnet` is `true` and a `deployments.ts` entry exists), the
+transaction builder can simulate, sign, and submit against Testnet; the
+generated integration examples and request payloads are otherwise identical in
+shape to every other component.
 
 ## Developer integration
 
@@ -187,4 +188,6 @@ transaction builders, and the integration generators were left unchanged.
 - Single staked and reward asset (same token).
 - Reward windows are fixed at funding time; a new `fund_rewards` starts a fresh
   window and carries any leftover reward proportionally.
-- No production Testnet deployment yet (`capabilities.testnet = false`).
+- A Testnet deployment address is registered and `capabilities.testnet` is `true`.
+  Registry presence is configuration evidence; independent verification of the
+  on-chain instance behavior and exact WASM hash parity are separate claims.

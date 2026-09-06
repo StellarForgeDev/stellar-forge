@@ -1,9 +1,9 @@
 # Access Control Component Specification
 
-> Status: **Implemented (v1), sandbox-ready; NOT deployed to Stellar Testnet.**
+> Status: **Implemented (v1), sandbox-ready, and registered for Stellar Testnet.**
 > The Access Control contract lives in `contracts/contracts/access-control`, builds
 > for `wasm32v1-none`, is registered in the catalog as
-> `implemented: true, sandbox: true, testnet: false`, runs in the local Playground
+> `implemented: true, sandbox: true, testnet: true`, runs in the local Playground
 > sandbox (with no dependencies), and ships with a passing Rust test suite plus a
 > sandbox execution proof.
 >
@@ -14,9 +14,12 @@
 > contract code, and a WASM artifact — **no** Access-Control-specific branching
 > anywhere in `src` or the sandbox-runner.
 >
-> `testnet` stays `false` because no real Testnet deployment exists; Access
-> Control is correctly excluded from Testnet transactions until a deployment
-> address is registered in `src/lib/transactions/deployments.ts`.
+> A Testnet deployment address is registered in
+> `src/lib/transactions/deployments.ts` and `capabilities.testnet` is `true`, so
+> the existing builder/validate/prepare/submit flow discovers Access Control
+> automatically with **no** component-specific code. Registry presence is
+> configuration evidence; independent verification of the on-chain instance
+> behavior and exact WASM hash parity are separate claims.
 
 ## Purpose
 
@@ -147,8 +150,8 @@ record:
 
 - `implemented: true` — a real contract lives in `contracts/contracts/access-control`.
 - `sandbox: true` — its WASM runs in the local sandbox-runner.
-- `testnet: false` — no deployment address is registered in
-  `src/lib/transactions/deployments.ts`, so Access Control is excluded from
+- `testnet: true` — a deployment address is registered in
+  `src/lib/transactions/deployments.ts`, so Access Control is included in
   Testnet transactions.
 - `constructorArgs` — catalog-driven defaults for the primary constructor:
   `{ admin: "admin" }`. The value references the `admin` identity name, which
@@ -158,7 +161,7 @@ record:
 
 `componentMaturity()` reports `Implemented` (since `implemented: true`). The
 platform must not advertise Testnet availability it cannot honor — Access
-Control's `testnet` flag stays `false` until a real deployment is registered.
+Control's `testnet` flag is `true` because a real deployment is registered.
 
 ## Platform changes required (none)
 
@@ -191,11 +194,11 @@ The Playground discovers Access Control purely from its catalog record:
 
 ## Transaction Integration
 
-Access Control reuses the existing Testnet flow — *when enabled*. Because
-`testnet` is `false`, `validateTransactionRequest` already excludes it from
-`/api/transactions/prepare`. The moment a deployment address is registered in
-`deployments.ts` and `testnet` is flipped to `true`, the same builder → prepare →
-sign → submit pipeline will work for `grant_role`/`revoke_role`/`has_role`/
+Access Control reuses the existing Testnet flow. Because
+`testnet` is `true` and a deployment address is registered in
+`deployments.ts`, `validateTransactionRequest` includes it in
+`/api/transactions/prepare`. The same builder → prepare →
+sign → submit pipeline works for `grant_role`/`revoke_role`/`has_role`/
 `transfer_admin` with **no** code change (the signer for the admin-only methods
 is the `admin` identity per the catalog `authorization` field).
 
@@ -236,8 +239,8 @@ parameter's catalog type is `"Symbol"`.
   `AccessControlClient`, derives the client from the package name, and handles
   the `Symbol` role parameter generically.
 - **Transaction-readiness tests** (`tests/transactions/access-control-readiness.test.ts`):
-  confirms Access Control is `implemented` + `sandbox` but excluded from the
-  Testnet transaction component list (`testnet: false`).
+  confirms Access Control is `implemented` + `sandbox` + `testnet` and included
+  in the Testnet transaction component list.
 - **Sandbox-runner tests** (`cargo test -p sandbox-runner`): the access control
   execution proof above, plus the existing token/payment/escrow proofs.
 
@@ -308,9 +311,10 @@ admin-authorized, dependency-free) required no component-specific branching.
 
 ### Risks / unanswered questions
 
-- **Testnet deployment:** `testnet` must remain `false` until a real deployment
-  is registered in `deployments.ts`; the CI/process should not flip it
-  speculatively. The local sandbox proof already covers execution correctness.
+- **Testnet deployment:** a Testnet deployment address is registered in
+  `deployments.ts` and `capabilities.testnet` is `true`. Registry presence is
+  configuration evidence; independent verification of the on-chain instance
+  behavior and exact WASM hash parity are separate claims.
 - **Symbol length:** `role` is a Soroban `Symbol` (≤ 32 characters). The API
   route enforces this bound (`MAX_SYMBOL_LENGTH = 32`); callers must supply
   role names within that limit.

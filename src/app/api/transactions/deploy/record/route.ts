@@ -4,6 +4,7 @@ import path from "node:path";
 import { StrKey } from "@stellar/stellar-sdk";
 import { canonicalTestnetServer, confirmedTransactionExists } from "@/lib/transactions/deployment";
 import { ACCESS_CONTROL_WORKFLOW } from "@/lib/verification/network-workflow";
+import { evidencePersistenceMode } from "@/lib/verification/evidence-persistence";
 
 export const runtime = "nodejs";
 const registryPath = path.join(process.cwd(), "contracts", "testnet-verification-deployments.json");
@@ -28,11 +29,25 @@ export async function POST(request: Request): Promise<Response> {
     const localArtifactHash = createHash("sha256").update(localWasm).digest("hex");
     const deployedArtifactHash = createHash("sha256").update(deployedWasm).digest("hex");
     if (localArtifactHash !== deployedArtifactHash) return Response.json({ error: "Independent deployed artifact verification failed." }, { status: 409 });
+    const persistence = evidencePersistenceMode();
+    if (persistence === "runtime-non-durable") {
+      return Response.json({
+        status: "VERIFIED_REPOSITORY_RECORDING_REQUIRED",
+        verified: true,
+        persistence: "repository-maintainer-commit-required",
+        message: "Deployment verification succeeded. Evidence must be recorded in the repository by a maintainer; runtime filesystem writes are not durable.",
+        evidence: { contractId, localArtifactHash, deployedArtifactHash, uploadTransactionHash: uploadHash, deploymentTransactionHash: deploymentHash, deployer, constructorAdmin: admin },
+      });
+    }
     const existing = JSON.parse(await readFile(registryPath, "utf8")) as unknown;
     if (!Array.isArray(existing)) return Response.json({ error: "Evidence registry is invalid." }, { status: 500 });
     if (existing.some((item) => item && typeof item === "object" && (item as Record<string, unknown>).contractId === contractId)) return Response.json({ error: "This contract evidence is already recorded." }, { status: 409 });
     const evidence = { componentId: ACCESS_CONTROL_WORKFLOW.componentId, network: "testnet", contractId, localArtifactHash, deployedArtifactHash, artifactVerified: true, uploadTransactionHash: uploadHash, deploymentTransactionHash: deploymentHash, deployer, constructorArguments: { admin }, confirmationTimestamp: new Date().toISOString(), verificationTimestamp: new Date().toISOString(), constructorVerification: "NOT_QUERYABLE", status: "RECORDED", verificationPurpose: "controlled-testnet-workflow" };
-    await writeFile(registryPath, `${JSON.stringify([...existing, evidence], null, 2)}\n`, "utf8");
-    return Response.json({ status: "RECORDED", evidence });
+    try {
+      await writeFile(registryPath, `${JSON.stringify([...existing, evidence], null, 2)}\n`, "utf8");
+    } catch {
+      return Response.json({ error: "Verification succeeded, but the local repository evidence file could not be written. No durable evidence was recorded." }, { status: 503 });
+    }
+    return Response.json({ status: "REPOSITORY_RECORD_WRITTEN", persistence: "local-repository-write; maintainer-commit-required", evidence });
   } catch { return Response.json({ error: "Independent deployment verification failed." }, { status: 502 }); }
 }

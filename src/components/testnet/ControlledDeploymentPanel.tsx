@@ -38,7 +38,6 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
   const [create, setCreate] = useState<StageResult | null>(null);
   const [contractId, setContractId] = useState<string | null>(null);
   const [deployedHash, setDeployedHash] = useState<string | null>(null);
-  const [recorded, setRecorded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deploymentSession, setDeploymentSession] = useState(() => createDeploymentSession({ artifactHash, deploymentAccount: null, constructorAdmin: null }));
   const [restorationStatus, setRestorationStatus] = useState<"RESTORED" | "RECONCILIATION_REQUIRED" | "RECONCILED" | "INVALID_PERSISTENCE" | null>(null);
@@ -276,7 +275,12 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
   async function recordEvidence() {
     if (!canRecordDeploymentEvidence({ status: "CONFIRMED", userConfirmed: false, simulationPassed: false, signedTransactionAvailable: false, uploadConfirmed: Boolean(uploadHash), creationConfirmed: Boolean(createHash), contractId, artifactVerified: Boolean(deployedHash && deployedHash === artifactHash) }) || !deployer) return;
     const response = await fetch("/api/transactions/deploy/record", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ componentId: ACCESS_CONTROL_WORKFLOW.componentId, network: "testnet", contractId, uploadTransactionHash: uploadHash, deploymentTransactionHash: createHash, deployer, constructorArguments: { admin } }) });
-    if (response.ok && advanceSession(["EVIDENCE_RECORDED"], { contractId, artifactHash: deployedHash })) setRecorded(true);
+    const result = await response.json() as { status?: string; message?: string; error?: string };
+    if (response.ok && result.status === "REPOSITORY_RECORD_WRITTEN") {
+      setError("Evidence was verified and written to the local repository working tree. A maintainer must commit the evidence before it is authoritative.");
+      return;
+    }
+    setError(result.message ?? result.error ?? "Verification succeeded, but repository evidence recording requires a maintainer commit.");
   }
 
   const simulationStatus = stage === "prepared" ? "PREPARED" : stage === "simulated" ? "SIMULATED" : stage === "awaiting-confirmation" ? "AWAITING_USER_CONFIRMATION" : stage.toUpperCase();
@@ -458,13 +462,13 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
     <div className="rounded-default border border-border/60 bg-canvas p-4 font-mono text-sm">
       <p><span className="text-text-secondary font-mono text-[11px] uppercase">User Confirmation</span> <span className={confirmed ? "text-tone-success" : "text-text-secondary"}>{confirmed ? "CONFIRMED • explicit user confirmation present" : "AWAITING_USER_CONFIRMATION • explicit confirmation required before signing"}</span></p>
       <p className="mt-2 text-text-secondary">Evidence progression: NO_EVIDENCE → PREPARED → SIMULATED → AWAITING_USER_CONFIRMATION → SIGNED → SUBMITTED → CONFIRMED → INDEPENDENTLY_VERIFIED → RECORDED. Invalid shortcuts (PREPARED→RECORDED, SIMULATED→VERIFIED, etc.) rejected.</p>
-      <p className="mt-2 text-text-secondary">Evidence: {recorded ? "RECORDED" : deployedHash ? "INDEPENDENTLY_VERIFIED" : contractId ? "CONFIRMED" : createHash || uploadHash ? "SUBMITTED" : stage === "awaiting-confirmation" ? "AWAITING_USER_CONFIRMATION" : stage === "simulated" ? "SIMULATED" : stage === "prepared" ? "PREPARED" : "NO_EVIDENCE"} {recorded ? "" : "(no deployment claimed)"}</p>
+      <p className="mt-2 text-text-secondary">Evidence: {deployedHash ? "INDEPENDENTLY_VERIFIED (repository commit required)" : contractId ? "CONFIRMED" : createHash || uploadHash ? "SUBMITTED" : stage === "awaiting-confirmation" ? "AWAITING_USER_CONFIRMATION" : stage === "simulated" ? "SIMULATED" : stage === "prepared" ? "PREPARED" : "NO_EVIDENCE"} (no durable runtime record claimed)</p>
     </div>
     <div className="mt-4 flex flex-wrap gap-3">
       {uploadHash && <p className="font-mono text-sm text-text-secondary">Upload confirmed: {uploadHash}</p>}
       {contractId && <p className="font-mono text-sm text-text-secondary">Contract ID: {contractId}</p>}
       {deployedHash && <p className="font-mono text-sm text-tone-success">Deployed SHA-256: {deployedHash} · {deployedHash === artifactHash ? "VERIFIED" : "MISMATCH"}</p>}
-      {deployedHash === artifactHash && contractId && <Button variant="ghost" onClick={() => void recordEvidence()} disabled={recorded}>{recorded ? "Evidence recorded" : "Record verified evidence"}</Button>}
+      {deployedHash === artifactHash && contractId && <Button variant="ghost" onClick={() => void recordEvidence()}>Prepare repository evidence record</Button>}
       {error && <p className="text-sm text-tone-error">{error}</p>}
     </div>
     <p className="mt-4 font-mono text-[11px] text-text-secondary">No contract was deployed by preparing or simulating. Deployment requires explicit signing and submission. No background execution, no auto-retry, no bulk deployments. Only Access Control eligible.</p>

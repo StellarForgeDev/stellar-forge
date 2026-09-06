@@ -618,6 +618,12 @@ No production/mainnet deployment, no multi-region, no database, and no
 server-side persistence exist. This setup is **not** a statement of production
 readiness.
 
+Deployment evidence follows a repository-authoritative model. Verification may
+run in the application, but durable evidence is the committed record in
+`contracts/testnet-verification-deployments.json` and the related evidence
+files. Vercel/runtime filesystem writes are not treated as shared persistence;
+local maintainer recording requires an explicit repository commit.
+
 ## Repository Boundary Strategy
 
 Stellar Forge follows this repository evolution strategy:

@@ -1,6 +1,7 @@
 import { diagnoseIndependentTransport, diagnoseWithBoundedRetries } from "@/lib/verification/testnet-connectivity";
 import { networkConfig } from "@/lib/transactions/networks";
-import { appendConnectivityHistory, summarizeHistory } from "@/lib/verification/connectivity-history";
+import { appendConnectivityHistory, readConnectivityHistory, summarizeHistory } from "@/lib/verification/connectivity-history";
+import { evidencePersistenceMode } from "@/lib/verification/evidence-persistence";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,8 @@ export async function GET(): Promise<Response> {
   try {
     // Bounded read-only retry, each attempt observable, no infinite, no background polling
     const { final: diagnostic, attempts, attemptCount } = await diagnoseWithBoundedRetries({ endpoint, expectedPassphrase }, { maxAttempts: 3, backoffMs: 150 });
-    const history = await appendConnectivityHistory(diagnostic);
+    const persistence = evidencePersistenceMode();
+    const history = persistence === "local-repository" ? await appendConnectivityHistory(diagnostic) : await readConnectivityHistory();
     const summary = summarizeHistory(history);
     // Independent transport diagnostic — environmental only, never used for deployment/artifact
     const transport = await diagnoseIndependentTransport("soroban-testnet.stellar.org");
@@ -27,6 +29,7 @@ export async function GET(): Promise<Response> {
         latestObservation: summary.latest,
         latestSuccessfulObservation: summary.latestSuccessful,
         readOnly: true,
+        persistence: persistence === "local-repository" ? "local-repository-write; maintainer-commit-required" : "runtime-non-durable; not persisted",
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },
     );
