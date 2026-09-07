@@ -52,9 +52,16 @@ function completeNextRunner(
   callback?.(error, stdout);
 }
 
-async function flushRouteProgress() {
-  await Promise.resolve();
-  await Promise.resolve();
+async function waitForExecFile(expectedCalls: number) {
+  const deadline = Date.now() + 2000;
+  while (harness.execFile.mock.calls.length < expectedCalls) {
+    if (Date.now() > deadline) {
+      throw new Error(
+        `execFile was not called ${expectedCalls} time(s) within 2 s`,
+      );
+    }
+    await new Promise<void>((r) => setTimeout(r, 0));
+  }
 }
 
 describe("POST /api/playground", () => {
@@ -206,7 +213,7 @@ describe("POST /api/playground", () => {
       const responsePromise = POST(
         request(payload({ runnerPath: "C:\\private\\evil.exe" })),
       );
-      await flushRouteProgress();
+      await waitForExecFile(1);
       expect(harness.execFile).toHaveBeenCalledTimes(1);
       expect(harness.execFile.mock.calls[0]?.[0]).toBe("/runner");
       completeNextRunner(successResponse);
@@ -252,7 +259,7 @@ describe("POST /api/playground", () => {
 
   it("maps a successful runner response through the HTTP boundary", async () => {
     const responsePromise = POST(request(payload()));
-    await flushRouteProgress();
+    await waitForExecFile(1);
     expect(harness.execFile).toHaveBeenCalledTimes(1);
     completeNextRunner(successResponse);
 
@@ -268,7 +275,7 @@ describe("POST /api/playground", () => {
     it("redacts diagnostics from a non-zero runner exit", async () => {
       const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const responsePromise = POST(request(payload()));
-      await flushRouteProgress();
+      await waitForExecFile(1);
       completeNextRunner(
         JSON.stringify({
           ok: false,
@@ -312,7 +319,7 @@ describe("POST /api/playground", () => {
 
     it("returns a stable error for empty or invalid runner output", async () => {
       const responsePromise = POST(request(payload()));
-      await flushRouteProgress();
+      await waitForExecFile(1);
       completeNextRunner("raw host diagnostics at C:\\private\\runner");
 
       const response = await responsePromise;
@@ -328,7 +335,7 @@ describe("POST /api/playground", () => {
 
     it("returns safe timeout information without exposing runner details", async () => {
       const responsePromise = POST(request(payload()));
-      await flushRouteProgress();
+      await waitForExecFile(1);
       completeNextRunner(
         "",
         Object.assign(new Error("timed out at C:\\private\\runner"), {
@@ -348,7 +355,7 @@ describe("POST /api/playground", () => {
   it("rejects admission when both execution slots are occupied and releases capacity after failure", async () => {
     const first = POST(request(payload()));
     const second = POST(request(payload()));
-    await flushRouteProgress();
+    await waitForExecFile(2);
     expect(harness.execFile).toHaveBeenCalledTimes(2);
 
     const rejected = await POST(request(payload()));
@@ -360,7 +367,7 @@ describe("POST /api/playground", () => {
     await Promise.all([first, second]);
 
     const admitted = POST(request(payload()));
-    await flushRouteProgress();
+    await waitForExecFile(3);
     expect(harness.execFile).toHaveBeenCalledTimes(3);
     completeNextRunner(successResponse);
     expect((await admitted).status).toBe(200);

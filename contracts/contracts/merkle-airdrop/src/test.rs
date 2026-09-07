@@ -11,7 +11,8 @@ use soroban_sdk::{
 };
 
 fn create_token<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, StellarAssetClient<'a>) {
-    let addr = e.register_stellar_asset_contract(admin.clone());
+    let asset = e.register_stellar_asset_contract_v2(admin.clone());
+    let addr = asset.address();
     (
         TokenClient::new(e, &addr),
         StellarAssetClient::new(e, &addr),
