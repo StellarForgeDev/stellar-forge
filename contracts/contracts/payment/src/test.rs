@@ -114,7 +114,6 @@ fn rejects_invalid_asset() {
     let e = Env::default();
     e.mock_all_auths();
 
-    let admin = Address::generate(&e);
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
