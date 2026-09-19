@@ -8,14 +8,43 @@ Stellar-Forge is an open-source developer platform for discovering,
 understanding, experimenting with, and reusing Stellar/Soroban building blocks.
 Network support is centralized in `src/lib/transactions/networks.ts` (`testnet` | `mainnet` | `futurenet`): **Testnet is operational** (default, 15 registered deployments; Token `name` manually verified end to end), **Mainnet is architecture-aware but undeployed** (`mainnet:false` for all components, correctly gated), **Futurenet** plumbing is retained. Registration does not independently verify every on-chain instance or WASM hash parity.
 
+## Repository Architecture and Ownership
+
+Stellar-Forge separates repository ownership across three coordinated repositories:
+
+| Repository | Scope | Git Relationship |
+|------------|-------|------------------|
+| **`stellar-forge`** | Application, UI, App Router, Playground API routes | Top-level host application |
+| **`stellar-forge-contracts`** | Soroban smart contracts, unit tests, prebuilt WASM, testnet evidence | Git submodule at `contracts/` |
+| **`stellar-forge-sandbox`** | Sandbox runner, Soroban host execution VM | Nested Git submodule at `contracts/contracts/sandbox-runner/` |
+
 ## Project setup
 
-Requirements (verified against the repository):
+Requirements:
 
 - **Node.js** (recent LTS)
 - **pnpm** (`packageManager: pnpm@11.21.0`)
 - **Rust toolchain** (`cargo`) with the `wasm32v1-none` target
 - **Stellar CLI** (`stellar`)
+- **Git** with recursive submodule support
+
+### Cloning
+
+Clone the repository with all submodules initialized recursively:
+
+```bash
+git clone --recurse-submodules https://github.com/StellarForgeDev/stellar-forge.git
+cd stellar-forge
+```
+
+For an existing clone:
+
+```bash
+git submodule sync --recursive
+git submodule update --init --recursive
+```
+
+### Install and Build
 
 Install and build the native sandbox-runner plus contract WASM:
 

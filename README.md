@@ -45,10 +45,16 @@ Verified from `package.json` and the repository:
 - **Soroban SDK** -- Rust contract development
 - **Stellar CLI** (`stellar`) -- builds contract WASM artifacts
 
-## Project Structure
+## Project Structure and Repository Architecture
+
+Stellar-Forge is structured across three repositories connected via Git submodules:
+
+* **`stellar-forge`** (this repository) -- Web application, UI, App Router pages, API routes, and documentation.
+* **`stellar-forge-contracts`** (submodule at `contracts/`) -- Soroban smart contracts, unit tests, prebuilt WASM artifacts, and deployment evidence.
+* **`stellar-forge-sandbox`** (nested submodule at `contracts/contracts/sandbox-runner/`) -- Native sandbox-runner executable that powers the local Soroban Playground.
 
 ```text
-stellar-forge/
+stellar-forge/                  (https://github.com/StellarForgeDev/stellar-forge)
 ├── public/                     Static assets
 ├── src/
 │   ├── app/                    Next.js App Router: pages and API routes
@@ -61,43 +67,34 @@ stellar-forge/
 │   │       ├── playground/     Local sandbox execution route
 │   │       └── transactions/   prepare and submit routes
 │   ├── components/             Reusable UI and feature components
-│   │   ├── catalog/            Catalog cards and listing
-│   │   ├── docs/               Documentation-rendering components
-│   │   ├── integration/        Integration code generator UI
-│   │   ├── layout/             Navigation and layout
-│   │   ├── playground/         Playground and sandbox UI
-│   │   ├── transactions/       Transaction builder and preview UI
-│   │   └── ui/                 Foundational UI primitives (Button, Card)
 │   ├── data/                   Component catalog and metadata
 │   └── lib/                    Application logic
-│       ├── docs/               Documentation content/snippets
-│       ├── integration/        Integration code generation
-│       ├── playground/         Sandbox artifact resolution and execution
-│       ├── transactions/       Preparation, simulation, signing, submission
-│       └── wallet/             Freighter wallet integration
-├── contracts/                  Rust/Soroban workspace
+├── contracts/                  Git submodule (https://github.com/StellarForgeDev/stellar-forge-contracts)
 │   ├── contracts/
-│   │   ├── token/              SEP-41 token (implemented, Testnet-deployed)
-│   │   ├── payment/            Stateless payment primitive (implemented, Testnet-deployed)
 │   │   ├── access-control/     Role-based authorization (implemented, Testnet-deployed)
-│   │   ├── escrow/             Conditional escrow (implemented, Testnet-deployed)
-│   │   ├── multi-signature/    Threshold multisig (implemented, Testnet-deployed)
-│   │   ├── subscription/       Recurring billing (implemented, Testnet-deployed)
-│   │   ├── vesting/            Vesting/timelock (implemented, Testnet-deployed)
-│   │   ├── staking/            Single-asset staking (implemented, Testnet-deployed)
-│   │   ├── atomic-swap/        Atomic swap (implemented, Testnet-deployed)
-│   │   ├── timelock/           Simple timelock (implemented, Testnet-deployed)
-│   │   ├── merkle-airdrop/     Merkle distributor (implemented, Testnet-deployed)
-│   │   ├── oracle/             Signed price feed (implemented, Testnet-deployed)
-│   │   ├── crowdfund/          Fixed-deadline crowdfund (implemented, Testnet-deployed)
 │   │   ├── allowance/          Delegated allowance (implemented, Testnet-deployed)
+│   │   ├── atomic-swap/        Atomic swap (implemented, Testnet-deployed)
 │   │   ├── claimable-balance/  Time-locked claimable balance (implemented, Testnet-deployed)
+│   │   ├── crowdfund/          Fixed-deadline crowdfund (implemented, Testnet-deployed)
+│   │   ├── escrow/             Conditional escrow (implemented, Testnet-deployed)
 │   │   ├── greeter/            Example contract used by the generic sandbox
-│   │   └── sandbox-runner/     Native runner that executes contract WASM
-│   └── prebuilt/               Committed contract WASM (15 x *.wasm)
+│   │   ├── merkle-airdrop/     Merkle distributor (implemented, Testnet-deployed)
+│   │   ├── multi-signature/    Threshold multisig (implemented, Testnet-deployed)
+│   │   ├── oracle/             Signed price feed (implemented, Testnet-deployed)
+│   │   ├── payment/            Stateless payment primitive (implemented, Testnet-deployed)
+│   │   ├── staking/            Single-asset staking (implemented, Testnet-deployed)
+│   │   ├── subscription/       Recurring billing (implemented, Testnet-deployed)
+│   │   ├── test-asset/         Minimal SEP-41 fixture for payment tests
+│   │   ├── timelock/           Simple timelock (implemented, Testnet-deployed)
+│   │   ├── token/              SEP-41 token (implemented, Testnet-deployed)
+│   │   ├── vesting/            Vesting/timelock (implemented, Testnet-deployed)
+│   │   └── sandbox-runner/     Nested Git submodule (https://github.com/StellarForgeDev/stellar-forge-sandbox)
+│   └── prebuilt/               Committed contract WASM (15 x *.wasm + metadata.json + checksums.txt)
 ├── scripts/                    Build/deploy helpers
+│   ├── build-sandbox-runner.mjs Native runner build script
 │   ├── sandbox-build.mjs       Local sandbox-runner + WASM build
 │   └── vercel-sandbox-build.sh Vercel Linux sandbox-runner build
+├── .gitmodules                 Root submodule declarations
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── next.config.ts
@@ -118,6 +115,23 @@ Generated/ignored directories (`node_modules/`, `.next/`, `contracts/target/`) a
 - **pnpm**
 - **Rust toolchain** (`cargo`) with the `wasm32v1-none` target
 - **Stellar CLI** (`stellar`)
+- **Git** with recursive submodule support
+
+### Cloning and Setup
+
+Clone the repository with all submodules initialized recursively:
+
+```bash
+git clone --recurse-submodules https://github.com/StellarForgeDev/stellar-forge.git
+cd stellar-forge
+```
+
+For an existing clone:
+
+```bash
+git submodule sync --recursive
+git submodule update --init --recursive
+```
 
 ### Workflow
 

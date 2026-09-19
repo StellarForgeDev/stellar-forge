@@ -240,26 +240,37 @@ src/
     transactions/       Preparation, simulation, signing, submission
     wallet/             Freighter wallet integration
 
- contracts/              Rust/Soroban workspace
+ contracts/              Git submodule (https://github.com/StellarForgeDev/stellar-forge-contracts)
    Cargo.toml            Workspace manifest (members: contracts/*)
+   rust-toolchain.toml   Authoritative contracts Rust toolchain
    contracts/
-      token/              SEP-41 token contract (implemented, Testnet-deployed)
-      payment/            Stateless payment primitive (implemented, Testnet-deployed)
-       escrow/             Stateful holding contract (implemented)
-       access-control/     Role-based authorization contract (implemented)
-       subscription/       Recurring subscription contract (implemented)
-       vesting/            Token vesting / unlock schedules (implemented)
-       staking/            Staking and rewards contract (implemented)
-       multi-signature/    Threshold multisig approvals (implemented)
-       test-asset/         Minimal SEP-41 fixture for payment tests
+      access-control/     Role-based authorization contract (implemented)
+      allowance/          Delegated allowance contract (implemented)
+      atomic-swap/        Atomic two-party swap (implemented)
+      claimable-balance/  Time-locked claimable balance (implemented)
+      crowdfund/          Fixed-deadline crowdfund (implemented)
+      escrow/             Stateful holding contract (implemented)
       greeter/            Example/sandbox test fixture (not a catalog component)
-      sandbox-runner/     Native runner that executes contract WASM
-     prebuilt/             15 committed contract WASM artifacts plus metadata.json and checksums.txt
+      merkle-airdrop/     Merkle distributor (implemented)
+      multi-signature/    Threshold multisig approvals (implemented)
+      oracle/             Signed price feed (implemented)
+      payment/            Stateless payment primitive (implemented, Testnet-deployed)
+      staking/            Staking and rewards contract (implemented)
+      subscription/       Recurring subscription contract (implemented)
+      test-asset/         Minimal SEP-41 fixture for payment tests
+      timelock/           Simple timelock (implemented)
+      token/              SEP-41 token contract (implemented, Testnet-deployed)
+      vesting/            Token vesting / unlock schedules (implemented)
+      sandbox-runner/     Nested Git submodule (https://github.com/StellarForgeDev/stellar-forge-sandbox)
+   prebuilt/             15 committed contract WASM artifacts plus metadata.json and checksums.txt
+   testnet-evidence.*    Committed Testnet verification and evidence records
 
 scripts/
+  build-sandbox-runner.mjs Native runner build script
   sandbox-build.mjs     Local sandbox-runner + WASM build
   vercel-sandbox-build.sh  Vercel Linux sandbox-runner build
 
+.gitmodules             Submodule wiring
 public/                 Static assets
 ```
 
@@ -822,8 +833,14 @@ ownership and release boundary.
 
 ### Current decision and migration progression
 
-**Stellar Forge will remain a monorepo during the current development stage.**
-The immediate priority is not repository splitting:
+**Phase 38A establishes Phase C selective extraction.**
+Repository ownership is separated into three coordinated repositories while preserving existing application paths and runtime behavior via Git submodules:
+
+* `stellar-forge`: Web application, UI, App Router, and API routes.
+* `stellar-forge-contracts`: Soroban contracts, unit tests, prebuilt WASM artifacts, and deployment evidence (submodule at `contracts/`).
+* `stellar-forge-sandbox`: Sandbox-runner execution engine (nested submodule at `contracts/contracts/sandbox-runner/`).
+
+The progression follows:
 
 ```text
 Strong internal architecture
@@ -836,7 +853,9 @@ Stable public APIs
         ↓
 Evidence of independent usefulness
         ↓
-Selective extraction
+Selective extraction (Phase 38A: contracts & sandbox Git submodules)
+        ↓
+Ecosystem growth
 ```
 
 This progression allows rapid development while preserving a realistic path
