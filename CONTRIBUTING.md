@@ -215,6 +215,25 @@ capability where possible.
 
 Stellar-Forge is distributed under the MIT License. See `LICENSE`.
 
+### Bounded contributions
+
+Choose the repository that owns the behavior: application/UI/API work belongs
+in `stellar-forge`, Soroban contract behavior belongs in
+`stellar-forge-contracts`, and sandbox execution belongs in
+`stellar-forge-sandbox`. Cross-repository changes must name the affected
+commits and explain the compatibility impact. Clone with submodules so the
+existing filesystem paths and playground execution chain are present:
+
+```bash
+git clone --recurse-submodules https://github.com/StellarForgeDev/stellar-forge.git
+git submodule update --init --recursive
+```
+
+For bug fixes, reproduce the failure in a deterministic test before changing
+behavior and keep the regression test. State-machine, security, validation,
+artifact, and protocol changes require focused invariant or regression tests.
+Do not make a contributor change sign, submit, deploy, or persist secrets.
+
 ## Future contribution expansion
 
 Contribution guidance will continue to grow as Stellar-Forge opens to more

@@ -1,4 +1,3 @@
-import { Keypair } from "@stellar/stellar-sdk";
 import { describe, expect, it } from "vitest";
 import {
   tryAcquirePlaygroundExecution,
@@ -9,7 +8,8 @@ import type { FunctionSpec } from "@/data/components";
 
 describe("Playground hardening", () => {
   it("accepts valid identities and rejects checksum-invalid strkeys", () => {
-    const publicKey = Keypair.random().publicKey();
+    const publicKey =
+      "GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW";
     expect(validateIdentities({ user: publicKey })).toEqual({
       value: { user: publicKey },
     });

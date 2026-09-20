@@ -7,6 +7,15 @@ Keep this PR focused on a single capability or fix.
 
 What changed and why? Reference the relevant `ROADMAP.md` milestone when applicable.
 
+## Issue and scope
+
+- Problem / issue being solved:
+- In-scope layer: [ ] application [ ] contracts [ ] sandbox [ ] docs/CI
+- Files or modules touched:
+- Out of scope:
+
+Changes outside the issue scope require explicit justification.
+
 ## Scope
 
 - [ ] Catalog / documentation only
@@ -31,6 +40,13 @@ Confirm you ran these before opening the PR:
 - [ ] `pnpm test` (Vitest) — if domain logic changed
 - [ ] `pnpm sandbox:build` + Playground check — if contract / sandbox changed
 - [ ] `cargo test` (in `contracts/`) — if contract changed
+
+## Cross-repository and safety checks
+
+- [ ] Sandbox artifact-backed tests/build ran when contracts or sandbox changed
+- [ ] Cross-repository impact and pinned submodule commits reviewed
+- [ ] No change to wallet, signing, submission, DeploymentSession, or evidence boundaries
+- [ ] Any sensitive-area change and required maintainer review are explained below
 
 ## Breaking changes
 

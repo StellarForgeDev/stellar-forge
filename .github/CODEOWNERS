@@ -1,0 +1,11 @@
+# The current project has one known maintainer. These entries route sensitive
+# changes for maintainer review; they do not provide independent approval.
+* @Marvelg256
+
+# Explicitly sensitive paths for readability and future ownership expansion.
+/src/app/api/transactions/ @Marvelg256
+/src/lib/transactions/ @Marvelg256
+/src/lib/verification/ @Marvelg256
+/src/lib/wallet/ @Marvelg256
+/src/app/api/playground/ @Marvelg256
+/.github/ @Marvelg256
