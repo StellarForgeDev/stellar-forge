@@ -44,7 +44,7 @@ jobs:
         with:
           toolchain: 1.97.1
           components: rustfmt, clippy
-          targets: wasm32v1-none
+          target: wasm32v1-none
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace -- -D warnings
