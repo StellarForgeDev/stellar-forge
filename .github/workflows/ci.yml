@@ -46,6 +46,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace -- -D warnings
+      - run: cargo clean
       - run: cargo build --target wasm32v1-none --release --workspace --exclude sandbox-runner --exclude greeter --exclude test-asset
       - name: Compare source-built WASM with committed prebuilt artifacts
         run: node scripts/verify-prebuilt.mjs --no-build

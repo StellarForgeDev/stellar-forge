@@ -14,7 +14,7 @@
 // on Vercel it is compiled by scripts/vercel-sandbox-build.sh.
 
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -62,6 +62,15 @@ function wasmBaseName(packageName) {
   return `${packageName.replace(/-/g, "_")}.wasm`;
 }
 
+
+// Keep embedded Soroban source paths independent of the host OS separator
+// without rewriting arbitrary contract data.
+function canonicalizeWasm(data) {
+  const normalized = data
+    .toString("latin1")
+    .replace(/(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.rs/g, (sourcePath) => sourcePath.replaceAll("\\", "/"));
+  return Buffer.from(normalized, "latin1");
+}
 for (const packageName of implementedPackages) {
   const wasm = path.join(WASM_TARGET, wasmBaseName(packageName));
   if (!existsSync(wasm)) {
@@ -92,6 +101,7 @@ if (updatePrebuilt) {
     const source = path.join(WASM_TARGET, wasmBaseName(packageName));
     const destination = path.join(PREBUILT, `${packageName}.wasm`);
     copyFileSync(source, destination);
+    writeFileSync(destination, canonicalizeWasm(readFileSync(destination)));
     console.log(`[sandbox] refreshed ${path.relative(ROOT, destination)}`);
   }
   console.log(

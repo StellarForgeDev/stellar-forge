@@ -75,6 +75,16 @@ function wasmBaseName(packageName) {
   return `${packageName.replace(/-/g, "_")}.wasm`;
 }
 
+
+// Soroban contract metadata embeds the source path. Normalize only those
+// source-path separators so artifacts generated on Windows and Linux have the
+// same canonical bytes without rewriting arbitrary contract data.
+function canonicalizeWasm(data) {
+  const normalized = data
+    .toString("latin1")
+    .replace(/(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.rs/g, (sourcePath) => sourcePath.replaceAll("\\", "/"));
+  return Buffer.from(normalized, "latin1");
+}
 function runCargoBuild(packages) {
   return new Promise((resolve, reject) => {
     const logPath = path.join(os.tmpdir(), `verify-prebuilt-cargo-${Date.now()}.log`);
@@ -113,8 +123,8 @@ function compare(packageName) {
   if (!existsSync(prebuilt)) {
     return { packageName, status: "missing-prebuilt", detail: prebuilt };
   }
-  const a = readFileSync(fresh);
-  const b = readFileSync(prebuilt);
+  const a = canonicalizeWasm(readFileSync(fresh));
+  const b = canonicalizeWasm(readFileSync(prebuilt));
   if (a.length !== b.length || !a.equals(b)) {
     return {
       packageName,
