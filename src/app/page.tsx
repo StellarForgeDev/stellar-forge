@@ -72,6 +72,10 @@ export default function Home() {
               <LinkButton href="/playground" variant="secondary">
                 Open Playground
               </LinkButton>
+
+              <LinkButton href="/transactions" variant="secondary">
+                Open Transaction Builder
+              </LinkButton>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs text-text-secondary">
