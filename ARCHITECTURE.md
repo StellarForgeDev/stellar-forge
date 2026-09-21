@@ -641,7 +641,7 @@ local maintainer recording requires an explicit repository commit.
 Stellar Forge follows this repository evolution strategy:
 
 ```text
-PHASE A — NOW
+PHASE A — INITIAL (Historical)
 One repository
 Strong internal boundaries
 Minimal coupling
@@ -656,7 +656,7 @@ Independent release needs emerge
 
         ↓
 
-PHASE C — EXTRACTION
+PHASE C — EXTRACTION (Completed in Phase 38A)
 Move mature modules into independent repositories/packages
 
         ↓
@@ -668,13 +668,13 @@ Independent contributors
 Separate CI/CD
 ```
 
-### Phase A — Current monorepo
+### Phase A — Initial monorepo (Historical)
 
-The project intentionally remains a unified repository while its modules,
-interfaces, and workflows are still evolving. The monorepo is the current
-development boundary, not a permanent architectural limitation. It keeps
-iteration fast and makes the relationships between catalog data, contracts,
-artifacts, sandbox execution, and the web application auditable.
+The project intentionally remained a unified repository while its modules,
+interfaces, and workflows were still evolving. The monorepo was the initial
+development boundary, not a permanent architectural limitation. It kept
+iteration fast and made the relationships between catalog data, contracts,
+artifacts, sandbox execution, and the web application auditable during early development.
 
 ### Phase B — Internal growth
 
@@ -690,7 +690,7 @@ As the project grows, internal modules should become increasingly independent:
 This phase establishes ownership, stable interfaces, independent tests, and
 real release requirements before any repository move is considered.
 
-### Phase C — Selective extraction
+### Phase C — Selective extraction (Completed in Phase 38A)
 
 A module should be extracted only when independence provides a measurable
 benefit. Extraction should relocate a mature boundary rather than discover the
@@ -754,7 +754,7 @@ they must not be created merely to match the diagram.
 
 ### Internal boundary principles
 
-- Keep the current repository unified while the project is evolving rapidly.
+- Maintain coordinated boundaries across the current three-repository architecture while the project evolves.
 - Establish clear ownership boundaries inside the repository.
 - Keep coupling between modules minimal.
 - Prefer stable interfaces between major subsystems.
@@ -788,26 +788,28 @@ true:
 > Repository extraction is an architectural optimization, not a milestone that
 > must happen simply because the repository becomes large.
 
-### Potential future repository boundaries
-
-The following are potential future extractions, not current commitments.
+### Current Repository Boundaries (Extracted in Phase 38A)
 
 #### Core platform — `stellar-forge`
 
-The primary repository would continue to own the web application,
+The primary repository continues to own the web application,
 documentation, component catalog UI, Playground UI, developer portal, and the
 broader ecosystem entry point.
 
 #### Contracts — `stellar-forge-contracts`
 
-This could eventually contain `token`, `payment`, `escrow`, `access-control`,
-`subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`,
-`merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`, and
-`multi-signature`, together with Rust/Soroban tests, contract build tooling,
-and contract versioning. The current Cargo workspace already provides the
-appropriate internal seam, but this repository must not be extracted until
-contract development, versioning, and release workflows are genuinely
-independent.
+This contains the catalog contract implementations (`token`, `payment`, `escrow`, `access-control`,
+etc.), together with Rust/Soroban tests, contract build tooling,
+and contract versioning. This repository was extracted in Phase 38A and is consumed by the core platform as a Git submodule.
+
+#### Sandbox infrastructure — `stellar-forge-sandbox`
+
+This contains the sandbox runner, execution engine, isolation,
+and resource limits. This repository was extracted in Phase 38A and is consumed by the contracts repository as a nested Git submodule.
+
+### Potential future repository boundaries
+
+The following are potential future extractions, not current commitments.
 
 #### Developer SDK — `stellar-forge-sdk`
 
@@ -822,14 +824,6 @@ This could eventually contain WASM artifacts, metadata, checksums, release
 manifests, and artifact versions. The existing verified artifact boundary
 provides groundwork for this possibility; the eventual repository, release, or
 storage mechanism remains intentionally undecided.
-
-#### Sandbox infrastructure — `stellar-forge-sandbox`
-
-This could eventually contain the sandbox runner, execution engine, isolation,
-resource limits, execution API, and hosted execution infrastructure. The
-current `sandbox-runner` remains under `contracts/contracts/sandbox-runner` and
-must not be extracted until hosted execution creates a justified independent
-ownership and release boundary.
 
 ### Current decision and migration progression
 
@@ -879,7 +873,7 @@ CI/CD complexity
 Slower development
 ```
 
-The preferred progression is:
+The preferred progression (Historical / Pre-extraction evolution) was:
 
 ```text
 Monorepo
@@ -893,16 +887,16 @@ Stable APIs
 Selective extraction
 ```
 
-Rationale:
+Historical Rationale (Pre-Extraction):
 
-- The web app, catalog data, domain logic, and the contract workspace are
-  tightly coupled today (the UI and API routes read the same catalog records,
-  and the contracts are consumed directly by the sandbox). Splitting now would
-  add cross-repo coordination cost without a clear benefit.
-- The contract workspace is already a Cargo workspace with clear member
-  boundaries; that is the natural internal seam.
-- A single `pnpm` + Cargo repository keeps contributor setup simple and the
-  catalog-to-contract relationship auditable.
+- The web app, catalog data, domain logic, and the contract workspace were
+  tightly coupled initially (the UI and API routes read the same catalog records,
+  and the contracts were consumed directly by the sandbox). Splitting early would
+  have added cross-repo coordination cost without a clear benefit.
+- The contract workspace was already a Cargo workspace with clear member
+  boundaries; that was the natural internal seam before extraction.
+- A single `pnpm` + Cargo repository kept contributor setup simple and the
+  catalog-to-contract relationship auditable during early development.
 
 Potential future boundaries (only when they have independent value and
 ownership): a published integration SDK/package, a standalone contract

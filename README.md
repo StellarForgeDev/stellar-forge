@@ -214,12 +214,10 @@ persistence.
 
 ### Planned
 
-Phase 6 is production hardening within the existing modular monorepo. Repository
-extraction remains a future option only when independent maturity and release
-needs justify it; it is not the current Phase 6 scope.
+Phase 6 is production hardening within the current three-repository architecture. Repository extraction to separate Git submodules (contracts and sandbox) was completed in Phase 38A.
 
 - **Phase 5.5** -- Integration generator strengthening (additional languages, SDK/package considerations).
-- **Phase 6** -- Production hardening of the existing modular monorepo, including
+- **Phase 6** -- Production hardening of the three-repository architecture, including
   artifact boundaries, Playground execution reliability, and documentation truth.
 - Continue expanding the catalog via the generic pipeline (no component-specific code).
 - Maintain the dedicated Transactions documentation section as the transaction flow evolves.
