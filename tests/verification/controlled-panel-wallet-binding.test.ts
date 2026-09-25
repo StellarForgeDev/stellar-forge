@@ -49,4 +49,30 @@ describe("ControlledDeploymentPanel wallet/deployment-account invariant", () => 
     expect(source).toContain("wallet.state.networkPassphrase !== testnetPassphrase");
     expect(source).toContain("wallet.signTransaction(result.transactionXdr, deployer)");
   });
+
+  describe("Targeted Testnet Deploy State Fixes", () => {
+    it("Test A: signing blocked on wallet/account mismatch (revalidation immediately before signing)", () => {
+      // Must explicitly check in signStage
+      expect(source).toMatch(/async function signStage[\s\S]*?if\s*\(\s*wallet\.state\.address\s*!==\s*deployer\s*\)\s*\{\s*setError\("Connected wallet does not match/);
+    });
+
+    it("Test B: changing deployment account invalidates stale preparation", () => {
+      // Must have invalidation logic attached to deployment account change
+      expect(source).toMatch(/function handleDeploymentAccountChange[\s\S]*?invalidateStalePreparation/);
+      expect(source).toContain("onChange={(event) => handleDeploymentAccountChange(event.target.value)}");
+    });
+
+    it("Test C: changing constructor admin invalidates stale preparation", () => {
+      // Must have invalidation logic attached to admin change
+      expect(source).toMatch(/function handleAdminChange[\s\S]*?invalidateStalePreparation/);
+      expect(source).toContain("onChange={(event) => handleAdminChange(event.target.value)}");
+    });
+
+    it("Test D: valid unchanged state still works", () => {
+      // Must preserve existing wallet.signTransaction
+      expect(source).toContain("wallet.signTransaction(result.transactionXdr, deployer)");
+      // Explicit submission/signing controls still enabled based on confirmed state
+      expect(source).toContain("disabled={!confirmed}");
+    });
+  });
 });

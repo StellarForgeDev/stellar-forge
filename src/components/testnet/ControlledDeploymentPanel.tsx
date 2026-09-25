@@ -140,6 +140,46 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
   }
 
   // Secret rejection helper (Phase 22 Step 3 + 4)
+  function invalidateStalePreparation() {
+    if (["preparing", "signing", "submitting", "signed"].includes(stage)) return;
+    if (["prepared", "simulated", "awaiting-confirmation"].includes(stage)) {
+      setStage("idle");
+      setUpload(null);
+      setCreate(null);
+      setConfirmed(false);
+      setSignedUpload(null);
+      setSignedCreate(null);
+      setError("Deployment account or admin changed after preparation. Re-prepare the transaction before signing.");
+      if (["UPLOAD_PREPARED", "UPLOAD_SIMULATED", "AWAITING_UPLOAD_CONFIRMATION", "CREATE_PREPARED", "CREATE_SIMULATED", "AWAITING_CREATE_CONFIRMATION"].includes(deploymentSession.state)) {
+        advanceSession(["FAILED", "NOT_STARTED"], {
+          failure: {
+            stage: deploymentSession.state,
+            classification: "SIMULATION_FAILED",
+            message: "Inputs changed after preparation.",
+            observedAt: new Date().toISOString(),
+            recoverable: true,
+            recommendedNextAction: "Re-prepare transaction",
+          },
+        });
+      }
+    }
+  }
+
+  function handleDeploymentAccountChange(value: string) {
+    if (value !== deploymentAccount) {
+      setDeploymentAccount(value);
+      setAccountInspection(null);
+      invalidateStalePreparation();
+    }
+  }
+
+  function handleAdminChange(value: string) {
+    if (value !== admin) {
+      setAdmin(value);
+      invalidateStalePreparation();
+    }
+  }
+
   function isSecretMaterial(value: string): boolean {
     const v = value.trim();
     if (!v) return false;
@@ -165,8 +205,11 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
       setError("The connected wallet did not provide a valid public G... address.");
       return;
     }
-    setDeploymentAccount(address);
-    setAccountInspection(null);
+    if (address !== deploymentAccount) {
+        setDeploymentAccount(address);
+        setAccountInspection(null);
+        invalidateStalePreparation();
+      }
     void refreshAuthoritativeState(address);
   }
 
@@ -208,6 +251,13 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
 
   async function signStage(result: StageResult, nextStage: "upload" | "create") {
     if (!sessionReconciled || deploymentSession.state !== (nextStage === "upload" ? "AWAITING_UPLOAD_CONFIRMATION" : "AWAITING_CREATE_CONFIRMATION") || readiness?.finalReadiness !== "READY_FOR_CONTROLLED_TESTNET_DEPLOYMENT" || !wallet.state.address || wallet.state.networkPassphrase !== testnetPassphrase) { setError("Live signing is blocked until the authoritative session and readiness gates genuinely pass."); return; }
+
+    if (wallet.state.address !== deployer) {
+      setError("Connected wallet does not match the deployment account. Reconnect or bind the correct wallet before signing.");
+      setStage("failed");
+      return;
+    }
+
     if (!canSignDeployment({ status: "AWAITING_CONFIRMATION", userConfirmed: confirmed, simulationPassed: result.simulation.status === "SUCCESS", signedTransactionAvailable: false, uploadConfirmed: Boolean(uploadHash), creationConfirmed: false, contractId, artifactVerified: false }) || !deployer) return;
     setError(null); setStage("signing");
     const signed = await wallet.signTransaction(result.transactionXdr, deployer);
@@ -466,7 +516,7 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
       <p className="flex items-baseline gap-3">Simulation boundary: <span className={stage === "prepared" ? "text-tone-pending" : stage === "simulated" ? "text-tone-success" : stage === "awaiting-confirmation" ? "text-accent-stellar" : "text-text-secondary"}>{simulationStatus}</span> — {stage === "awaiting-confirmation" ? "AWAITING_USER_CONFIRMATION: signing has not occurred" : stage === "simulated" ? "SIMULATED: ready for user confirmation" : stage === "prepared" ? "PREPARED: transaction built" : "IDLE"}</p>
       <p className="mt-3 text-text-secondary leading-relaxed">Upload: {upload ? `${upload.simulation.status} (${upload.simulation.status === "SUCCESS" ? "SIMULATED" : "FAILED"})` : "NOT_STARTED"} • Create: {create ? `${create.simulation.status}` : "NOT_STARTED"} • Signing has not occurred until you confirm. Submission requires explicit confirmation + valid signed transaction. No autoSign/autoSubmit.</p>
     </div>
-    <label className="mt-8 block font-mono text-sm text-text-secondary">Deployment account address<input value={deploymentAccount} onChange={(event) => { setDeploymentAccount(event.target.value); setAccountInspection(null); }} placeholder="G... (enter explicitly)" className="mt-3 block min-h-11 w-full rounded-default border border-border bg-canvas px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary/60" />{deploymentAccount && !deployerValid ? <span className="mt-2 block font-mono text-[11px] text-tone-error">Invalid Stellar public key — must be valid G... StrKey (56 chars), S... secrets and arbitrary text rejected</span> : null}</label>
+    <label className="mt-8 block font-mono text-sm text-text-secondary">Deployment account address<input value={deploymentAccount} onChange={(event) => handleDeploymentAccountChange(event.target.value)} placeholder="G... (enter explicitly)" className="mt-3 block min-h-11 w-full rounded-default border border-border bg-canvas px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary/60" />{deploymentAccount && !deployerValid ? <span className="mt-2 block font-mono text-[11px] text-tone-error">Invalid Stellar public key — must be valid G... StrKey (56 chars), S... secrets and arbitrary text rejected</span> : null}</label>
     <div className="mt-5 flex flex-wrap gap-3">
       {walletAddressValid ? (
         <Button variant="secondary" onClick={useConnectedWallet}>Use connected wallet</Button>
@@ -477,7 +527,7 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
       <Button variant="secondary" onClick={() => void inspectAccount()} disabled={!isValidPublicKey(deploymentAccount) || accountInspection !== null}>Inspect public account</Button>
     </div>
     {accountInspection && <p className="mt-3 font-mono text-sm text-text-secondary">Account: {accountInspection.status} · sequence {accountInspection.sequenceNumber ?? "unknown"} · XLM {accountInspection.nativeBalance ?? "unknown"}</p>}
-    <label className="mt-8 block font-mono text-sm text-text-secondary">Constructor admin address<input value={admin} onChange={(event) => setAdmin(event.target.value)} placeholder="G... (enter intentionally, S... rejected)" className="mt-3 block min-h-11 w-full rounded-default border border-border bg-canvas px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary/60" />{admin && !adminValid ? <span className="mt-2 block font-mono text-[11px] text-tone-error">Invalid Stellar public key — must be valid G... StrKey (56 chars), S... secrets and arbitrary text rejected</span> : null}</label>
+    <label className="mt-8 block font-mono text-sm text-text-secondary">Constructor admin address<input value={admin} onChange={(event) => handleAdminChange(event.target.value)} placeholder="G... (enter intentionally, S... rejected)" className="mt-3 block min-h-11 w-full rounded-default border border-border bg-canvas px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary/60" />{admin && !adminValid ? <span className="mt-2 block font-mono text-[11px] text-tone-error">Invalid Stellar public key — must be valid G... StrKey (56 chars), S... secrets and arbitrary text rejected</span> : null}</label>
     {stage === "awaiting-confirmation" && <label className="mt-5 flex gap-2 text-sm text-text-primary"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />You are about to deploy a smart contract to Stellar Testnet. This creates permanent Testnet state, consumes network resources, is not Mainnet, and requires my wallet confirmation. No background execution.</label>}
     <div className="mt-6 flex flex-wrap gap-3"><Button variant="primary" onClick={() => void prepare("upload")} disabled={deploymentSession.state !== "PREFLIGHT_READY" || !sessionReconciled || stage === "preparing" || stage === "signing" || stage === "submitting" || !deployerValid || !adminValid}>Prepare and simulate upload</Button>{canPrepareCreateStage && <Button variant="primary" onClick={() => void prepare("create")} disabled={stage === "preparing" || stage === "signing" || stage === "submitting"}>Prepare and simulate create</Button>}{deploymentSession.state === "AWAITING_UPLOAD_CONFIRMATION" && upload && !uploadHash ? <Button variant="primary" onClick={() => void signStage(upload, "upload")} disabled={!confirmed}>Confirm and sign upload</Button> : deploymentSession.state === "AWAITING_CREATE_CONFIRMATION" && create ? <Button variant="primary" onClick={() => void signStage(create, "create")} disabled={!confirmed}>Confirm and sign create</Button> : null}{deploymentSession.state === "UPLOAD_SIGNED" && signedUpload && <Button variant="primary" onClick={() => void submitStage("upload")} disabled={!confirmed || (pendingRequiresInspection && !hasInspectedSincePending)}>Explicitly submit signed upload</Button>}{deploymentSession.state === "CREATE_SIGNED" && signedCreate && <Button variant="primary" onClick={() => void submitStage("create")} disabled={!confirmed || (pendingRequiresInspection && !hasInspectedSincePending)}>Explicitly submit signed create</Button>}{deploymentSession.state === "CREATE_CONFIRMED" && contractId && <Button variant="secondary" onClick={() => void verifyContract()}>Verify deployed WASM</Button>}</div>
     {pendingRequiresInspection && !hasInspectedSincePending && pendingHash && <p className="font-mono text-[11px] text-tone-pending">PENDING inspection required before resubmission. Hash: {pendingHash}. Use “Refresh transaction confirmation” to inspect.</p>}
