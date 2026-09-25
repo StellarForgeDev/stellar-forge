@@ -1,4 +1,4 @@
-import type { ReconciliationStatus } from "./artifact-status";
+import type { EffectiveEvidenceStatus } from "./artifact-status";
 
 export type EnvironmentAccountRole = "admin" | "user1" | "user2" | "user3" | "beneficiary" | "depositor" | "arbiter" | "owner" | "spender" | "claimant" | "signer1" | "signer2" | "signer3" | "distributor" | "contributor" | "merchant" | "subscriber";
 export interface AccountRequirement { role: EnvironmentAccountRole; required: boolean; minimumNativeBalance?: string; }
@@ -9,8 +9,9 @@ export interface ContractDependencyRequirement { component: string; deploymentRe
 export type AuthorizationRequirement = "single-signer" | "admin" | "owner" | "spender" | "claimant" | "multi-party" | "external-cryptographic-signature";
 export type TimeRequirement = { kind: "none" } | { kind: "wait-until" | "minimum-duration" | "deadline"; description: string };
 export type SpecialFixtureRequirement = "merkle" | "oracle-signature" | "multisig" | "two-assets";
+export type EnvironmentArtifactStatus = EffectiveEvidenceStatus | "EVIDENCE_UNAVAILABLE" | "ARTIFACT_UNAVAILABLE";
 export interface EnvironmentProfile { componentId: string; localWorkflowExists: boolean; contractDependency: ContractDependencyRequirement; accounts: AccountRequirement[]; assets: AssetRequirement[]; contractDependencies: ContractDependencyRequirement[]; constructorConfiguration: { required: boolean; parameters: { name: string; type: string }[] }; authorization: AuthorizationRequirement[]; time: TimeRequirement; fixtures: SpecialFixtureRequirement[]; }
-export interface EnvironmentContext { accounts: Partial<Record<EnvironmentAccountRole, { address: string; nativeBalance?: string }>>; assets: Record<string, import("./canonical-assets").CanonicalTestnetAsset>; deployments: Record<string, string | null>; artifactStatuses: Record<string, ReconciliationStatus[]>; controlledDeployments: Record<string, { contractId: string; artifactVerified: boolean }>; }
+export interface EnvironmentContext { accounts: Partial<Record<EnvironmentAccountRole, { address: string; nativeBalance?: string }>>; assets: Record<string, import("./canonical-assets").CanonicalTestnetAsset>; deployments: Record<string, string | null>; artifactStatuses: Record<string, EnvironmentArtifactStatus[]>; controlledDeployments: Record<string, { contractId: string; artifactVerified: boolean }>; }
 export const ENVIRONMENT_READINESS_STATUSES = ["READY", "MISSING_ACCOUNT", "MISSING_ASSET", "MISSING_DEPENDENCY", "ARTIFACT_MISMATCH", "MISSING_CONSTRUCTOR_CONFIGURATION", "MISSING_AUTHORIZATION_PARTICIPANT", "TIME_REQUIREMENT", "SPECIAL_FIXTURE_REQUIRED", "BLOCKED", "UNKNOWN"] as const;
 export type EnvironmentReadinessStatus = (typeof ENVIRONMENT_READINESS_STATUSES)[number];
 export interface EnvironmentReadinessResult { componentId: string; statuses: EnvironmentReadinessStatus[]; blockers: string[]; readyForPreflight: boolean; readyForExecution: boolean; }
