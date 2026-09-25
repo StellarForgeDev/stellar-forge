@@ -5,8 +5,8 @@ export const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self'",
+      process.env.NODE_ENV === "development" ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
+      process.env.NODE_ENV === "development" ? "style-src 'self' 'unsafe-inline'" : "style-src 'self'",
       "font-src 'self'",
       "img-src 'self'",
       "connect-src 'self' https://friendbot.stellar.org",

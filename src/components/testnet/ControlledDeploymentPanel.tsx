@@ -6,6 +6,7 @@ import { useWallet } from "@/lib/wallet/useWallet";
 import { submitSignedTransaction } from "@/lib/transactions/client";
 import { Button } from "@/components/ui/Button";
 import { ACCESS_CONTROL_WORKFLOW } from "@/lib/verification/network-workflow";
+import { isValidWalletAddress } from "@/lib/wallet/validation";
 import { networkConfig } from "@/lib/transactions/networks";
 import { canRecordDeploymentEvidence, canSignDeployment, canSubmitDeployment, canPrepareCreate, canSimulateCreate, canSimulateUpload } from "@/lib/verification/deployment-guards";
 import {
@@ -22,7 +23,7 @@ import { serializeDeploymentSession } from "@/lib/verification/deployment-sessio
 type StageResult = { transactionXdr: string; simulation: { status: string; error?: string }; artifact: { path: string; sha256: string }; constructorArgs: Record<string, string> };
 type ReadinessResult = { finalReadiness?: string; blockingCategory?: string | null; blockingReason?: string | null; recommendedAction?: string | null; gates?: Record<string, { status: string; blockingReason?: string }> };
 
-export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifactVerified: artifactEvidenceVerified, connectivityHealthy }: { artifactHash: string | null; artifactPath: string; artifactVerified: boolean; connectivityHealthy: boolean }) {
+export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifactStatus, connectivityHealthy }: { artifactHash: string | null; artifactPath: string; artifactStatus: string; connectivityHealthy: boolean }) {
   // Detect an existing public wallet connection; deployment authorization remains explicit.
   const wallet = useWallet(undefined, { autoRestore: true });
   const [deploymentAccount, setDeploymentAccount] = useState("");
@@ -62,6 +63,8 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
     }
   }, [hasMounted, deploymentSession.lastObservedAt]);
   const deployer = deploymentAccount.trim();
+  const walletAddress = isValidWalletAddress(wallet.state.address) ? wallet.state.address : null;
+  const walletAddressValid = wallet.state.status === "connected" && walletAddress !== null;
   const testnetPassphrase = networkConfig("testnet").passphrase;
   const testnetEndpoint = networkConfig("testnet").rpcUrl;
 
@@ -89,17 +92,18 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
     } catch {}
   }, [deploymentSession]);
 
-  async function refreshAuthoritativeState() {
+  async function refreshAuthoritativeState(accountOverride?: string) {
     setError(null);
+    const effectiveDeployer = (accountOverride ?? deployer).trim();
     const query = new URLSearchParams();
-    if (deployer) query.set("account", deployer);
+    if (effectiveDeployer) query.set("account", effectiveDeployer);
     if (admin.trim()) query.set("admin", admin.trim());
     try {
       const [readinessResponse, reconciliationResponse] = await Promise.all([
         fetch(`/api/testnet/readiness?${query.toString()}`, { cache: "no-store" }),
         fetch("/api/testnet/deployment-session/reconcile", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
           serialized: serializeDeploymentSession(deploymentSession),
-          account: deployer || null,
+          account: effectiveDeployer || null,
           admin: admin.trim() || null,
           uploadRecovery: deploymentSession.state === "UPLOAD_SIGNED" ? {
             signedTransactionAvailable: Boolean(signedUpload),
@@ -153,6 +157,17 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
     // Must be exact single G... address, no embedded whitespace or extra content
     if (trimmed.length !== 56) return false;
     return StrKey.isValidEd25519PublicKey(trimmed);
+  }
+
+  async function useConnectedWallet() {
+    const address = wallet.state.address;
+    if (!address || !isValidPublicKey(address)) {
+      setError("The connected wallet did not provide a valid public G... address.");
+      return;
+    }
+    setDeploymentAccount(address);
+    setAccountInspection(null);
+    void refreshAuthoritativeState(address);
   }
 
   async function prepare(nextStage: "upload" | "create") {
@@ -293,9 +308,9 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
   const adminValid = isValidPublicKey(admin);
   const deploymentAccountDisplay = !deployer ? "NOT SUPPLIED • ACCOUNT_NOT_SUPPLIED" : deployerValid ? deployer : "INVALID_STELLAR_ADDRESS";
   const adminDisplay = !adminTrimmed ? "NOT SUPPLIED" : adminValid ? adminTrimmed : "INVALID_STELLAR_ADDRESS";
-  const artifactVerified = artifactEvidenceVerified && Boolean(artifactHash);
+  const isVerified = artifactStatus === "VERIFIED_MATCH";
   const deploymentAccountSupplied = Boolean(deployer);
-  const walletConnected = wallet.state.status === "connected";
+  const walletConnected = walletAddressValid;
   const walletOnTestnet = wallet.state.networkPassphrase === testnetPassphrase;
   const preflightStatus = readiness?.finalReadiness ?? "NOT_REFRESHED";
   const environmentReady = walletConnected && walletOnTestnet && connectivityHealthy;
@@ -324,7 +339,7 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
         </div>
         <div className="grid grid-cols-[10rem_1fr] gap-2">
           <span className="text-text-secondary">Wallet</span>
-          <span>{walletConnected ? `${wallet.state.address?.slice(0, 8)}… (${wallet.state.networkName ?? "unknown"})` : "NOT CONNECTED"}</span>
+          <span>{walletAddress ? `${walletAddress.slice(0, 8)}… (${wallet.state.networkName ?? "unknown"})` : "NOT CONNECTED"}</span>
         </div>
       </div>
 
@@ -340,7 +355,7 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
         </div>
         <div className="grid grid-cols-[10rem_1fr] gap-2">
           <span className="text-text-secondary">Status</span>
-          <span className={artifactVerified ? "text-tone-success" : "text-tone-error"}>{artifactVerified ? "READY • VERIFIED_MATCH" : "BLOCKED • artifact unavailable"}</span>
+          <span className={isVerified ? "text-tone-success" : "text-tone-error"}>{isVerified ? "READY • VERIFIED_MATCH" : `BLOCKED • ${artifactStatus}`}</span>
         </div>
       </div>
 
@@ -452,7 +467,15 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
       <p className="mt-3 text-text-secondary leading-relaxed">Upload: {upload ? `${upload.simulation.status} (${upload.simulation.status === "SUCCESS" ? "SIMULATED" : "FAILED"})` : "NOT_STARTED"} • Create: {create ? `${create.simulation.status}` : "NOT_STARTED"} • Signing has not occurred until you confirm. Submission requires explicit confirmation + valid signed transaction. No autoSign/autoSubmit.</p>
     </div>
     <label className="mt-8 block font-mono text-sm text-text-secondary">Deployment account address<input value={deploymentAccount} onChange={(event) => { setDeploymentAccount(event.target.value); setAccountInspection(null); }} placeholder="G... (enter explicitly)" className="mt-3 block min-h-11 w-full rounded-default border border-border bg-canvas px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary/60" />{deploymentAccount && !deployerValid ? <span className="mt-2 block font-mono text-[11px] text-tone-error">Invalid Stellar public key — must be valid G... StrKey (56 chars), S... secrets and arbitrary text rejected</span> : null}</label>
-    <div className="mt-5 flex flex-wrap gap-3"><Button variant="secondary" onClick={() => void wallet.connect()} disabled={wallet.state.status === "connecting" || wallet.state.status === "connected"}>Connect wallet explicitly</Button><Button variant="secondary" onClick={() => void inspectAccount()} disabled={!isValidPublicKey(deploymentAccount) || accountInspection !== null}>Inspect public account</Button></div>
+    <div className="mt-5 flex flex-wrap gap-3">
+      {walletAddressValid ? (
+        <Button variant="secondary" onClick={useConnectedWallet}>Use connected wallet</Button>
+      ) : null}
+      <Button variant="secondary" onClick={() => void wallet.connect()} disabled={wallet.state.status === "connecting" || wallet.state.status === "checking"}>
+        {wallet.state.status === "connecting" ? "Waiting for wallet approval…" : wallet.state.status === "connected" ? "Reconnect wallet" : "Connect wallet explicitly"}
+      </Button>
+      <Button variant="secondary" onClick={() => void inspectAccount()} disabled={!isValidPublicKey(deploymentAccount) || accountInspection !== null}>Inspect public account</Button>
+    </div>
     {accountInspection && <p className="mt-3 font-mono text-sm text-text-secondary">Account: {accountInspection.status} · sequence {accountInspection.sequenceNumber ?? "unknown"} · XLM {accountInspection.nativeBalance ?? "unknown"}</p>}
     <label className="mt-8 block font-mono text-sm text-text-secondary">Constructor admin address<input value={admin} onChange={(event) => setAdmin(event.target.value)} placeholder="G... (enter intentionally, S... rejected)" className="mt-3 block min-h-11 w-full rounded-default border border-border bg-canvas px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary/60" />{admin && !adminValid ? <span className="mt-2 block font-mono text-[11px] text-tone-error">Invalid Stellar public key — must be valid G... StrKey (56 chars), S... secrets and arbitrary text rejected</span> : null}</label>
     {stage === "awaiting-confirmation" && <label className="mt-5 flex gap-2 text-sm text-text-primary"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />You are about to deploy a smart contract to Stellar Testnet. This creates permanent Testnet state, consumes network resources, is not Mainnet, and requires my wallet confirmation. No background execution.</label>}

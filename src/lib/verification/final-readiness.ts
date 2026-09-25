@@ -1,7 +1,7 @@
 import type { TestnetConnectivityDiagnostic } from "./testnet-connectivity";
 import type { DeploymentEvidence } from "./deployment-evidence";
 
-export type FinalReadinessStatus = "READY_FOR_CONTROLLED_TESTNET_DEPLOYMENT" | "NOT_READY";
+export type FinalReadinessStatus = "READY_FOR_CONTROLLED_TESTNET_DEPLOYMENT" | "NOT_READY" | "LOCAL_ARTIFACT_MISMATCH" | "EVIDENCE_UNAVAILABLE" | "ARTIFACT_UNAVAILABLE";
 
 export interface FinalReadinessGate {
   name: string;
@@ -43,6 +43,7 @@ const CANONICAL_PASSPHRASE = "Test SDF Network ; September 2015";
 export function evaluateFinalReadiness(input: {
   connectivity: TestnetConnectivityDiagnostic | null;
   artifactEvidence: DeploymentEvidence[] | null;
+  artifactVerification?: import("./artifact-evidence-verification").ArtifactEvidenceVerificationResult;
   deploymentAccount: { supplied: boolean; valid: boolean; status: string; exists: boolean | null; sufficientBalance: boolean | null } | null;
   constructorAdmin: { supplied: boolean; valid: boolean; status: string } | null;
   deploymentGuards: { uploadPreparationOk: boolean; createRequiresConfirmedUpload: boolean; signingExplicit: boolean; submissionExplicit: boolean; noAutoRetry: boolean } | null;
@@ -92,7 +93,15 @@ export function evaluateFinalReadiness(input: {
   }
 
   // Artifact gate
-  if (!input.artifactEvidence) {
+  if (input.artifactVerification) {
+    if (input.artifactVerification.status === "VERIFIED_MATCH") {
+      gates.artifact = { name: "Artifact", status: "PASS" };
+    } else if (input.artifactVerification.status === "LOCAL_ARTIFACT_MISMATCH") {
+      gates.artifact = { name: "Artifact", status: "FAIL", blockingCategory: "ARTIFACT", blockingReason: "The current canonical Access Control artifact does not match the independently evidenced artifact.", recommendedAction: "Verify authoritative artifact" };
+    } else {
+      gates.artifact = { name: "Artifact", status: "BLOCKED", blockingCategory: "ARTIFACT", blockingReason: input.artifactVerification.error, recommendedAction: "Refresh artifact evidence" };
+    }
+  } else if (!input.artifactEvidence) {
     gates.artifact = { name: "Artifact", status: "BLOCKED", blockingCategory: "ARTIFACT", blockingReason: "No evidence", recommendedAction: "Refresh artifact evidence" };
   } else {
     const evidenceArray = input.artifactEvidence as unknown as DeploymentEvidence[];
@@ -267,6 +276,13 @@ export function evaluateFinalReadiness(input: {
   } else {
     // All PASS
     status = "READY_FOR_CONTROLLED_TESTNET_DEPLOYMENT";
+  }
+
+  if (input.artifactVerification && input.artifactVerification.status !== "VERIFIED_MATCH") {
+    status = input.artifactVerification.status;
+    blockingCategory = gates.artifact.blockingCategory ?? "ARTIFACT";
+    blockingReason = gates.artifact.blockingReason ?? "Artifact verification failed";
+    recommendedAction = gates.artifact.recommendedAction ?? "Verify authoritative artifact";
   }
 
   return {

@@ -1,8 +1,7 @@
 import { restoreDeploymentSession, reconcileRestoredSession } from "@/lib/verification/deployment-session";
 import { diagnoseTestnetConnectivity } from "@/lib/verification/testnet-connectivity";
 import { networkConfig } from "@/lib/transactions/networks";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { verifyArtifactEvidence } from "@/lib/verification/artifact-evidence-verification";
 import type { DeploymentEvidence } from "@/lib/verification/deployment-evidence";
 
 export const runtime = "nodejs";
@@ -30,13 +29,9 @@ export async function POST(request: Request): Promise<Response> {
   // Fresh read-only reconciliation required — do not automatically perform wallet connection, signing, etc.
   const endpoint = networkConfig("testnet").rpcUrl;
   const connectivity = await diagnoseTestnetConnectivity({ endpoint, expectedPassphrase: networkConfig("testnet").passphrase });
-  let evidence: DeploymentEvidence[] = [];
-  try {
-    const raw = await readFile(path.join(process.cwd(), "contracts", "testnet-evidence.json"), "utf8");
-    evidence = (JSON.parse(raw) as { evidence?: DeploymentEvidence[] }).evidence ?? [];
-  } catch {}
-  const accessControl = evidence.find((e) => e.componentId === "access-control");
-  const artifactVerified = Boolean(accessControl?.status.includes("VERIFIED_MATCH"));
+  const artifactVerification = await verifyArtifactEvidence("access-control");
+  const artifactVerified = artifactVerification.status === "VERIFIED_MATCH";
+  const artifactStatus = artifactVerification.status;
 
   // Determine account status if supplied, else NOT_SUPPLIED
   let accountStatus: { status: string; exists: boolean | null; sufficientBalance: boolean | null } = { status: "ACCOUNT_NOT_SUPPLIED", exists: null, sufficientBalance: null };
@@ -48,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const reconciled = reconcileRestoredSession(restored.session, {
     connectivity: { status: connectivity.status, failureCategory: connectivity.failureCategory },
-    artifact: { verified: artifactVerified, status: accessControl?.status.join(",") ?? "UNKNOWN" },
+    artifact: { verified: artifactVerified, status: artifactStatus },
     account: accountStatus,
     constructorAdmin: { supplied: Boolean(admin), valid: Boolean(admin && admin.startsWith("G")) },
   });

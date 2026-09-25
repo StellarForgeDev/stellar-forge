@@ -5,6 +5,7 @@ import type {
   WalletError,
   WalletSignResult,
 } from "@/lib/wallet/types";
+import { isUsableWalletConnection } from "@/lib/wallet/validation";
 
 type FreighterModule = typeof import("@stellar/freighter-api");
 
@@ -75,15 +76,22 @@ export const freighterAdapter: WalletAdapter = {
         };
       }
 
+      const connection = {
+        address: access.address,
+        network: {
+          name: network.network,
+          passphrase: network.networkPassphrase,
+        },
+      };
+      if (!isUsableWalletConnection(connection)) {
+        return {
+          ok: false,
+          error: unavailable("Freighter returned an invalid wallet connection."),
+        };
+      }
       return {
         ok: true,
-        connection: {
-          address: access.address,
-          network: {
-            name: network.network,
-            passphrase: network.networkPassphrase,
-          },
-        },
+        connection,
       };
     } catch {
       return {
@@ -119,15 +127,19 @@ export const freighterAdapter: WalletAdapter = {
         return { ok: false, error: unavailable("Wallet network could not be read.") };
       }
 
+      const connection = {
+        address: address.address,
+        network: {
+          name: network.network,
+          passphrase: network.networkPassphrase,
+        },
+      };
+      if (!isUsableWalletConnection(connection)) {
+        return { ok: false, error: unavailable("Freighter returned an invalid wallet connection.") };
+      }
       return {
         ok: true,
-        connection: {
-          address: address.address,
-          network: {
-            name: network.network,
-            passphrase: network.networkPassphrase,
-          },
-        },
+        connection,
       };
     } catch {
       return {
@@ -204,22 +216,27 @@ export const freighterAdapter: WalletAdapter = {
 
       const instance = new api.WatchWalletChanges(2000);
       const watched = instance.watch((params) => {
-        if (params.error) {
+        if (!params || params.error) {
           // The extension reported an error (e.g. the user revoked access
           // or locked it). Transition the app to the disconnected state
           // instead of staying stuck on the last "connected" value.
           onChange({ type: "disconnected" });
           return;
         }
+        const connection = {
+          address: params.address,
+          network: {
+            name: params.network,
+            passphrase: params.networkPassphrase,
+          },
+        };
+        if (!isUsableWalletConnection(connection)) {
+          onChange({ type: "disconnected" });
+          return;
+        }
         onChange({
           type: "connected",
-          connection: {
-            address: params.address,
-            network: {
-              name: params.network,
-              passphrase: params.networkPassphrase,
-            },
-          },
+          connection,
         });
       });
       if (watched.error) return;

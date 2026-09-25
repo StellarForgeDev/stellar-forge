@@ -1,11 +1,11 @@
+import { StrKey } from "@stellar/stellar-sdk";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { createHash } from "node:crypto";
-import { StrKey } from "@stellar/stellar-sdk";
 import { stellarComponents } from "@/data/components";
 import { buildInvocationArgs } from "@/lib/transactions/args";
 import { canonicalTestnetServer, confirmedTransactionExists, prepareDeploymentStage } from "@/lib/transactions/deployment";
 import { ACCESS_CONTROL_WORKFLOW } from "@/lib/verification/network-workflow";
+import { verifyArtifactEvidence } from "@/lib/verification/artifact-evidence-verification";
 
 export const runtime = "nodejs";
 
@@ -32,14 +32,23 @@ export async function POST(request: Request): Promise<Response> {
   const component = stellarComponents.find((candidate) => candidate.slug === input.component);
   const constructor = component?.interface?.find((method) => method.name === "__constructor");
   if (!component || !constructor) return Response.json({ status: "FAILED", error: "Constructor metadata is unavailable." }, { status: 400 });
-  const wasmPath = path.join(process.cwd(), "contracts", "prebuilt", `${component.slug}.wasm`);
-  const wasm = await readFile(wasmPath);
-  const wasmHash = createHash("sha256").update(wasm).digest("hex");
+
+  const verification = await verifyArtifactEvidence(component.slug);
+  if (verification.status === "ARTIFACT_UNAVAILABLE" || verification.status === "EVIDENCE_UNAVAILABLE") {
+    return Response.json({ status: "FAILED", error: verification.error }, { status: 409 });
+  }
+  if (verification.status === "LOCAL_ARTIFACT_MISMATCH") {
+    return Response.json({ status: "FAILED", error: "Access Control artifact evidence is not VERIFIED_MATCH for the canonical local artifact." }, { status: 409 });
+  }
+
+  let wasm: Buffer;
   try {
-    const evidence = JSON.parse(await readFile(path.join(process.cwd(), "contracts", "testnet-evidence.json"), "utf8")) as { evidence?: Array<{ componentId?: string; status?: string[]; sourceArtifact?: { sha256?: string | null } }> };
-    const accessEvidence = evidence.evidence?.find((item) => item.componentId === ACCESS_CONTROL_WORKFLOW.componentId);
-    if (!accessEvidence?.status?.includes("VERIFIED_MATCH") || accessEvidence.sourceArtifact?.sha256 !== wasmHash) return Response.json({ status: "FAILED", error: "Access Control artifact evidence is not VERIFIED_MATCH for the canonical local artifact." }, { status: 409 });
-  } catch { return Response.json({ status: "FAILED", error: "Authoritative Access Control artifact evidence is unavailable." }, { status: 409 }); }
+    wasm = await readFile(path.join(process.cwd(), "contracts", "prebuilt", `${component.slug}.wasm`));
+  } catch {
+    return Response.json({ status: "FAILED", error: "Failed to read canonical local artifact." }, { status: 409 });
+  }
+  const wasmHash = verification.wasmHash;
+
   const rawValues = typeof input.constructorArgs === "object" && input.constructorArgs !== null ? input.constructorArgs as Record<string, unknown> : {};
   const values: Record<string, string> = {};
   for (const [k, v] of Object.entries(rawValues)) {

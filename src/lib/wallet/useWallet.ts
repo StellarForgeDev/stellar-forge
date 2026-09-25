@@ -7,6 +7,7 @@ import type {
   WalletSignResult,
   WalletState,
 } from "@/lib/wallet/types";
+import { isUsableWalletConnection } from "@/lib/wallet/validation";
 
 export type { WalletState, WalletStatus } from "@/lib/wallet/types";
 
@@ -17,6 +18,13 @@ const disconnectedState: WalletState = {
   networkPassphrase: null,
   error: null,
 };
+
+function invalidConnectionState(): WalletState {
+  return {
+    ...disconnectedState,
+    error: { code: "wallet-unavailable", message: "Wallet returned an invalid public account or network." },
+  };
+}
 
 export function useWallet(
   adapter: WalletAdapter = freighterAdapter,
@@ -43,10 +51,11 @@ export function useWallet(
       return;
     }
     let cancelled = false;
+    let changeVersion = 0;
 
     async function restoreConnection() {
       const available = await adapter.isAvailable();
-      if (cancelled) return;
+      if (cancelled || changeVersion !== 0) return;
 
       if (!available) {
         setState({
@@ -60,9 +69,9 @@ export function useWallet(
       }
 
       const result = await adapter.getConnection();
-      if (cancelled) return;
+      if (cancelled || changeVersion !== 0) return;
 
-      if (result.ok) {
+      if (result.ok && isUsableWalletConnection(result.connection)) {
         setState({
           status: "connected",
           address: result.connection.address,
@@ -71,7 +80,7 @@ export function useWallet(
           error: null,
         });
       } else {
-        setState(disconnectedState);
+        setState(result.ok ? invalidConnectionState() : disconnectedState);
       }
     }
 
@@ -79,7 +88,8 @@ export function useWallet(
 
     const unsubscribe = adapter.subscribe((change) => {
       if (cancelled) return;
-      if (change.type === "connected") {
+      changeVersion += 1;
+      if (change.type === "connected" && isUsableWalletConnection(change.connection)) {
         setState({
           status: "connected",
           address: change.connection.address,
@@ -88,7 +98,7 @@ export function useWallet(
           error: null,
         });
       } else {
-        setState(disconnectedState);
+        setState(change.type === "connected" ? invalidConnectionState() : disconnectedState);
       }
     });
 
@@ -102,7 +112,7 @@ export function useWallet(
     setState((previous) => ({ ...previous, status: "connecting", error: null }));
 
     const result = await adapter.connect();
-    if (result.ok) {
+    if (result.ok && isUsableWalletConnection(result.connection)) {
       setState({
         status: "connected",
         address: result.connection.address,
@@ -116,7 +126,7 @@ export function useWallet(
         address: null,
         networkName: null,
         networkPassphrase: null,
-        error: result.error,
+        error: result.ok ? invalidConnectionState().error : result.error,
       });
     }
   }, [adapter]);

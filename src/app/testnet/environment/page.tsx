@@ -1,3 +1,4 @@
+import { verifyArtifactEvidence } from "@/lib/verification/artifact-evidence-verification";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { environmentProfiles } from "@/lib/verification/environment-profiles";
@@ -17,5 +18,15 @@ async function readContext(): Promise<EnvironmentContext> {
   try { evidence = ((JSON.parse(await readFile(path.join(process.cwd(), "contracts", "testnet-evidence.json"), "utf8")) as { evidence?: DeploymentEvidence[] }).evidence ?? []); } catch { /* report unknown evidence */ }
   let controlled: Record<string, { contractId: string; artifactVerified: boolean }> = {};
   try { const records = JSON.parse(await readFile(path.join(process.cwd(), "contracts", "testnet-verification-deployments.json"), "utf8")) as Array<{ componentId?: string; contractId?: string; artifactVerified?: boolean }>; controlled = Object.fromEntries(records.filter((record) => record.componentId && record.contractId && record.artifactVerified).map((record) => [record.componentId, { contractId: record.contractId!, artifactVerified: true }])); } catch { /* empty registry is valid */ }
-  return { accounts: {}, assets: {}, deployments: Object.fromEntries(evidence.map((item) => [item.componentId, item.contractId])), artifactStatuses: Object.fromEntries(evidence.map((item) => [item.componentId, [...item.status]])), controlledDeployments: controlled };
+
+  const artifactStatuses: Record<string, EnvironmentContext["artifactStatuses"][string]> = {};
+  for (const item of evidence) {
+    const v = await verifyArtifactEvidence(item.componentId);
+    artifactStatuses[item.componentId] = [v.status as any];
+    if (controlled[item.componentId]) {
+      controlled[item.componentId].artifactVerified = v.status === "VERIFIED_MATCH";
+    }
+  }
+
+  return { accounts: {}, assets: {}, deployments: Object.fromEntries(evidence.map((item) => [item.componentId, item.contractId])), artifactStatuses, controlledDeployments: controlled };
 }

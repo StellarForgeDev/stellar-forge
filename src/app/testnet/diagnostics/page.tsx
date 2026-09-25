@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { verifyArtifactEvidence, type ArtifactEvidenceVerificationResult } from "@/lib/verification/artifact-evidence-verification";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { DiagnosticsRefreshButton } from "@/components/testnet/DiagnosticsRefreshButton";
 import { AccountReadinessChecker } from "@/components/testnet/AccountReadinessChecker";
@@ -38,8 +39,9 @@ interface Diagnostic {
 
 export default async function TestnetDiagnosticsPage() {
   const { diagnostic, evidence, registry } = await readEvidenceFile();
+  const artifactVerification = await verifyArtifactEvidence("access-control");
   const overallStatus = diagnostic.status === "NETWORK_OK" || diagnostic.status === "HEALTHY" ? "NETWORK_OK" : diagnostic.status ?? "UNKNOWN";
-  const blockingReason = getBlockingReason(diagnostic, evidence);
+  const blockingReason = getBlockingReason(diagnostic, evidence, artifactVerification);
   const artifactSummary = summarizeArtifacts(evidence);
   const deploymentAccountStatus = "NOT_SUPPLIED" as const; // requires explicit G... via checker
   const constructorAdminStatus = "NOT_SUPPLIED" as const;
@@ -62,10 +64,10 @@ export default async function TestnetDiagnosticsPage() {
     ["Last Observed", diagnostic.observedAt ?? "not recorded"],
     ["Latest Successful Observation", evidence.find((e) => e.latestSuccessfulObservation)?.latestSuccessfulObservation?.observedAt ?? "none — historical preserved"],
     ["Previous Observation", evidence[0]?.observations?.[evidence[0].observations.length - 2]?.observedAt ?? "none"],
-    ["Artifact retrieval", `${evidence.length ? summarizeArtifacts(evidence) : "NOT_OBSERVED"}`],
+    ["Historical artifact retrieval", `${evidence.length ? summarizeArtifacts(evidence) : "NOT_OBSERVED"}`],
     ["Deployment account readiness", deploymentAccountStatus],
     ["Constructor admin readiness", constructorAdminStatus],
-    ["Overall preflight", overallStatus === "NETWORK_OK" && evidence.find((e) => e.componentId === "access-control")?.status.includes("VERIFIED_MATCH") ? "BLOCKED • awaiting account/admin" : "BLOCKED"],
+    ["Overall preflight", overallStatus === "NETWORK_OK" && artifactVerification.status === "VERIFIED_MATCH" ? "BLOCKED • awaiting account/admin" : "BLOCKED"],
   ];
   return (
     <main className="min-w-0 flex-1">
@@ -102,12 +104,12 @@ export default async function TestnetDiagnosticsPage() {
         <DiagnosticsRefreshButton />
 
         <div className="mt-8 rounded-default border border-border bg-surface p-5">
-          <h2 className="font-sans font-medium text-text-primary">Artifact retrieval (15 registered Testnet WASMs)</h2>
-          <p className="mt-2 text-xs leading-5 text-text-secondary">Fetched bytes are hashed and compared against local/prebuilt artifacts. Historical observations are preserved; unavailable results are never converted into mismatches.</p>
+          <h2 className="font-sans font-medium text-text-primary">Historical artifact retrieval (15 registered Testnet WASMs)</h2>
+          <p className="mt-2 text-xs leading-5 text-text-secondary">Fetched bytes are hashed and compared against local/prebuilt artifacts. Historical observations are preserved; unavailable results are never converted into mismatches. These rows reflect historical provenance — current deployment eligibility is assessed separately via the shared artifact verifier.</p>
           <p className="mt-2 font-mono text-xs text-text-secondary">Registry: {registry.expectedCount ?? 15} expected • {registry.accountedCount ?? 0} accounted • {registry.errors?.length ?? 0} errors</p>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[700px] text-left text-xs">
-              <thead className="border-b border-border font-mono uppercase text-text-secondary"><tr><th className="p-2">Component</th><th className="p-2">Retrieval</th><th className="p-2">Effective</th><th className="p-2">Local hash</th><th className="p-2">Deployed</th></tr></thead>
+              <thead className="border-b border-border font-mono uppercase text-text-secondary"><tr><th className="p-2">Component</th><th className="p-2">Retrieval</th><th className="p-2">Effective</th><th className="p-2">Local hash</th><th className="p-2">Historical deployed</th></tr></thead>
               <tbody>
                 {evidence.length === 0 && <tr><td colSpan={5} className="p-3 text-text-secondary">No evidence recorded.</td></tr>}
                 {evidence.map((item) => (
@@ -116,13 +118,13 @@ export default async function TestnetDiagnosticsPage() {
                     <td className="p-2">{item.latestObservation?.confidence ?? "NOT_OBSERVED"} {item.latestObservation?.errorCategory ? `(${item.latestObservation.errorCategory})` : ""}</td>
                     <td className="p-2">{item.effectiveStatus ?? item.status.join(", ")}</td>
                     <td className="p-2 font-mono text-[10px] break-all">{item.sourceArtifact.sha256?.slice(0, 12) ?? "—"}…</td>
-                    <td className="p-2 font-mono text-[10px] break-all">{item.deployedArtifact.sha256?.slice(0, 12) ?? "unavailable"} {item.status.includes("VERIFIED_MATCH") ? "VERIFIED" : ""}</td>
+                    <td className="p-2 font-mono text-[10px] break-all">{item.deployedArtifact.sha256?.slice(0, 12) ?? "unavailable"} {item.status.includes("VERIFIED_MATCH") ? "Historical: VERIFIED" : ""}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-3 font-mono text-[11px] text-text-secondary">{artifactSummary}</p>
+          <p className="mt-3 font-mono text-[11px] text-text-secondary">Historical evidence summary: {artifactSummary}</p>
         </div>
 
         <AccountReadinessChecker />
@@ -133,13 +135,13 @@ export default async function TestnetDiagnosticsPage() {
           <div className="mt-4 grid gap-2 text-xs">
             <div className="grid grid-cols-[14rem_1fr] gap-2"><span className="text-text-secondary">Network</span><span className={diagnostic.networkPassphrase === "PASS" && overallStatus === "NETWORK_OK" ? "text-tone-success" : "text-tone-error"}>{diagnostic.networkPassphrase === "PASS" && overallStatus === "NETWORK_OK" ? "GREEN · Testnet confirmed" : "RED · BLOCKED"}</span></div>
             <div className="grid grid-cols-[14rem_1fr] gap-2"><span className="text-text-secondary">RPC</span><span className={diagnostic.rpc === "PASS" && diagnostic.sorobanRpc === "PASS" ? "text-tone-success" : "text-tone-error"}>{diagnostic.rpc === "PASS" && diagnostic.sorobanRpc === "PASS" ? "GREEN · RPC healthy" : "RED · RPC unavailable"}</span></div>
-            <div className="grid grid-cols-[14rem_1fr] gap-2"><span className="text-text-secondary">Artifact</span><span className={evidence.find((e) => e.componentId === "access-control")?.status.includes("VERIFIED_MATCH") ? "text-tone-success" : "text-tone-error"}>{evidence.find((e) => e.componentId === "access-control")?.status.includes("VERIFIED_MATCH") ? "GREEN · VERIFIED_MATCH (independently observed artifact parity)" : "RED · BLOCKED"}</span></div>
+            <div className="grid grid-cols-[14rem_1fr] gap-2"><span className="text-text-secondary">Artifact</span><span className={artifactVerification.status === "VERIFIED_MATCH" ? "text-tone-success" : "text-tone-error"}>{artifactVerification.status === "VERIFIED_MATCH" ? "GREEN · VERIFIED_MATCH (independently observed artifact parity)" : "RED · BLOCKED"}</span></div>
             <div className="grid grid-cols-[14rem_1fr] gap-2"><span className="text-text-secondary">Deployment account</span><span className="text-tone-pending">AWAITING EXPLICIT G... • ACCOUNT_NOT_SUPPLIED (manual check above)</span></div>
             <div className="grid grid-cols-[14rem_1fr] gap-2"><span className="text-text-secondary">Constructor admin</span><span className="text-tone-pending">AWAITING EXPLICIT G... • admin==address? No, separate concepts (even if same G...)</span></div>
-            <div className="grid grid-cols-[14rem_1fr] gap-2"><span className="text-text-secondary">Overall preflight</span><span className={overallStatus === "NETWORK_OK" && evidence.find((e) => e.componentId === "access-control")?.status.includes("VERIFIED_MATCH") ? "text-tone-pending" : "text-tone-error"}>{overallStatus === "NETWORK_OK" && evidence.find((e) => e.componentId === "access-control")?.status.includes("VERIFIED_MATCH") ? "BLOCKED • ACCOUNT_NOT_SUPPLIED (awaiting explicit funded account + valid admin)" : "BLOCKED"}</span></div>
+            <div className="grid grid-cols-[14rem_1fr] gap-2"><span className="text-text-secondary">Overall preflight</span><span className={overallStatus === "NETWORK_OK" && artifactVerification.status === "VERIFIED_MATCH" ? "text-tone-pending" : "text-tone-error"}>{overallStatus === "NETWORK_OK" && artifactVerification.status === "VERIFIED_MATCH" ? "BLOCKED • ACCOUNT_NOT_SUPPLIED (awaiting explicit funded account + valid admin)" : "BLOCKED"}</span></div>
           </div>
           <p className="mt-3 font-mono text-[11px] text-text-secondary">Blocking reason: {blockingReason}</p>
-          <p className="mt-2 font-mono text-[11px] text-text-secondary">Gates: Testnet confirmed: {overallStatus === "NETWORK_OK" ? "PASS" : "FAIL"} • RPC healthy: {diagnostic.rpc === "PASS" && diagnostic.sorobanRpc === "PASS" ? "PASS" : "FAIL"} • artifact VERIFIED_MATCH: {evidence.find((e) => e.componentId === "access-control")?.status.includes("VERIFIED_MATCH") ? "PASS" : "FAIL"} • account supplied: FAIL • account exists: UNKNOWN • sufficient balance: UNKNOWN • admin supplied: FAIL • admin valid: UNKNOWN • plan valid: PENDING</p>
+          <p className="mt-2 font-mono text-[11px] text-text-secondary">Gates: Testnet confirmed: {overallStatus === "NETWORK_OK" ? "PASS" : "FAIL"} • RPC healthy: {diagnostic.rpc === "PASS" && diagnostic.sorobanRpc === "PASS" ? "PASS" : "FAIL"} • artifact VERIFIED_MATCH: {artifactVerification.status === "VERIFIED_MATCH" ? "PASS" : "FAIL"} • account supplied: FAIL • account exists: UNKNOWN • sufficient balance: UNKNOWN • admin supplied: FAIL • admin valid: UNKNOWN • plan valid: PENDING</p>
         </div>
         <div className="mt-8 rounded-default border border-border bg-surface p-5">
           <h2 className="font-sans font-medium text-text-primary">Simulation status</h2>
@@ -158,7 +160,11 @@ export default async function TestnetDiagnosticsPage() {
         <div className="mt-8 rounded-default border border-border bg-surface p-5">
           <h2 className="font-sans font-medium text-text-primary">Evidence progression</h2>
           <p className="mt-2 text-xs leading-5 text-text-secondary">Allowed: no evidence → prepared → simulated → user confirmation → signed → submitted → confirmed → independently verified → recorded. Never allowed: simulated → verified, confirmed → verified, prepared → deployed.</p>
-          <p className="mt-2 font-mono text-xs text-text-secondary">Current deployment evidence: {artifactSummary.includes("VERIFIED") ? "verified" : "not yet verified"}</p>
+          <div className="mt-3 grid gap-1 font-mono text-xs">
+            <p className="text-text-secondary">Current local artifact verification: <span className={artifactVerification.status === "VERIFIED_MATCH" ? "text-tone-success" : "text-tone-error"}>{artifactVerification.status}</span></p>
+            <p className="text-text-secondary">Historical deployment evidence: {evidence.some((e) => e.status.includes("VERIFIED_MATCH")) ? "VERIFIED (historical provenance)" : "not yet verified"}</p>
+            <p className="text-text-secondary">Current deployment eligibility: <span className={artifactVerification.status === "VERIFIED_MATCH" ? "text-tone-success" : "text-tone-error"}>{artifactVerification.status === "VERIFIED_MATCH" ? "eligible (current artifact matches historical evidence)" : `not eligible (${artifactVerification.status})`}</span></p>
+          </div>
         </div>
       </section>
     </main>
@@ -175,16 +181,14 @@ async function readEvidenceFile(): Promise<{ diagnostic: Diagnostic; evidence: D
   }
 }
 
-function getBlockingReason(diagnostic: Diagnostic, evidence: DeploymentEvidence[]): string {
+function getBlockingReason(diagnostic: Diagnostic, evidence: DeploymentEvidence[], artifactVerification: ArtifactEvidenceVerificationResult): string {
   if (diagnostic.failureCategory && diagnostic.failureCategory !== "NETWORK_OK") return diagnostic.failureCategory;
   if (diagnostic.status === "BLOCKED") return diagnostic.error ?? "RPC_BLOCKED";
   if (diagnostic.dns === "FAIL") return "DNS_FAILURE";
   if (diagnostic.tls === "FAIL") return "TLS_FAILURE";
   if (diagnostic.http === "FAIL") return "HTTP_FAILURE";
   if (diagnostic.rpc === "FAIL" || diagnostic.sorobanRpc === "FAIL") return "RPC_UNAVAILABLE";
-  const access = evidence.find((e) => e.componentId === "access-control");
-  if (!access) return "ARTIFACT_EVIDENCE_MISSING";
-  if (!access.status.includes("VERIFIED_MATCH")) return `ARTIFACT_${access.effectiveStatus ?? access.status[0] ?? "BLOCKED"}`;
+  if (artifactVerification.status !== "VERIFIED_MATCH") return `ARTIFACT_${artifactVerification.status}`;
   if (evidence.length < 15) return "ARTIFACT_RETRIEVAL_INCOMPLETE";
   const unavailable = evidence.filter((e) => e.effectiveStatus === "TRANSIENT_FAILURE" || e.status.includes("DEPLOYMENT_UNAVAILABLE"));
   if (unavailable.length) return `RPC_RETRIEVAL_TRANSIENT (${unavailable.length}/15 unavailable)`;

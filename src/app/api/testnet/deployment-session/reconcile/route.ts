@@ -5,6 +5,7 @@ import { networkConfig } from "@/lib/transactions/networks";
 import { inspectPublicAccount, createTestnetAccountReader } from "@/lib/verification/account-inspection";
 import type { DeploymentEvidence } from "@/lib/verification/deployment-evidence";
 import { createDeploymentSession, isValidPublicDeploymentAddress, reconcileDeploymentSession, restoreDeploymentSession } from "@/lib/verification/deployment-session";
+import { verifyArtifactEvidence } from "@/lib/verification/artifact-evidence-verification";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,8 +49,10 @@ async function reconcileRequest(request: Request): Promise<Response> {
     evidence = [];
   }
   const accessControl = evidence.find((e) => e.componentId === "access-control");
-  const artifactVerified = Boolean(accessControl?.status.includes("VERIFIED_MATCH"));
-  const artifactStatus = accessControl?.status.join(",") ?? "UNKNOWN";
+  const verification = await verifyArtifactEvidence("access-control");
+  const artifactVerified = verification.status === "VERIFIED_MATCH";
+  const artifactStatus = verification.status;
+  const localHash = "wasmHash" in verification ? verification.wasmHash : (accessControl?.sourceArtifact.sha256 ?? null);
 
   const accountTrimmed = accountParam?.trim() ?? "";
   const isAccountValid = isValidPublicKey(accountParam);
@@ -135,8 +138,8 @@ async function reconcileRequest(request: Request): Promise<Response> {
       artifact: {
         verified: artifactVerified,
         status: artifactStatus,
-        localHash: accessControl?.sourceArtifact.sha256 ?? null,
-        deployedHash: accessControl?.deployedArtifact.sha256 ?? null,
+        localHash: localHash,
+        deployedHash: accessControl?.deployedArtifact?.sha256 ?? null,
       },
       account: accountStatus,
       constructorAdmin,
