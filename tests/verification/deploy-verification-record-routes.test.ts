@@ -18,8 +18,9 @@ vi.mock("@/lib/transactions/deployment", () => ({
 vi.mock("@/lib/verification/evidence-persistence", () => ({ evidencePersistenceMode }));
 vi.mock("node:fs/promises", () => ({ readFile, writeFile }));
 
-import { POST as verifyPost } from "@/app/api/transactions/deploy/verify/route";
-import { POST as recordPost } from "@/app/api/transactions/deploy/record/route";
+import { POST as _verifyPost } from "@/app/api/transactions/deploy/[action]/route";
+async function verifyPost(req: Request) { return _verifyPost(req, { params: Promise.resolve({ action: "verify" }) }); }
+async function recordPost(req: Request) { return _verifyPost(req, { params: Promise.resolve({ action: "record" }) }); }
 
 const CONTRACT = "CB5LA255QBGZH4UURMOGL6SJIVQE5PFQXZZ5JSF7UD5SIYQSGVAM3HQY";
 const ACCOUNT = "GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW";
