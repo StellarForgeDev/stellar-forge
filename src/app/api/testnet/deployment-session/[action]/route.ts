@@ -4,7 +4,7 @@ import { diagnoseTestnetConnectivity } from "@/lib/verification/testnet-connecti
 import { networkConfig } from "@/lib/transactions/networks";
 import { inspectPublicAccount, createTestnetAccountReader } from "@/lib/verification/account-inspection";
 import type { DeploymentEvidence } from "@/lib/verification/deployment-evidence";
-import { createDeploymentSession, isValidPublicDeploymentAddress, reconcileDeploymentSession, restoreDeploymentSession } from "@/lib/verification/deployment-session";
+import { createDeploymentSession, isValidPublicDeploymentAddress, reconcileDeploymentSession, restoreDeploymentSession, reconcileRestoredSession } from "@/lib/verification/deployment-session";
 import { verifyCandidateArtifact, verifyHistoricalArtifact } from "@/lib/verification/artifact-provenance";
 
 export const runtime = "nodejs";
@@ -155,5 +155,84 @@ async function reconcileRequest(request: Request): Promise<Response> {
   );
 }
 
-export async function GET(request: Request): Promise<Response> { return reconcileRequest(request); }
-export async function POST(request: Request): Promise<Response> { return reconcileRequest(request); }
+async function handleRestore(request: Request): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON." }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
+  const serialized = body && typeof body === "object" && typeof (body as Record<string, unknown>).serialized === "string" ? (body as Record<string, string>).serialized : null;
+  const account = body && typeof body === "object" && typeof (body as Record<string, unknown>).account === "string" ? (body as Record<string, string>).account : null;
+  const admin = body && typeof body === "object" && typeof (body as Record<string, unknown>).admin === "string" ? (body as Record<string, string>).admin : null;
+
+  const restored = restoreDeploymentSession(serialized);
+  if (restored.status === "INVALID_PERSISTENCE") {
+    return Response.json({ status: "INVALID_PERSISTENCE", error: restored.error, readOnly: true }, { status: 200, headers: { "Cache-Control": "no-store" } });
+  }
+  if (!restored.session) {
+    return Response.json({ status: "INVALID_PERSISTENCE", error: "No session.", readOnly: true }, { status: 200, headers: { "Cache-Control": "no-store" } });
+  }
+
+  // Fresh read-only reconciliation required — do not automatically perform wallet connection, signing, etc.
+  const endpoint = networkConfig("testnet").rpcUrl;
+  const connectivity = await diagnoseTestnetConnectivity({ endpoint, expectedPassphrase: networkConfig("testnet").passphrase });
+  const artifactVerification = await verifyCandidateArtifact("access-control");
+  const artifactVerified = artifactVerification.status === "CANDIDATE_VERIFIED";
+  const artifactStatus = artifactVerification.status;
+
+  // Determine account status if supplied, else NOT_SUPPLIED
+  let accountStatus: { status: string; exists: boolean | null; sufficientBalance: boolean | null } = { status: "ACCOUNT_NOT_SUPPLIED", exists: null, sufficientBalance: null };
+  if (account) {
+    // For restore, we don't re-inspect account automatically; we require explicit inspection
+    // But if account matches persisted session's account, we can keep historical
+    accountStatus = { status: "ACCOUNT_NOT_SUPPLIED", exists: null, sufficientBalance: null };
+  }
+
+  const reconciled = reconcileRestoredSession(restored.session, {
+    connectivity: { status: connectivity.status, failureCategory: connectivity.failureCategory },
+    artifact: { verified: artifactVerified, status: artifactStatus },
+    account: accountStatus,
+    constructorAdmin: { supplied: Boolean(admin), valid: Boolean(admin && admin.startsWith("G")) },
+  });
+
+  return Response.json(
+    {
+      readOnly: true,
+      restorationStatus: restored.status,
+      reconciliationRequired: restored.reconciliationRequired,
+      session: reconciled.session,
+      status: reconciled.status,
+      artifact: {
+        authority: "CANDIDATE",
+        verified: artifactVerified,
+        status: artifactStatus,
+        candidateHash: "candidateHash" in artifactVerification ? artifactVerification.candidateHash : null,
+        actualHash: "actualHash" in artifactVerification ? artifactVerification.actualHash : null,
+      },
+      historyLength: reconciled.session.snapshots.length,
+      note: "Restored session preserves historical lifecycle state. Current environment requires fresh reconciliation. No signing/submission performed.",
+    },
+    { status: 200, headers: { "Cache-Control": "no-store" } },
+  );
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ action: string }> }
+): Promise<Response> {
+  const { action } = await params;
+  if (action === "restore") return handleRestore(request);
+  if (action === "reconcile") return reconcileRequest(request);
+  return Response.json({ error: "Unsupported action." }, { status: 404 });
+}
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ action: string }> }
+): Promise<Response> {
+  const { action } = await params;
+  if (action === "restore") return Response.json({ error: "POST with { serialized } required." }, { status: 405, headers: { "Cache-Control": "no-store" } });
+  if (action === "reconcile") return reconcileRequest(request);
+  return Response.json({ error: "Unsupported action." }, { status: 404 });
+}

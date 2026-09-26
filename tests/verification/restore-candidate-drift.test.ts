@@ -8,7 +8,8 @@ vi.mock("@/lib/verification/testnet-connectivity", () => ({
   diagnoseTestnetConnectivity: async () => ({ status: "NETWORK_OK", failureCategory: undefined }),
 }));
 
-import { POST } from "@/app/api/testnet/deployment-session/restore/route";
+import { POST as _POST } from "@/app/api/testnet/deployment-session/[action]/route";
+async function POST(req: Request) { return _POST(req, { params: Promise.resolve({ action: "restore" }) }); }
 
 const ACCOUNT = "GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW";
 const HASH = "39b4c6d022146e4316642cf94bfc759fa85ae7399539798021e0136c768dfc3e";

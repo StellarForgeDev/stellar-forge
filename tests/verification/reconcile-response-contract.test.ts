@@ -61,7 +61,8 @@ describe("reconcile response contract", () => {
   it("successful reconciliation returns session with PREFLIGHT_READY", async () => {
     const session = createDeploymentSession({ artifactHash: EXPECTED_HASH, deploymentAccount: null, constructorAdmin: null });
     const serialized = serializeDeploymentSession(session);
-    const { POST } = await import("@/app/api/testnet/deployment-session/reconcile/route.ts");
+    const { POST: _POST } = await import("@/app/api/testnet/deployment-session/[action]/route.ts");
+    const POST = (req: Request) => _POST(req, { params: Promise.resolve({ action: "reconcile" }) });
     const req = new Request("http://localhost:3000/api/testnet/deployment-session/reconcile", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -88,7 +89,8 @@ describe("reconcile response contract", () => {
   it("preserves all existing flat fields alongside session", async () => {
     const session = createDeploymentSession({ artifactHash: EXPECTED_HASH, deploymentAccount: null, constructorAdmin: null });
     const serialized = serializeDeploymentSession(session);
-    const { POST } = await import("@/app/api/testnet/deployment-session/reconcile/route.ts");
+    const { POST: _POST } = await import("@/app/api/testnet/deployment-session/[action]/route.ts");
+    const POST = (req: Request) => _POST(req, { params: Promise.resolve({ action: "reconcile" }) });
     const req = new Request("http://localhost:3000/api/testnet/deployment-session/reconcile", {
       method: "POST",
       headers: { "content-type": "application/json" },

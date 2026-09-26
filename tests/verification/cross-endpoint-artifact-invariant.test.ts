@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { GET as getReadiness } from "@/app/api/testnet/readiness/route";
-import { GET as getReconcile } from "@/app/api/testnet/deployment-session/reconcile/route";
+import { GET as _getReconcile } from "@/app/api/testnet/deployment-session/[action]/route";
+async function getReconcile(req: Request) { return _getReconcile(req, { params: Promise.resolve({ action: "reconcile" }) }); }
 import { POST as _postPrepare } from "@/app/api/transactions/deploy/[action]/route";
 async function postPrepare(req: Request) { return _postPrepare(req, { params: Promise.resolve({ action: "prepare" }) }); }
 
