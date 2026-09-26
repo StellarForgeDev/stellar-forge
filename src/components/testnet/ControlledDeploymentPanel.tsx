@@ -21,7 +21,8 @@ import { clearDeploymentSession, saveDeploymentSession } from "@/lib/verificatio
 import { serializeDeploymentSession } from "@/lib/verification/deployment-session";
 
 type StageResult = { transactionXdr: string; simulation: { status: string; error?: string }; artifact: { path: string; sha256: string }; constructorArgs: Record<string, string> };
-type ReadinessResult = { finalReadiness?: string; blockingCategory?: string | null; blockingReason?: string | null; recommendedAction?: string | null; gates?: Record<string, { status: string; blockingReason?: string }> };
+type ReadinessResult = { finalReadiness?: string; blockingCategory?: string | null; blockingReason?: string | null; recommendedAction?: string | null; artifact?: { authority?: string; accessControl?: string; candidateHash?: string | null; hash?: string | null }; gates?: Record<string, { status: string; blockingReason?: string }> };
+type AuthoritativeRefreshResult = { ok: true; readiness: ReadinessResult; session: import("@/lib/verification/deployment-session").DeploymentSession } | { ok: false; error: string };
 
 export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifactStatus, connectivityHealthy }: { artifactHash: string | null; artifactPath: string; artifactStatus: string; connectivityHealthy: boolean }) {
   // Detect an existing public wallet connection; deployment authorization remains explicit.
@@ -92,7 +93,7 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
     } catch {}
   }, [deploymentSession]);
 
-  async function refreshAuthoritativeState(accountOverride?: string) {
+  async function refreshAuthoritativeState(accountOverride?: string): Promise<AuthoritativeRefreshResult> {
     setError(null);
     const effectiveDeployer = (accountOverride ?? deployer).trim();
     const query = new URLSearchParams();
@@ -118,13 +119,17 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
       const readinessPayload = await readinessResponse.json() as ReadinessResult;
       const reconciliationPayload = await reconciliationResponse.json() as { session?: import("@/lib/verification/deployment-session").DeploymentSession; error?: string };
       if (readinessResponse.ok) setReadiness(readinessPayload);
+      if (!readinessResponse.ok) throw new Error("Authoritative readiness request failed.");
       if (!reconciliationResponse.ok || !reconciliationPayload.session) throw new Error(reconciliationPayload.error ?? "Authoritative session reconciliation failed.");
       setDeploymentSession(reconciliationPayload.session);
       setSessionReconciled(true);
       setRestorationStatus("RECONCILED");
       if (pendingRequiresInspection) setHasInspectedSincePending(true);
+      return { ok: true, readiness: readinessPayload, session: reconciliationPayload.session };
     } catch (refreshError) {
-      setError(refreshError instanceof Error ? refreshError.message : "Authoritative readiness refresh failed.");
+      const message = refreshError instanceof Error ? refreshError.message : "Authoritative readiness refresh failed.";
+      setError(message);
+      return { ok: false, error: message };
     }
   }
 
@@ -162,6 +167,29 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
           },
         });
       }
+    }
+  }
+
+  function invalidateCandidateBoundState(reason: string) {
+    setStage("failed");
+    setUpload(null);
+    setCreate(null);
+    setConfirmed(false);
+    setSignedUpload(null);
+    setSignedCreate(null);
+    setSessionReconciled(false);
+    setError(reason);
+    if (["UPLOAD_PREPARED", "UPLOAD_SIMULATED", "AWAITING_UPLOAD_CONFIRMATION", "UPLOAD_SIGNED", "CREATE_PREPARED", "CREATE_SIMULATED", "AWAITING_CREATE_CONFIRMATION", "CREATE_SIGNED"].includes(deploymentSession.state)) {
+      advanceSession(["FAILED", "NOT_STARTED"], {
+        failure: {
+          stage: deploymentSession.state,
+          classification: "ARTIFACT_BLOCKED",
+          message: "Deployment candidate changed after preparation.",
+          observedAt: new Date().toISOString(),
+          recoverable: true,
+          recommendedNextAction: "Refresh candidate authority and prepare a new transaction",
+        },
+      });
     }
   }
 
@@ -259,6 +287,13 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
     }
 
     if (!canSignDeployment({ status: "AWAITING_CONFIRMATION", userConfirmed: confirmed, simulationPassed: result.simulation.status === "SUCCESS", signedTransactionAvailable: false, uploadConfirmed: Boolean(uploadHash), creationConfirmed: false, contractId, artifactVerified: false }) || !deployer) return;
+    const fresh = await refreshAuthoritativeState();
+    const currentCandidateHash = fresh.ok ? fresh.readiness.artifact?.candidateHash : null;
+    const preparedSessionHash = fresh.ok ? fresh.session.artifactHash : null;
+    if (!fresh.ok || fresh.readiness.finalReadiness !== "READY_FOR_CONTROLLED_TESTNET_DEPLOYMENT" || fresh.readiness.artifact?.accessControl !== "CANDIDATE_VERIFIED" || currentCandidateHash !== result.artifact.sha256 || preparedSessionHash !== result.artifact.sha256 || fresh.session.deploymentAccount !== deployer || fresh.session.constructorAdmin !== admin.trim()) {
+      invalidateCandidateBoundState("Candidate authority or deployment inputs changed. The prepared transaction was discarded; refresh and prepare again.");
+      return;
+    }
     setError(null); setStage("signing");
     const signed = await wallet.signTransaction(result.transactionXdr, deployer);
     if (!signed.ok) { setError(signed.error.message); setStage("failed"); return; }
@@ -276,6 +311,12 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
     }
     const signedState = nextStage === "upload" ? "UPLOAD_SIGNED" : "CREATE_SIGNED";
     if (!sessionReconciled || deploymentSession.state !== signedState || !canSubmitDeployment({ status: "AWAITING_CONFIRMATION", userConfirmed: confirmed, simulationPassed: true, signedTransactionAvailable: Boolean(signedXdr), uploadConfirmed: Boolean(uploadHash), creationConfirmed: false, contractId, artifactVerified: false }) || !signedXdr) return;
+    const fresh = await refreshAuthoritativeState();
+    const boundResult = nextStage === "upload" ? upload : create;
+    if (!fresh.ok || fresh.readiness.finalReadiness !== "READY_FOR_CONTROLLED_TESTNET_DEPLOYMENT" || fresh.readiness.artifact?.accessControl !== "CANDIDATE_VERIFIED" || fresh.readiness.artifact?.candidateHash !== boundResult?.artifact.sha256 || fresh.session.artifactHash !== boundResult?.artifact.sha256 || fresh.session.deploymentAccount !== deployer || fresh.session.constructorAdmin !== admin.trim()) {
+      invalidateCandidateBoundState("Candidate authority or deployment inputs changed. The signed transaction was discarded; refresh and prepare again.");
+      return;
+    }
     setError(null); setStage("submitting");
     const submitted = await submitSignedTransaction({ network: "testnet", signedXdr, controlledDeployment: true });
     if (submitted.ok && submitted.submission.status === "PENDING") {
@@ -358,7 +399,7 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
   const adminValid = isValidPublicKey(admin);
   const deploymentAccountDisplay = !deployer ? "NOT SUPPLIED • ACCOUNT_NOT_SUPPLIED" : deployerValid ? deployer : "INVALID_STELLAR_ADDRESS";
   const adminDisplay = !adminTrimmed ? "NOT SUPPLIED" : adminValid ? adminTrimmed : "INVALID_STELLAR_ADDRESS";
-  const isVerified = artifactStatus === "VERIFIED_MATCH";
+  const isVerified = artifactStatus === "CANDIDATE_VERIFIED";
   const deploymentAccountSupplied = Boolean(deployer);
   const walletConnected = walletAddressValid;
   const walletOnTestnet = wallet.state.networkPassphrase === testnetPassphrase;
@@ -405,7 +446,7 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
         </div>
         <div className="grid grid-cols-[10rem_1fr] gap-2">
           <span className="text-text-secondary">Status</span>
-          <span className={isVerified ? "text-tone-success" : "text-tone-error"}>{isVerified ? "READY • VERIFIED_MATCH" : `BLOCKED • ${artifactStatus}`}</span>
+          <span className={isVerified ? "text-tone-success" : "text-tone-error"}>{isVerified ? "READY • CANDIDATE_VERIFIED" : `BLOCKED • ${artifactStatus}`}</span>
         </div>
       </div>
 

@@ -1,11 +1,9 @@
 import { StrKey } from "@stellar/stellar-sdk";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { stellarComponents } from "@/data/components";
 import { buildInvocationArgs } from "@/lib/transactions/args";
 import { canonicalTestnetServer, confirmedTransactionExists, prepareDeploymentStage } from "@/lib/transactions/deployment";
 import { ACCESS_CONTROL_WORKFLOW } from "@/lib/verification/network-workflow";
-import { verifyArtifactEvidence } from "@/lib/verification/artifact-evidence-verification";
+import { verifyCandidateArtifact } from "@/lib/verification/artifact-provenance";
 
 export const runtime = "nodejs";
 
@@ -33,21 +31,14 @@ export async function POST(request: Request): Promise<Response> {
   const constructor = component?.interface?.find((method) => method.name === "__constructor");
   if (!component || !constructor) return Response.json({ status: "FAILED", error: "Constructor metadata is unavailable." }, { status: 400 });
 
-  const verification = await verifyArtifactEvidence(component.slug);
-  if (verification.status === "ARTIFACT_UNAVAILABLE" || verification.status === "EVIDENCE_UNAVAILABLE") {
-    return Response.json({ status: "FAILED", error: verification.error }, { status: 409 });
-  }
-  if (verification.status === "LOCAL_ARTIFACT_MISMATCH") {
-    return Response.json({ status: "FAILED", error: "Access Control artifact evidence is not VERIFIED_MATCH for the canonical local artifact." }, { status: 409 });
+  const verification = await verifyCandidateArtifact(component.slug);
+  if (verification.status !== "CANDIDATE_VERIFIED") {
+    const error = "error" in verification ? verification.error : "The canonical artifact does not match the authorized deployment candidate.";
+    return Response.json({ status: "FAILED", error, candidateStatus: verification.status }, { status: 409 });
   }
 
-  let wasm: Buffer;
-  try {
-    wasm = await readFile(path.join(process.cwd(), "contracts", "prebuilt", `${component.slug}.wasm`));
-  } catch {
-    return Response.json({ status: "FAILED", error: "Failed to read canonical local artifact." }, { status: 409 });
-  }
-  const wasmHash = verification.wasmHash;
+  const wasm = verification.verifiedArtifactBytes;
+  const wasmHash = verification.actualHash;
 
   const rawValues = typeof input.constructorArgs === "object" && input.constructorArgs !== null ? input.constructorArgs as Record<string, unknown> : {};
   const values: Record<string, string> = {};

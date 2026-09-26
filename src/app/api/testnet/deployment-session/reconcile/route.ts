@@ -5,7 +5,7 @@ import { networkConfig } from "@/lib/transactions/networks";
 import { inspectPublicAccount, createTestnetAccountReader } from "@/lib/verification/account-inspection";
 import type { DeploymentEvidence } from "@/lib/verification/deployment-evidence";
 import { createDeploymentSession, isValidPublicDeploymentAddress, reconcileDeploymentSession, restoreDeploymentSession } from "@/lib/verification/deployment-session";
-import { verifyArtifactEvidence } from "@/lib/verification/artifact-evidence-verification";
+import { verifyCandidateArtifact, verifyHistoricalArtifact } from "@/lib/verification/artifact-provenance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,10 +49,11 @@ async function reconcileRequest(request: Request): Promise<Response> {
     evidence = [];
   }
   const accessControl = evidence.find((e) => e.componentId === "access-control");
-  const verification = await verifyArtifactEvidence("access-control");
-  const artifactVerified = verification.status === "VERIFIED_MATCH";
-  const artifactStatus = verification.status;
-  const localHash = "wasmHash" in verification ? verification.wasmHash : (accessControl?.sourceArtifact.sha256 ?? null);
+  const candidateVerification = await verifyCandidateArtifact("access-control");
+  const historicalVerification = await verifyHistoricalArtifact("access-control");
+  const artifactVerified = candidateVerification.status === "CANDIDATE_VERIFIED";
+  const artifactStatus = candidateVerification.status;
+  const localHash = "actualHash" in candidateVerification ? candidateVerification.actualHash : null;
 
   const accountTrimmed = accountParam?.trim() ?? "";
   const isAccountValid = isValidPublicKey(accountParam);
@@ -74,7 +75,7 @@ async function reconcileRequest(request: Request): Promise<Response> {
 
   // Create or load session — for Phase 28, we create a fresh NOT_STARTED and reconcile
   let baseSession = createDeploymentSession({
-    artifactHash: accessControl?.sourceArtifact.sha256 ?? null,
+    artifactHash: "actualHash" in candidateVerification ? candidateVerification.actualHash : null,
     deploymentAccount: isAccountValid ? accountTrimmed : null,
     constructorAdmin: adminValid ? adminTrimmed : null,
   });
@@ -140,6 +141,9 @@ async function reconcileRequest(request: Request): Promise<Response> {
         status: artifactStatus,
         localHash: localHash,
         deployedHash: accessControl?.deployedArtifact?.sha256 ?? null,
+        authority: "CANDIDATE",
+        candidateHash: "candidateHash" in candidateVerification ? candidateVerification.candidateHash : null,
+        historicalStatus: historicalVerification.status,
       },
       account: accountStatus,
       constructorAdmin,

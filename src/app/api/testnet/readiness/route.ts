@@ -6,7 +6,7 @@ import { evaluateFinalReadiness } from "@/lib/verification/final-readiness";
 import { inspectPublicAccount, createTestnetAccountReader } from "@/lib/verification/account-inspection";
 import { StrKey } from "@stellar/stellar-sdk";
 import type { DeploymentEvidence } from "@/lib/verification/deployment-evidence";
-import { verifyArtifactEvidence } from "@/lib/verification/artifact-evidence-verification";
+import { verifyCandidateArtifact, verifyHistoricalArtifact } from "@/lib/verification/artifact-provenance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +37,8 @@ export async function GET(request: Request): Promise<Response> {
     evidence = null;
   }
 
-  const verification = await verifyArtifactEvidence("access-control");
+  const candidateVerification = await verifyCandidateArtifact("access-control");
+  const historicalVerification = await verifyHistoricalArtifact("access-control");
 
   // Inspect deployment account if supplied
   let deploymentAccount: { supplied: boolean; valid: boolean; status: string; exists: boolean | null; sufficientBalance: boolean | null } = {
@@ -84,7 +85,8 @@ export async function GET(request: Request): Promise<Response> {
   const result = evaluateFinalReadiness({
     connectivity,
     artifactEvidence: evidence,
-    artifactVerification: verification,
+    candidateVerification,
+    deploymentArtifactAuthority: "CANDIDATE",
     deploymentAccount,
     constructorAdmin,
     deploymentGuards: { uploadPreparationOk: true, createRequiresConfirmedUpload: true, signingExplicit: true, submissionExplicit: true, noAutoRetry: true },
@@ -122,8 +124,11 @@ export async function GET(request: Request): Promise<Response> {
         observedAt: connectivity.observedAt,
       },
       artifact: {
-        accessControl: verification.status === "VERIFIED_MATCH" ? "VERIFIED_MATCH" : verification.status,
-        hash: "wasmHash" in verification ? verification.wasmHash : null,
+        authority: "CANDIDATE",
+        accessControl: candidateVerification.status,
+        hash: "actualHash" in candidateVerification ? candidateVerification.actualHash : null,
+        candidateHash: "candidateHash" in candidateVerification ? candidateVerification.candidateHash : null,
+        historical: historicalVerification.status,
       },
       deploymentAccount,
       constructorAdmin,

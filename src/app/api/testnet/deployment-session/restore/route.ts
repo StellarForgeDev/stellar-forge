@@ -1,8 +1,7 @@
 import { restoreDeploymentSession, reconcileRestoredSession } from "@/lib/verification/deployment-session";
 import { diagnoseTestnetConnectivity } from "@/lib/verification/testnet-connectivity";
 import { networkConfig } from "@/lib/transactions/networks";
-import { verifyArtifactEvidence } from "@/lib/verification/artifact-evidence-verification";
-import type { DeploymentEvidence } from "@/lib/verification/deployment-evidence";
+import { verifyCandidateArtifact } from "@/lib/verification/artifact-provenance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,8 +28,8 @@ export async function POST(request: Request): Promise<Response> {
   // Fresh read-only reconciliation required — do not automatically perform wallet connection, signing, etc.
   const endpoint = networkConfig("testnet").rpcUrl;
   const connectivity = await diagnoseTestnetConnectivity({ endpoint, expectedPassphrase: networkConfig("testnet").passphrase });
-  const artifactVerification = await verifyArtifactEvidence("access-control");
-  const artifactVerified = artifactVerification.status === "VERIFIED_MATCH";
+  const artifactVerification = await verifyCandidateArtifact("access-control");
+  const artifactVerified = artifactVerification.status === "CANDIDATE_VERIFIED";
   const artifactStatus = artifactVerification.status;
 
   // Determine account status if supplied, else NOT_SUPPLIED
@@ -55,6 +54,13 @@ export async function POST(request: Request): Promise<Response> {
       reconciliationRequired: restored.reconciliationRequired,
       session: reconciled.session,
       status: reconciled.status,
+      artifact: {
+        authority: "CANDIDATE",
+        verified: artifactVerified,
+        status: artifactStatus,
+        candidateHash: "candidateHash" in artifactVerification ? artifactVerification.candidateHash : null,
+        actualHash: "actualHash" in artifactVerification ? artifactVerification.actualHash : null,
+      },
       historyLength: reconciled.session.snapshots.length,
       note: "Restored session preserves historical lifecycle state. Current environment requires fresh reconciliation. No signing/submission performed.",
     },

@@ -93,7 +93,10 @@ describe("versioned artifact provenance", () => {
     mockFiles({ wasm: dummyWasm, manifest: { schemaVersion: "1.0.0", candidates: [{ ...candidate, artifactHash: dummyHash }] } });
     const result = await verifyCandidateArtifact("access-control");
     expect(result.status).toBe("CANDIDATE_VERIFIED");
-    if (result.status === "CANDIDATE_VERIFIED") expect(result.actualHash).toBe(dummyHash);
+    if (result.status === "CANDIDATE_VERIFIED") {
+      expect(result.actualHash).toBe(dummyHash);
+      expect(result.verifiedArtifactBytes).toEqual(dummyWasm);
+    }
   });
 
   it("keeps historical verification separate from candidate verification", async () => {

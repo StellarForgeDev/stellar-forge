@@ -43,11 +43,17 @@ const DEPLOYMENT_ACCOUNT = "GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7P
 const ADMIN = "GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW";
 const EXPECTED_HASH = "dbc9527173eb86ad1ba2d155a14910062f8c33a871fe59b871aaa83148f0abfd";
 
-vi.mock("@/lib/verification/artifact-evidence-verification", () => ({
-  verifyArtifactEvidence: vi.fn().mockResolvedValue({
+vi.mock("@/lib/verification/artifact-provenance", () => ({
+  verifyCandidateArtifact: vi.fn().mockResolvedValue({
+    status: "CANDIDATE_VERIFIED",
+    actualHash: "mocked-hash",
+    candidateHash: "mocked-hash",
+    candidate: {}
+  }),
+  verifyHistoricalArtifact: vi.fn().mockResolvedValue({
     status: "VERIFIED_MATCH",
-    wasmHash: "mocked-hash",
-    evidenceHash: "mocked-hash"
+    wasmHash: "historical-hash",
+    evidenceHash: "historical-hash"
   })
 }));
 

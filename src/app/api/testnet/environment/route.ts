@@ -5,7 +5,7 @@ import { networkConfig } from "@/lib/transactions/networks";
 import { inspectPublicAccount, createTestnetAccountReader } from "@/lib/verification/account-inspection";
 import { StrKey } from "@stellar/stellar-sdk";
 import type { DeploymentEvidence } from "@/lib/verification/deployment-evidence";
-import { verifyArtifactEvidence } from "@/lib/verification/artifact-evidence-verification";
+import { verifyCandidateArtifact, verifyHistoricalArtifact } from "@/lib/verification/artifact-provenance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +39,8 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const accessControl = evidence.find((e) => e.componentId === "access-control");
-  const artifactVerification = await verifyArtifactEvidence("access-control");
+  const candidateVerification = await verifyCandidateArtifact("access-control");
+  const historicalVerification = await verifyHistoricalArtifact("access-control");
 
   const artifactRetrieval = evidence.length ? `${evidence.length} historical components observed` : "NOT_OBSERVED";
 
@@ -64,7 +65,7 @@ export async function GET(request: Request): Promise<Response> {
   let preflightStatus = "BLOCKED";
   let blocker = "UNKNOWN";
   if (connectivity.status !== "NETWORK_OK") blocker = connectivity.failureCategory ?? "RPC_UNAVAILABLE";
-  else if (artifactVerification.status !== "VERIFIED_MATCH") blocker = `ARTIFACT_${artifactVerification.status}`;
+  else if (candidateVerification.status !== "CANDIDATE_VERIFIED") blocker = `CANDIDATE_ARTIFACT_${candidateVerification.status}`;
   else if (accountReadiness.status !== "ACCOUNT_READY") blocker = accountReadiness.status;
   else if (constructorReadiness.status !== "READY • valid G...") blocker = constructorReadiness.status;
   else { preflightStatus = "READY"; blocker = "READY_FOR_LIVE_DEPLOYMENT (all gates PASS)"; }
@@ -72,7 +73,7 @@ export async function GET(request: Request): Promise<Response> {
   // For Phase 24, never return READY_FOR_LIVE_DEPLOYMENT unless all gates genuinely PASS; in this aggregate endpoint without explicit funded account, will remain BLOCKED
   if (accountReadiness.status !== "ACCOUNT_READY" || constructorReadiness.status !== "READY • valid G...") {
     preflightStatus = "BLOCKED";
-    if (connectivity.status === "NETWORK_OK" && artifactVerification.status === "VERIFIED_MATCH") {
+    if (connectivity.status === "NETWORK_OK" && candidateVerification.status === "CANDIDATE_VERIFIED") {
       blocker = accountReadiness.status === "ACCOUNT_NOT_SUPPLIED" ? "ACCOUNT_NOT_SUPPLIED" : accountReadiness.status.includes("UNFUNDED") ? "ACCOUNT_UNFUNDED" : constructorReadiness.status;
     }
   }
@@ -96,8 +97,11 @@ export async function GET(request: Request): Promise<Response> {
         latencyMs: connectivity.latencyMs,
       },
       artifact: {
-        accessControl: artifactVerification.status,
-        accessControlVerified: artifactVerification.status === "VERIFIED_MATCH",
+        authority: "CANDIDATE",
+        accessControl: candidateVerification.status,
+        accessControlVerified: candidateVerification.status === "CANDIDATE_VERIFIED",
+        candidateHash: "candidateHash" in candidateVerification ? candidateVerification.candidateHash : null,
+        historicalStatus: historicalVerification.status,
         historicalEvidence: accessControl?.status.join(",") ?? "UNKNOWN",
         retrieval: artifactRetrieval,
         token: evidence.find((e) => e.componentId === "token")?.status.join(",") ?? "UNKNOWN",

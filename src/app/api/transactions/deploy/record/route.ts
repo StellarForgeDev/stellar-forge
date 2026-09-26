@@ -5,6 +5,7 @@ import { StrKey } from "@stellar/stellar-sdk";
 import { canonicalTestnetServer, confirmedTransactionExists } from "@/lib/transactions/deployment";
 import { ACCESS_CONTROL_WORKFLOW } from "@/lib/verification/network-workflow";
 import { evidencePersistenceMode } from "@/lib/verification/evidence-persistence";
+import { verifyCandidateArtifact } from "@/lib/verification/artifact-provenance";
 
 export const runtime = "nodejs";
 const registryPath = path.join(process.cwd(), "contracts", "testnet-verification-deployments.json");
@@ -24,11 +25,13 @@ export async function POST(request: Request): Promise<Response> {
   const server = canonicalTestnetServer();
   if (!(await confirmedTransactionExists(server, uploadHash)) || !(await confirmedTransactionExists(server, deploymentHash))) return Response.json({ error: "Both deployment stages must be RPC-confirmed before evidence recording." }, { status: 409 });
   try {
+    const candidate = await verifyCandidateArtifact(ACCESS_CONTROL_WORKFLOW.componentId);
+    if (candidate.status !== "CANDIDATE_VERIFIED") return Response.json({ error: "The authorized deployment candidate is unavailable or does not match the canonical artifact.", candidateStatus: candidate.status }, { status: 409 });
     const localWasm = await readFile(path.join(process.cwd(), "contracts", "prebuilt", `${ACCESS_CONTROL_WORKFLOW.componentId}.wasm`));
     const deployedWasm = await server.getContractWasmByContractId(contractId);
     const localArtifactHash = createHash("sha256").update(localWasm).digest("hex");
     const deployedArtifactHash = createHash("sha256").update(deployedWasm).digest("hex");
-    if (localArtifactHash !== deployedArtifactHash) return Response.json({ error: "Independent deployed artifact verification failed." }, { status: 409 });
+    if (localArtifactHash !== candidate.candidateHash || deployedArtifactHash !== candidate.candidateHash) return Response.json({ error: "Independent deployed artifact verification failed.", candidateHash: candidate.candidateHash, localArtifactHash, deployedArtifactHash }, { status: 409 });
     const persistence = evidencePersistenceMode();
     if (persistence === "runtime-non-durable") {
       return Response.json({

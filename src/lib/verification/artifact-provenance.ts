@@ -31,7 +31,7 @@ export interface CanonicalArtifactIdentity {
 }
 
 export type CandidateVerificationResult =
-  | { status: "CANDIDATE_VERIFIED"; actualHash: string; candidateHash: string; candidate: ArtifactCandidate }
+  | { status: "CANDIDATE_VERIFIED"; actualHash: string; candidateHash: string; candidate: ArtifactCandidate; verifiedArtifactBytes: Buffer }
   | { status: "CANDIDATE_MISMATCH"; actualHash: string; candidateHash: string; candidate: ArtifactCandidate }
   | { status: "CANDIDATE_MANIFEST_UNAVAILABLE"; error: string }
   | { status: "ARTIFACT_UNAVAILABLE"; error: string }
@@ -120,7 +120,7 @@ export async function verifyCandidateArtifact(component: string): Promise<Candid
   if (artifact.identity.sha256 !== candidate.artifactHash) {
     return { status: "CANDIDATE_MISMATCH", actualHash: artifact.identity.sha256, candidateHash: candidate.artifactHash, candidate };
   }
-  return { status: "CANDIDATE_VERIFIED", actualHash: artifact.identity.sha256, candidateHash: candidate.artifactHash, candidate };
+  return { status: "CANDIDATE_VERIFIED", actualHash: artifact.identity.sha256, candidateHash: candidate.artifactHash, candidate, verifiedArtifactBytes: artifact.bytes };
 }
 
 export async function verifyHistoricalArtifact(component: string): Promise<ArtifactEvidenceVerificationResult> {

@@ -7,14 +7,14 @@ describe("Testnet Deploy UI invariants", () => {
     const pageContent = readFileSync(path.join(process.cwd(), "src/app/testnet/deploy/page.tsx"), "utf8");
     const panelContent = readFileSync(path.join(process.cwd(), "src/components/testnet/ControlledDeploymentPanel.tsx"), "utf8");
 
-    // The page must use verifyArtifactEvidence instead of directly using accessEvidence.status
-    expect(pageContent).toMatch(/verifyArtifactEvidence/);
+    // The deployment page must use candidate authorization instead of historical evidence status.
+    expect(pageContent).toMatch(/verifyCandidateArtifact/);
     expect(pageContent).toMatch(/artifactStatus=\{verification\.status\}/);
     expect(pageContent).not.toMatch(/artifactVerified=\{accessEvidence\.status\.includes\("VERIFIED_MATCH"\)\}/);
 
     // The panel must accept artifactStatus as a string, not a boolean artifactVerified
     expect(panelContent).toMatch(/artifactStatus: string/);
-    expect(panelContent).toMatch(/const isVerified = artifactStatus === "VERIFIED_MATCH";/);
+    expect(panelContent).toMatch(/const isVerified = artifactStatus === "CANDIDATE_VERIFIED";/);
     expect(panelContent).toMatch(/BLOCKED • \$\{artifactStatus\}/);
   });
 });

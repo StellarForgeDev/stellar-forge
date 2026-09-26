@@ -1,6 +1,8 @@
 import { submitTransaction } from "@/lib/transactions/submit";
 import { isTransactionNetwork } from "@/lib/transactions/networks";
 import type { TransactionNetwork } from "@/lib/transactions/networks";
+import { verifyCandidateArtifact } from "@/lib/verification/artifact-provenance";
+import { validateControlledDeploymentTransaction } from "@/lib/verification/controlled-deployment-transaction";
 
 export const runtime = "nodejs";
 
@@ -38,6 +40,17 @@ export async function POST(request: Request): Promise<Response> {
       "request must include only a supported network and a signed transaction XDR",
       400,
     );
+  }
+
+  if (requestBody.controlledDeployment) {
+    const candidate = await verifyCandidateArtifact("access-control");
+    if (candidate.status !== "CANDIDATE_VERIFIED") {
+      return jsonError("The controlled deployment candidate is no longer authorized.", 409, "controlled-deployment.candidate-stale");
+    }
+    const transactionCheck = validateControlledDeploymentTransaction(requestBody.signedXdr, candidate.candidateHash);
+    if (!transactionCheck.ok) {
+      return jsonError(transactionCheck.error, 409, "controlled-deployment.artifact-mismatch");
+    }
   }
 
   const result = await submitTransaction(requestBody);

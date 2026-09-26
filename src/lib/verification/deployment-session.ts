@@ -315,7 +315,7 @@ export function invalidateSessionIfNeeded(session: DeploymentSession, prereqs: S
     }
     if (!prereqs.artifact.verified) {
       if (current !== "ARTIFACT_BLOCKED") {
-        const res = transitionDeploymentSession(session, "ARTIFACT_BLOCKED", { blockingReason: `ARTIFACT_BLOCKED: ${prereqs.artifact.status}`, failure: { stage: current, classification: "ARTIFACT_BLOCKED", message: "Artifact no longer VERIFIED_MATCH", observedAt: nowIso(), recoverable: true, recommendedNextAction: "Refresh artifact evidence" } });
+        const res = transitionDeploymentSession(session, "ARTIFACT_BLOCKED", { blockingReason: `ARTIFACT_BLOCKED: ${prereqs.artifact.status}`, failure: { stage: current, classification: "ARTIFACT_BLOCKED", message: "Deployment artifact authority is no longer verified", observedAt: nowIso(), recoverable: true, recommendedNextAction: "Refresh deployment artifact verification" } });
         if ("session" in res) return res.session;
       }
       return session;

@@ -1,5 +1,6 @@
 import type { TestnetConnectivityDiagnostic } from "./testnet-connectivity";
 import type { DeploymentEvidence } from "./deployment-evidence";
+import type { CandidateVerificationResult } from "./artifact-provenance";
 
 export type FinalReadinessStatus = "READY_FOR_CONTROLLED_TESTNET_DEPLOYMENT" | "NOT_READY" | "LOCAL_ARTIFACT_MISMATCH" | "EVIDENCE_UNAVAILABLE" | "ARTIFACT_UNAVAILABLE";
 
@@ -44,6 +45,8 @@ export function evaluateFinalReadiness(input: {
   connectivity: TestnetConnectivityDiagnostic | null;
   artifactEvidence: DeploymentEvidence[] | null;
   artifactVerification?: import("./artifact-evidence-verification").ArtifactEvidenceVerificationResult;
+  candidateVerification?: CandidateVerificationResult;
+  deploymentArtifactAuthority?: "CANDIDATE";
   deploymentAccount: { supplied: boolean; valid: boolean; status: string; exists: boolean | null; sufficientBalance: boolean | null } | null;
   constructorAdmin: { supplied: boolean; valid: boolean; status: string } | null;
   deploymentGuards: { uploadPreparationOk: boolean; createRequiresConfirmedUpload: boolean; signingExplicit: boolean; submissionExplicit: boolean; noAutoRetry: boolean } | null;
@@ -93,7 +96,17 @@ export function evaluateFinalReadiness(input: {
   }
 
   // Artifact gate
-  if (input.artifactVerification) {
+  if (input.deploymentArtifactAuthority === "CANDIDATE" && !input.candidateVerification) {
+    gates.artifact = { name: "Artifact", status: "BLOCKED", blockingCategory: "ARTIFACT", blockingReason: "Candidate verification is required for controlled deployment readiness.", recommendedAction: "Verify the deployment candidate" };
+  } else if (input.candidateVerification) {
+    if (input.candidateVerification.status === "CANDIDATE_VERIFIED") {
+      gates.artifact = { name: "Artifact", status: "PASS", blockingReason: "Current canonical artifact matches the authorized deployment candidate." };
+    } else if (input.candidateVerification.status === "CANDIDATE_MISMATCH") {
+      gates.artifact = { name: "Artifact", status: "FAIL", blockingCategory: "ARTIFACT", blockingReason: "The current canonical artifact does not match the authorized deployment candidate.", recommendedAction: "Verify the candidate artifact and manifest" };
+    } else {
+      gates.artifact = { name: "Artifact", status: "BLOCKED", blockingCategory: "ARTIFACT", blockingReason: input.candidateVerification.error, recommendedAction: "Restore and verify the deployment candidate" };
+    }
+  } else if (input.artifactVerification) {
     if (input.artifactVerification.status === "VERIFIED_MATCH") {
       gates.artifact = { name: "Artifact", status: "PASS" };
     } else if (input.artifactVerification.status === "LOCAL_ARTIFACT_MISMATCH") {
@@ -278,7 +291,17 @@ export function evaluateFinalReadiness(input: {
     status = "READY_FOR_CONTROLLED_TESTNET_DEPLOYMENT";
   }
 
-  if (input.artifactVerification && input.artifactVerification.status !== "VERIFIED_MATCH") {
+  if (input.deploymentArtifactAuthority === "CANDIDATE" && !input.candidateVerification) {
+    status = "NOT_READY";
+    blockingCategory = "ARTIFACT";
+    blockingReason = "Candidate verification is required for controlled deployment readiness.";
+    recommendedAction = "Verify the deployment candidate";
+  } else if (input.candidateVerification && input.candidateVerification.status !== "CANDIDATE_VERIFIED") {
+    status = "NOT_READY";
+    blockingCategory = gates.artifact.blockingCategory ?? "ARTIFACT";
+    blockingReason = gates.artifact.blockingReason ?? "Deployment candidate verification failed";
+    recommendedAction = gates.artifact.recommendedAction ?? "Verify the deployment candidate";
+  } else if (!input.candidateVerification && input.artifactVerification && input.artifactVerification.status !== "VERIFIED_MATCH") {
     status = input.artifactVerification.status;
     blockingCategory = gates.artifact.blockingCategory ?? "ARTIFACT";
     blockingReason = gates.artifact.blockingReason ?? "Artifact verification failed";

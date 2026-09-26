@@ -20,9 +20,10 @@ vi.mock("@/lib/verification/account-inspection", () => ({
   createTestnetAccountReader: vi.fn()
 }));
 
-const mockVerify = vi.fn();
-vi.mock("@/lib/verification/artifact-evidence-verification", () => ({
-  verifyArtifactEvidence: (...args: unknown[]) => mockVerify(...args)
+const mockCandidateVerify = vi.fn();
+vi.mock("@/lib/verification/artifact-provenance", () => ({
+  verifyCandidateArtifact: (...args: unknown[]) => mockCandidateVerify(...args),
+  verifyHistoricalArtifact: async () => ({ status: "VERIFIED_MATCH", wasmHash: "historical-hash", evidenceHash: "historical-hash" }),
 }));
 
 vi.mock("@/lib/transactions/deployment", () => ({
@@ -61,7 +62,7 @@ describe("Cross-Endpoint Artifact Invariant", () => {
   });
 
   it("1. Current artifact matches evidence (all PASS)", async () => {
-    mockVerify.mockResolvedValue({ status: "VERIFIED_MATCH", wasmHash: "dummy-hash", evidenceHash: "dummy-hash" });
+    mockCandidateVerify.mockResolvedValue({ status: "CANDIDATE_VERIFIED", actualHash: "dummy-hash", candidateHash: "dummy-hash", candidate: {} });
 
     // Readiness
     const readinessRes = await getReadiness(new Request("http://localhost/api/testnet/readiness?account=GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW&admin=GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW"));
@@ -74,7 +75,7 @@ describe("Cross-Endpoint Artifact Invariant", () => {
     const reconcileRes = await getReconcile(new Request("http://localhost/api/testnet/deployment-session/reconcile"));
     const reconcileBody = await reconcileRes.json();
     expect(reconcileBody.artifact.verified).toBe(true);
-    expect(reconcileBody.artifact.status).toBe("VERIFIED_MATCH");
+    expect(reconcileBody.artifact.status).toBe("CANDIDATE_VERIFIED");
 
     // Prepare
     const prepareReq = new Request("http://localhost/api/transactions/deploy/prepare", {
@@ -89,13 +90,13 @@ describe("Cross-Endpoint Artifact Invariant", () => {
   });
 
   it("2. Current artifact mismatches evidence (BLOCKED / 409)", async () => {
-    mockVerify.mockResolvedValue({ status: "LOCAL_ARTIFACT_MISMATCH", wasmHash: "different", evidenceHash: "dummy-hash", error: "Mismatch" });
+    mockCandidateVerify.mockResolvedValue({ status: "CANDIDATE_MISMATCH", actualHash: "different", candidateHash: "dummy-hash", candidate: {} });
 
     // Readiness
     const readinessRes = await getReadiness(new Request("http://localhost/api/testnet/readiness?account=GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW&admin=GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW"));
     const readinessBody = await readinessRes.json();
     expect(readinessBody.gates.artifact.status).toBe("FAIL");
-    expect(readinessBody.finalReadiness).toBe("LOCAL_ARTIFACT_MISMATCH");
+    expect(readinessBody.finalReadiness).toBe("NOT_READY");
 
     // Reconciliation
     const reconcileRes = await getReconcile(new Request("http://localhost/api/testnet/deployment-session/reconcile"));
@@ -113,11 +114,11 @@ describe("Cross-Endpoint Artifact Invariant", () => {
   });
 
   it("3. Missing artifact", async () => {
-    mockVerify.mockResolvedValue({ status: "ARTIFACT_UNAVAILABLE", error: "Missing wasm" });
+    mockCandidateVerify.mockResolvedValue({ status: "ARTIFACT_UNAVAILABLE", error: "Missing wasm" });
 
     const readinessRes = await getReadiness(new Request("http://localhost/api/testnet/readiness"));
     const readinessBody = await readinessRes.json();
-    expect(readinessBody.finalReadiness).toBe("ARTIFACT_UNAVAILABLE");
+    expect(readinessBody.finalReadiness).toBe("NOT_READY");
 
     const reconcileRes = await getReconcile(new Request("http://localhost/api/testnet/deployment-session/reconcile"));
     const reconcileBody = await reconcileRes.json();
@@ -132,15 +133,15 @@ describe("Cross-Endpoint Artifact Invariant", () => {
   });
 
   it("4. Missing evidence", async () => {
-    mockVerify.mockResolvedValue({ status: "EVIDENCE_UNAVAILABLE", error: "Missing evidence" });
+    mockCandidateVerify.mockResolvedValue({ status: "CANDIDATE_MANIFEST_UNAVAILABLE", error: "Missing evidence" });
 
     const readinessRes = await getReadiness(new Request("http://localhost/api/testnet/readiness"));
     const readinessBody = await readinessRes.json();
-    expect(readinessBody.finalReadiness).toBe("EVIDENCE_UNAVAILABLE");
+    expect(readinessBody.finalReadiness).toBe("NOT_READY");
 
     const reconcileRes = await getReconcile(new Request("http://localhost/api/testnet/deployment-session/reconcile"));
     const reconcileBody = await reconcileRes.json();
-    expect(reconcileBody.artifact.status).toBe("EVIDENCE_UNAVAILABLE");
+    expect(reconcileBody.artifact.status).toBe("CANDIDATE_MANIFEST_UNAVAILABLE");
 
     const prepareReq = new Request("http://localhost/api/transactions/deploy/prepare", {
       method: "POST",
