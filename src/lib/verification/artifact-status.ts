@@ -39,3 +39,20 @@ export function hasStatus(
 ): boolean {
   return statuses.includes(status);
 }
+
+export interface VerificationDecisionInput {
+  verified?: unknown;
+  deployedHash?: string | null;
+  candidateHash?: string | null;
+  localArtifactHash: string | null;
+}
+
+export function evaluateVerificationDecision(input: VerificationDecisionInput): { success: boolean; error?: string } {
+  if (input.verified !== true || !input.deployedHash || !input.candidateHash) {
+    return { success: false, error: `Independent verification failed: deployed WASM hash (${input.deployedHash ?? 'missing'}) does not match authoritative candidate (${input.candidateHash ?? 'missing'}).` };
+  }
+  if (input.candidateHash !== input.localArtifactHash || input.deployedHash !== input.localArtifactHash) {
+    return { success: false, error: `Independent verification failed: local artifact evidence (${input.localArtifactHash}) does not match server verification.` };
+  }
+  return { success: true };
+}

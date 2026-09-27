@@ -17,11 +17,31 @@ import {
   restoreDeploymentSession,
   transitionDeploymentSession,
 } from "@/lib/verification/deployment-session";
+import { evaluateVerificationDecision } from "@/lib/verification/artifact-status";
 import { clearDeploymentSession, saveDeploymentSession } from "@/lib/verification/deployment-session-persistence";
 import { serializeDeploymentSession } from "@/lib/verification/deployment-session";
 
 type StageResult = { transactionXdr: string; simulation: { status: string; error?: string }; artifact: { path: string; sha256: string }; constructorArgs: Record<string, string> };
 type ReadinessResult = { finalReadiness?: string; blockingCategory?: string | null; blockingReason?: string | null; recommendedAction?: string | null; artifact?: { authority?: string; accessControl?: string; candidateHash?: string | null; hash?: string | null }; gates?: Record<string, { status: string; blockingReason?: string }> };
+
+export function resolvePanelVerificationDecision(
+  responseOk: boolean,
+  result: { deployedHash?: string; candidateHash?: string | null; verified?: unknown; error?: string },
+  localArtifactHash: string | null
+): { success: boolean; error?: string } {
+  if (!responseOk) {
+    return { success: false, error: result.error ?? "Independent verification failed: server returned an error." };
+  }
+  if (result.error) {
+    return { success: false, error: result.error };
+  }
+  return evaluateVerificationDecision({
+    verified: result.verified,
+    deployedHash: result.deployedHash,
+    candidateHash: result.candidateHash,
+    localArtifactHash
+  });
+}
 type AuthoritativeRefreshResult = { ok: true; readiness: ReadinessResult; session: import("@/lib/verification/deployment-session").DeploymentSession } | { ok: false; error: string };
 
 export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifactStatus, connectivityHealthy }: { artifactHash: string | null; artifactPath: string; artifactStatus: string; connectivityHealthy: boolean }) {
@@ -359,12 +379,17 @@ export function ControlledDeploymentPanel({ artifactHash, artifactPath, artifact
     const pendingSession = advanceSession(["INDEPENDENT_VERIFICATION_PENDING"], { contractId });
     if (!pendingSession) return;
     const response = await fetch("/api/transactions/deploy/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ contractId }) });
-    const result = await response.json() as { deployedHash?: string; artifactHash?: string | null; verified?: boolean; error?: string };
-    if (!response.ok || !result.deployedHash) { setError(result.error ?? "The deployed contract could not be independently verified."); return; }
-    if (!result.verified || result.deployedHash !== artifactHash || result.artifactHash !== artifactHash) { setError("Independent verification failed: deployed WASM hash does not exactly match authoritative artifact evidence."); return; }
-    const verifiedSession = advanceSession(["INDEPENDENTLY_VERIFIED"], { contractId, artifactHash: result.deployedHash }, pendingSession);
+    const result = await response.json() as { deployedHash?: string; candidateHash?: string | null; verified?: unknown; error?: string };
+
+    const decision = resolvePanelVerificationDecision(response.ok, result, artifactHash);
+
+    if (!decision.success) {
+      setError(decision.error!);
+      return;
+    }
+    const verifiedSession = advanceSession(["INDEPENDENTLY_VERIFIED"], { contractId, artifactHash: result.deployedHash as string }, pendingSession);
     if (!verifiedSession) return;
-    setDeployedHash(result.deployedHash);
+    setDeployedHash(result.deployedHash as string);
   }
 
   async function inspectAccount() {
