@@ -254,157 +254,26 @@ function verifyFromPackage(dir) {
   }
 
   const metadata = readJsonIfExists(metadataPath);
-  if (!metadata || typeof metadata !== "object") {
-    console.error(`[verify-prebuilt] invalid metadata.json`);
-    process.exit(1);
-  }
-
-  for (const field of ["version", "gitCommit", "sdkVersion", "target", "toolchain"]) {
-    if (typeof metadata[field] !== "string" || metadata[field].trim().length === 0) {
-      console.error(`[verify-prebuilt] metadata.json ${field} must be a non-empty string`);
-      process.exit(1);
-    }
-  }
-  if (metadata.gitCommit !== "unknown" && !/^[a-f0-9]{40}$/.test(metadata.gitCommit)) {
-    console.error("[verify-prebuilt] metadata.json gitCommit must be a 40-character hexadecimal commit or unknown");
-    process.exit(1);
-  }
-  if (!Object.prototype.hasOwnProperty.call(metadata, "contracts")) {
-    console.error("[verify-prebuilt] metadata.json missing field: contracts");
-    process.exit(1);
-  }
-
-  if (!isPlainObject(metadata.contracts)) {
-    console.error(`[verify-prebuilt] metadata.contracts must be a plain object`);
-    process.exit(1);
-  }
-
-  const metadataContracts = Object.keys(metadata.contracts).sort();
-  if (metadataContracts.length === 0) {
-    console.error(`[verify-prebuilt] metadata.contracts is empty`);
-    process.exit(1);
-  }
-
-  // Parse checksums.txt
   const checksumsRaw = readFileSync(checksumsPath, "utf8");
-  const lines = checksumsRaw.split("\n").filter((l) => l.trim().length > 0);
-  const checksumsMap = new Map();
-  for (const line of lines) {
-    const match = line.match(/^([a-f0-9]{64})\s+(\S+)$/);
-    if (!match) {
-      console.error(`[verify-prebuilt] invalid checksums.txt line: ${line}`);
-      process.exit(1);
-    }
-    const [, hash, file] = match;
-    if (checksumsMap.has(file)) {
-      console.error(`[verify-prebuilt] duplicate checksums.txt entry: ${file}`);
-      process.exit(1);
-    }
-    checksumsMap.set(file, hash);
-  }
 
-  if (checksumsMap.size !== metadataContracts.length) {
-    console.error(
-      `[verify-prebuilt] metadata and checksums artifact count mismatch: ${metadataContracts.length} vs ${checksumsMap.size}`,
-    );
-    process.exit(1);
-  }
+  const wasmFilesOnDisk = readdirSync(absDir)
+    .filter(f => f.endsWith(".wasm"))
+    .map(file => ({
+      file,
+      hash: computeSha256(path.join(absDir, file))
+    }));
 
-  let failed = 0;
-  for (const slug of metadataContracts) {
-    if (!isSafeArtifactSlug(slug)) {
-      console.error(`[verify-prebuilt] unsafe metadata contract key: ${slug}`);
-      failed++;
-      continue;
-    }
-    const entry = metadata.contracts[slug];
-    if (!isPlainObject(entry)) {
-      console.error(`[verify-prebuilt] metadata missing entry for ${slug}`);
-      failed++;
-      continue;
-    }
-    const { package: pkg, crate, file, sha256 } = entry;
-    if (typeof pkg !== "string" || typeof crate !== "string" || typeof file !== "string" || typeof sha256 !== "string") {
-      console.error(`[verify-prebuilt] metadata entry for ${slug} has invalid fields`);
-      failed++;
-      continue;
-    }
-    if (pkg !== slug) {
-      console.error(`[verify-prebuilt] metadata ${slug} package mismatch: ${pkg}`);
-      failed++;
-    }
-    if (crate !== pkg.replace(/-/g, "_")) {
-      console.error(`[verify-prebuilt] metadata ${slug} crate mismatch: ${crate}`);
-      failed++;
-    }
-    if (!isSafeWasmBasename(file)) {
-      console.error(`[verify-prebuilt] metadata ${slug} file is unsafe: ${file}`);
-      failed++;
-      continue;
-    }
-    if (!/^[a-f0-9]{64}$/.test(sha256)) {
-      console.error(`[verify-prebuilt] metadata ${slug} has invalid sha256: ${sha256}`);
-      failed++;
-      continue;
-    }
-    const expectedFile = `${pkg}.wasm`;
-    if (file !== expectedFile) {
-      console.error(`[verify-prebuilt] metadata ${slug} file mismatch: expected ${expectedFile}, got ${file}`);
-      failed++;
-      continue;
-    }
-    const filePath = safeArtifactPath(absDir, file);
-    if (!filePath) {
-      console.error(`[verify-prebuilt] metadata ${slug} file escapes artifact directory: ${file}`);
-      failed++;
-      continue;
-    }
-    if (!existsSync(filePath)) {
-      console.error(`[verify-prebuilt] missing WASM for ${slug}: ${filePath}`);
-      failed++;
-      continue;
-    }
-    const actualHash = computeSha256(filePath);
-    if (actualHash !== sha256) {
-      console.error(`[verify-prebuilt] hash mismatch for ${file}: expected ${sha256}, got ${actualHash}`);
-      failed++;
-      continue;
-    }
-    const checksumsHash = checksumsMap.get(file);
-    if (!checksumsHash) {
-      console.error(`[verify-prebuilt] checksums.txt missing entry for ${file}`);
-      failed++;
-      continue;
-    }
-    if (checksumsHash !== sha256) {
-      console.error(`[verify-prebuilt] metadata vs checksums mismatch for ${file}: ${sha256} vs ${checksumsHash}`);
-      failed++;
-      continue;
-    }
-    if (checksumsHash !== actualHash) {
-      console.error(`[verify-prebuilt] checksums.txt hash mismatch for ${file}`);
-      failed++;
-      continue;
-    }
-    console.log(`[verify-prebuilt] OK   ${slug} (${actualHash.slice(0, 8)}...)`);
-  }
+  const result = verifyArtifactIntegrity({
+    metadata,
+    checksumsRaw,
+    wasmFilesOnDisk
+  });
 
-  // Ensure checksums.txt has no extra entries beyond metadata
-  for (const file of checksumsMap.keys()) {
-    if (!isSafeWasmBasename(file)) {
-      console.error(`[verify-prebuilt] checksums.txt filename is unsafe: ${file}`);
-      failed++;
-      continue;
+  if (!result.success) {
+    for (const err of result.errors) {
+      console.error(`[verify-prebuilt] ${err}`);
     }
-    const slug = file.replace(/\.wasm$/, "");
-    if (!metadataContracts.includes(slug)) {
-      console.error(`[verify-prebuilt] checksums.txt has extra entry not in metadata: ${file}`);
-      failed++;
-    }
-  }
-
-  if (failed > 0) {
-    console.error(`[verify-prebuilt] ${failed} artifact(s) failed checksum verification`);
+    console.error(`[verify-prebuilt] ${result.errors.length} artifact(s) failed checksum verification`);
     process.exit(1);
   }
   console.log("[verify-prebuilt] all checksums verified OK (checksum-only mode)");
@@ -480,7 +349,160 @@ async function main() {
   verifyFromPackage(PREBUILT);
 }
 
-main().catch((err) => {
-  console.error("[verify-prebuilt] unexpected error:", err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error("[verify-prebuilt] unexpected error:", err);
+    process.exit(1);
+  });
+}
+
+
+export function verifyArtifactIntegrity({
+  metadata,
+  checksumsRaw,
+  wasmFilesOnDisk
+}) {
+  const errors = [];
+
+  if (!metadata || typeof metadata !== "object") {
+    errors.push("invalid metadata.json");
+    return { success: false, errors };
+  }
+
+  for (const field of ["version", "gitCommit", "sdkVersion", "target", "toolchain"]) {
+    if (typeof metadata[field] !== "string" || metadata[field].trim().length === 0) {
+      errors.push(`metadata.json ${field} must be a non-empty string`);
+    }
+  }
+
+  if (metadata.gitCommit !== "unknown" && !/^[a-f0-9]{40}$/.test(metadata.gitCommit)) {
+    errors.push("metadata.json gitCommit must be a 40-character hexadecimal commit or unknown");
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(metadata, "contracts")) {
+    errors.push("metadata.json missing field: contracts");
+    return { success: false, errors };
+  }
+
+  function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  if (!isPlainObject(metadata.contracts)) {
+    errors.push("metadata.contracts must be a plain object");
+    return { success: false, errors };
+  }
+
+  const metadataContracts = Object.keys(metadata.contracts).sort();
+  if (metadataContracts.length === 0) {
+    errors.push("metadata.contracts is empty");
+    return { success: false, errors };
+  }
+
+  if (typeof checksumsRaw !== "string") {
+    errors.push("invalid checksums.txt");
+    return { success: false, errors };
+  }
+
+  const lines = checksumsRaw.split("\n").filter((l) => l.trim().length > 0);
+  const checksumsMap = new Map();
+  for (const line of lines) {
+    const match = line.match(/^([a-f0-9]{64})\s+(\S+)$/);
+    if (!match) {
+      errors.push(`invalid checksums.txt line: ${line}`);
+      continue;
+    }
+    const [, hash, file] = match;
+    if (checksumsMap.has(file)) {
+      errors.push(`duplicate checksums.txt entry: ${file}`);
+    }
+    checksumsMap.set(file, hash);
+  }
+
+  if (checksumsMap.size !== metadataContracts.length) {
+    errors.push(`metadata and checksums artifact count mismatch: ${metadataContracts.length} vs ${checksumsMap.size}`);
+  }
+
+  const onDiskMap = new Map();
+  for (const { file, hash } of wasmFilesOnDisk) {
+    onDiskMap.set(file, hash);
+  }
+
+  for (const slug of metadataContracts) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      errors.push(`unsafe metadata contract key: ${slug}`);
+      continue;
+    }
+    const entry = metadata.contracts[slug];
+    if (!isPlainObject(entry)) {
+      errors.push(`metadata missing entry for ${slug}`);
+      continue;
+    }
+    const { package: pkg, crate, file, sha256 } = entry;
+    if (typeof pkg !== "string" || typeof crate !== "string" || typeof file !== "string" || typeof sha256 !== "string") {
+      errors.push(`metadata entry for ${slug} has invalid fields`);
+      continue;
+    }
+    if (pkg !== slug) {
+      errors.push(`metadata ${slug} package mismatch: ${pkg}`);
+    }
+    if (crate !== pkg.replace(/-/g, "_")) {
+      errors.push(`metadata ${slug} crate mismatch: ${crate}`);
+    }
+
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*\.wasm$/.test(file)) {
+      errors.push(`metadata ${slug} file is unsafe: ${file}`);
+      continue;
+    }
+    if (!/^[a-f0-9]{64}$/.test(sha256)) {
+      errors.push(`metadata ${slug} has invalid sha256: ${sha256}`);
+      continue;
+    }
+    const expectedFile = `${pkg}.wasm`;
+    if (file !== expectedFile) {
+      errors.push(`metadata ${slug} file mismatch: expected ${expectedFile}, got ${file}`);
+      continue;
+    }
+
+    if (!onDiskMap.has(file)) {
+      errors.push(`missing WASM for ${slug}: ${file}`);
+      continue;
+    }
+
+    const actualHash = onDiskMap.get(file);
+    if (actualHash !== sha256) {
+      errors.push(`hash mismatch for ${file}: expected ${sha256}, got ${actualHash}`);
+    }
+
+    const checksumsHash = checksumsMap.get(file);
+    if (!checksumsHash) {
+      errors.push(`checksums.txt missing entry for ${file}`);
+    } else if (checksumsHash !== sha256) {
+      errors.push(`metadata vs checksums mismatch for ${file}: ${sha256} vs ${checksumsHash}`);
+    } else if (checksumsHash !== actualHash) {
+      errors.push(`checksums.txt hash mismatch for ${file}`);
+    }
+  }
+
+  for (const file of checksumsMap.keys()) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*\.wasm$/.test(file)) {
+      if (!errors.some(e => e.includes(`checksums.txt filename is unsafe: ${file}`))) {
+        errors.push(`checksums.txt filename is unsafe: ${file}`);
+      }
+      continue;
+    }
+    const slug = file.replace(/\.wasm$/, "");
+    if (!metadataContracts.includes(slug)) {
+      errors.push(`checksums.txt has extra entry not in metadata: ${file}`);
+    }
+  }
+
+  for (const file of onDiskMap.keys()) {
+    const slug = file.replace(/\.wasm$/, "");
+    if (!metadataContracts.includes(slug)) {
+      errors.push(`unexpected extra WASM file on disk: ${file}`);
+    }
+  }
+
+  return { success: errors.length === 0, errors };
+}
