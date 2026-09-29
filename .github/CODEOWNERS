@@ -3,9 +3,17 @@
 * @Marvelg256
 
 # Explicitly sensitive paths for readability and future ownership expansion.
-/src/app/api/transactions/ @Marvelg256
+/.github/ @Marvelg256
+/contracts/ @Marvelg256
+/contracts/prebuilt/ @Marvelg256
+/contracts/deployment-candidates.json @Marvelg256
+/contracts/Cargo.toml @Marvelg256
+/contracts/Cargo.lock @Marvelg256
 /src/lib/transactions/ @Marvelg256
 /src/lib/verification/ @Marvelg256
 /src/lib/wallet/ @Marvelg256
+/src/app/api/transactions/ @Marvelg256
 /src/app/api/playground/ @Marvelg256
-/.github/ @Marvelg256
+/package.json @Marvelg256
+/pnpm-lock.yaml @Marvelg256
+/rust-toolchain.toml @Marvelg256
