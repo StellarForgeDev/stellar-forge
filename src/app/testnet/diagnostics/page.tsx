@@ -61,10 +61,10 @@ export default async function TestnetDiagnosticsPage() {
     ["Passphrase", diagnostic.networkPassphrase ?? "UNKNOWN"],
     ["Overall Classification", overallStatus],
     ["Precise Blocking Reason", blockingReason],
-    ["Latency", diagnostic.latencyMs ? `${diagnostic.latencyMs}ms` : "—"],
+    ["Latency", diagnostic.latencyMs ? `${diagnostic.latencyMs}ms` : "-"],
     ["Attempt Count", String(diagnostic.attemptCount ?? 1)],
     ["Last Observed", diagnostic.observedAt ?? "not recorded"],
-    ["Latest Successful Observation", evidence.find((e) => e.latestSuccessfulObservation)?.latestSuccessfulObservation?.observedAt ?? "none — historical preserved"],
+    ["Latest Successful Observation", evidence.find((e) => e.latestSuccessfulObservation)?.latestSuccessfulObservation?.observedAt ?? "none - historical preserved"],
     ["Previous Observation", evidence[0]?.observations?.[evidence[0].observations.length - 2]?.observedAt ?? "none"],
     ["Historical artifact retrieval", `${evidence.length ? summarizeArtifacts(evidence) : "NOT_OBSERVED"}`],
     ["Deployment account readiness", deploymentAccountStatus],
@@ -107,19 +107,20 @@ export default async function TestnetDiagnosticsPage() {
 
         <div className="mt-8 rounded-default border border-border bg-surface p-5">
           <h2 className="font-sans font-medium text-text-primary">Historical artifact retrieval (15 registered Testnet WASMs)</h2>
-          <p className="mt-2 text-xs leading-5 text-text-secondary">Fetched bytes are hashed and compared against local/prebuilt artifacts. Historical observations are preserved; unavailable results are never converted into mismatches. These rows reflect historical provenance — current deployment eligibility is assessed separately via the shared artifact verifier.</p>
+          <p className="mt-2 text-xs leading-5 text-text-secondary">Fetched bytes are hashed and compared against local/prebuilt artifacts. Historical observations are preserved; unavailable results are never converted into mismatches. These rows reflect historical provenance - current deployment eligibility is assessed separately via the shared artifact verifier.</p>
           <p className="mt-2 font-mono text-xs text-text-secondary">Registry: {registry.expectedCount ?? 15} expected • {registry.accountedCount ?? 0} accounted • {registry.errors?.length ?? 0} errors</p>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[700px] text-left text-xs">
-              <thead className="border-b border-border font-mono uppercase text-text-secondary"><tr><th className="p-2">Component</th><th className="p-2">Retrieval</th><th className="p-2">Effective</th><th className="p-2">Local hash</th><th className="p-2">Historical deployed</th></tr></thead>
+              <thead className="border-b border-border font-mono uppercase text-text-secondary"><tr><th className="p-2">Component</th><th className="p-2">Retrieval</th><th className="p-2">RPC retrieval</th><th className="p-2">Artifact status</th><th className="p-2">Local hash</th><th className="p-2">Historical deployed</th></tr></thead>
               <tbody>
-                {evidence.length === 0 && <tr><td colSpan={5} className="p-3 text-text-secondary">No evidence recorded.</td></tr>}
+                {evidence.length === 0 && <tr><td colSpan={6} className="p-3 text-text-secondary">No evidence recorded.</td></tr>}
                 {evidence.map((item) => (
                   <tr key={item.componentId} className="border-b border-border/60">
                     <td className="p-2 font-medium">{item.componentId}</td>
                     <td className="p-2">{item.latestObservation?.confidence ?? "NOT_OBSERVED"} {item.latestObservation?.errorCategory ? `(${item.latestObservation.errorCategory})` : ""}</td>
-                    <td className="p-2">{item.effectiveStatus ?? item.status.join(", ")}</td>
-                    <td className="p-2 font-mono text-[10px] break-all">{item.sourceArtifact.sha256?.slice(0, 12) ?? "—"}…</td>
+                    <td className="p-2">{item.rpcRetrievalStatus ?? "-"}</td>
+                    <td className="p-2">{item.status.join(", ")}</td>
+                    <td className="p-2 font-mono text-[10px] break-all">{item.sourceArtifact.sha256?.slice(0, 12) ?? "-"}…</td>
                     <td className="p-2 font-mono text-[10px] break-all">{item.deployedArtifact.sha256?.slice(0, 12) ?? "unavailable"} {item.status.includes("VERIFIED_MATCH") ? "Historical: VERIFIED" : ""}</td>
                   </tr>
                 ))}
@@ -192,7 +193,7 @@ function getBlockingReason(diagnostic: Diagnostic, evidence: DeploymentEvidence[
   if (diagnostic.rpc === "FAIL" || diagnostic.sorobanRpc === "FAIL") return "RPC_UNAVAILABLE";
   if (candidateVerification.status !== "CANDIDATE_VERIFIED") return `CANDIDATE_ARTIFACT_${candidateVerification.status}`;
   if (evidence.length < 15) return "ARTIFACT_RETRIEVAL_INCOMPLETE";
-  const unavailable = evidence.filter((e) => e.effectiveStatus === "TRANSIENT_FAILURE" || e.status.includes("DEPLOYMENT_UNAVAILABLE"));
+  const unavailable = evidence.filter((e) => e.rpcRetrievalStatus === "TRANSIENT_FAILURE" || e.status.includes("DEPLOYMENT_UNAVAILABLE"));
   if (unavailable.length) return `RPC_RETRIEVAL_TRANSIENT (${unavailable.length}/15 unavailable)`;
   return "AWAITING_EXPLICIT_ACCOUNT_AND_SIMULATION";
 }
@@ -202,6 +203,6 @@ function summarizeArtifacts(evidence: DeploymentEvidence[]): string {
   const verified = evidence.filter((e) => e.status.includes("VERIFIED_MATCH")).length;
   const mismatch = evidence.filter((e) => e.status.includes("DEPLOYMENT_MISMATCH")).length;
   const unavailable = evidence.filter((e) => e.status.includes("DEPLOYMENT_UNAVAILABLE")).length;
-  const transient = evidence.filter((e) => e.effectiveStatus === "TRANSIENT_FAILURE").length;
+  const transient = evidence.filter((e) => e.rpcRetrievalStatus === "TRANSIENT_FAILURE").length;
   return `${evidence.length} components • ${verified} VERIFIED_MATCH • ${mismatch} mismatch • ${unavailable} unavailable • ${transient} transient`;
 }

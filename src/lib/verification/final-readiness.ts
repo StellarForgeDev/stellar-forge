@@ -125,9 +125,20 @@ export function evaluateFinalReadiness(input: {
       gates.artifact = { name: "Artifact", status: "BLOCKED", blockingCategory: "ARTIFACT", blockingReason: "Access Control evidence missing", recommendedAction: "Refresh artifact" };
     } else if (!sourceHash || !prebuiltHash || sourceHash !== prebuiltHash) {
       gates.artifact = { name: "Artifact", status: "FAIL", blockingCategory: "ARTIFACT", blockingReason: "Source and prebuilt artifact hashes do not match.", recommendedAction: "Verify authoritative artifact" };
-    } else if (accessControl.latestObservation?.confidence === "TRANSIENT_FAILURE" || accessControl.effectiveStatus === "HISTORICAL_VERIFIED" || accessControl.effectiveStatus === "HISTORICAL_DEPLOYMENT_MISMATCH") {
-      gates.artifact = { name: "Artifact", status: "BLOCKED", blockingCategory: "ARTIFACT", blockingReason: `Current retrieval unavailable: ${accessControl.latestObservation?.errorCategory ?? accessControl.effectiveStatus}`, recommendedAction: "Refresh artifact retrieval (read-only)" };
-    } else if (!accessControl.status.includes("VERIFIED_MATCH") && !String(accessControl.effectiveStatus ?? "").includes("VERIFIED")) {
+    } else if (accessControl.latestObservation?.confidence === "TRANSIENT_FAILURE" || (accessControl.rpcRetrievalStatus === "HISTORICAL_VERIFIED" && !accessControl.status.includes("DEPLOYMENT_MISMATCH"))) {
+      gates.artifact = { name: "Artifact", status: "BLOCKED", blockingCategory: "ARTIFACT", blockingReason: `Current retrieval unavailable: ${accessControl.latestObservation?.errorCategory ?? accessControl.rpcRetrievalStatus}`, recommendedAction: "Refresh artifact retrieval (read-only)" };
+    } else if (accessControl.status.includes("DEPLOYMENT_MISMATCH") || accessControl.status.includes("LOCAL_ARTIFACT_MISMATCH")) {
+      const retrievalError = accessControl.rpcRetrievalStatus !== "VERIFIED" && accessControl.latestObservation?.errorCategory
+        ? ` (Retrieval unavailable: ${accessControl.latestObservation.errorCategory})`
+        : "";
+      gates.artifact = {
+        name: "Artifact",
+        status: "BLOCKED",
+        blockingCategory: "ARTIFACT",
+        blockingReason: `${accessControl.status.join(",")}${retrievalError}`,
+        recommendedAction: "Refresh artifact"
+      };
+    } else if (!accessControl.status.includes("VERIFIED_MATCH") && accessControl.rpcRetrievalStatus !== "VERIFIED") {
       gates.artifact = { name: "Artifact", status: "BLOCKED", blockingCategory: "ARTIFACT", blockingReason: accessControl.status.join(","), recommendedAction: "Refresh artifact" };
     } else {
       gates.artifact = { name: "Artifact", status: "PASS" };

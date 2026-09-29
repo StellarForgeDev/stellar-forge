@@ -20,14 +20,31 @@ describe("Testnet evidence reliability", () => {
   it("preserves verified evidence after a transient failure", () => {
     const verified = { source: "rpc", success: true, contractReachable: true, wasmAvailable: true, artifactHash: "a", observedAt: "1", retrievalMethod: "rpc", confidence: "VERIFIED" as const, authoritative: true, supersedesPrevious: true };
     const failed = { source: "rpc", success: false, contractReachable: null, wasmAvailable: false, artifactHash: null, observedAt: "2", retrievalMethod: "rpc", confidence: "TRANSIENT_FAILURE" as const, errorCategory: "TIMEOUT" as const, authoritative: false, supersedesPrevious: false };
-    expect(mergeRetrievalObservation([verified], failed).effectiveStatus).toBe("HISTORICAL_VERIFIED");
+    expect(mergeRetrievalObservation([verified], failed).rpcRetrievalStatus).toBe("HISTORICAL_VERIFIED");
   });
 
   it("keeps mismatch history distinct from a later unavailable observation", () => {
     const first = { source: "rpc", success: true, contractReachable: true, wasmAvailable: true, artifactHash: "a", observedAt: "1", retrievalMethod: "rpc", confidence: "VERIFIED" as const, authoritative: true, supersedesPrevious: true };
     const second = { ...first, artifactHash: "b", observedAt: "2" };
     const failed = { source: "rpc", success: false, contractReachable: null, wasmAvailable: false, artifactHash: null, observedAt: "3", retrievalMethod: "rpc", confidence: "TRANSIENT_FAILURE" as const, errorCategory: "RPC_UNAVAILABLE" as const, authoritative: false, supersedesPrevious: false };
-    expect(mergeRetrievalObservation([first, second], failed).effectiveStatus).toBe("HISTORICAL_DEPLOYMENT_MISMATCH");
+    expect(mergeRetrievalObservation([first, second], failed).rpcRetrievalStatus).toBe("HISTORICAL_VERIFIED");
+  });
+
+  it("successful RPC retrieval can be represented explicitly as rpcRetrievalStatus = VERIFIED even with mismatch", () => {
+    const evidence: DeploymentEvidence = { componentId: "access-control", network: "testnet", contractId: contract, sourceArtifact: { path: "a", sha256: "local-hash" }, prebuiltArtifact: { path: "b", sha256: "local-hash" }, deployedArtifact: { sha256: "remote-hash" }, artifactParity: { sourceMatchesPrebuilt: true, prebuiltMatchesDeployed: false, sourceMatchesDeployed: false }, provenance: { metadataCommit: null, currentRepositoryCommit: null }, verification: { verifiedAt: "1", verificationMethod: "stellar-sdk-rpc-getContractWasmByContractId" }, status: ["DEPLOYMENT_MISMATCH"] };
+    const observation = { source: "rpc", success: true, contractReachable: true, wasmAvailable: true, artifactHash: "remote-hash", observedAt: "2", retrievalMethod: "rpc", confidence: "VERIFIED" as const, authoritative: true, supersedesPrevious: true };
+    const merged = attachRetrievalObservation(evidence, observation);
+    expect(merged.rpcRetrievalStatus).toBe("VERIFIED");
+    expect(merged.status).toContain("DEPLOYMENT_MISMATCH");
+  });
+
+  it("a retrieval failure does not become an artifact mismatch", () => {
+    const evidence: DeploymentEvidence = { componentId: "access-control", network: "testnet", contractId: contract, sourceArtifact: { path: "a", sha256: "a" }, prebuiltArtifact: { path: "b", sha256: "a" }, deployedArtifact: { sha256: "a" }, artifactParity: { sourceMatchesPrebuilt: true, prebuiltMatchesDeployed: true, sourceMatchesDeployed: true }, provenance: { metadataCommit: null, currentRepositoryCommit: null }, verification: { verifiedAt: "1", verificationMethod: "stellar-sdk-rpc-getContractWasmByContractId" }, status: ["VERIFIED_MATCH"] };
+    const observation = { source: "rpc", success: false, contractReachable: null, wasmAvailable: false, artifactHash: null, observedAt: "2", retrievalMethod: "rpc", confidence: "TRANSIENT_FAILURE" as const, errorCategory: "TIMEOUT" as const, authoritative: false, supersedesPrevious: false };
+    const merged = attachRetrievalObservation(evidence, observation);
+    expect(merged.rpcRetrievalStatus).toBe("TRANSIENT_FAILURE");
+    expect(merged.status).not.toContain("DEPLOYMENT_MISMATCH");
+    expect(merged.status).toContain("VERIFIED_MATCH");
   });
 
   it("classifies unsupported methods and contract-not-found only from explicit errors", () => {

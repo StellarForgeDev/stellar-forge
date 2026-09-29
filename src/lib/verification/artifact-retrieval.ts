@@ -2,7 +2,7 @@ import { StrKey } from "@stellar/stellar-sdk";
 import { Server } from "@stellar/stellar-sdk/rpc";
 import { sha256Bytes } from "./artifact-verification.ts";
 import type { ArtifactRetrievalObservation, DeploymentEvidence } from "./deployment-evidence.ts";
-import type { EffectiveEvidenceStatus, EvidenceConfidence, RetrievalFailureCategory } from "./artifact-status.ts";
+import type { EvidenceConfidence, RetrievalFailureCategory } from "./artifact-status.ts";
 
 export interface ArtifactRetrievalStrategy {
   source: string;
@@ -65,17 +65,14 @@ export function classifyRetrievalError(error: unknown): { category: RetrievalFai
   return { category: "UNKNOWN_ERROR", message, contractReachable: null };
 }
 
-export function mergeRetrievalObservation(existing: ArtifactRetrievalObservation[] | undefined, observation: ArtifactRetrievalObservation): { observations: ArtifactRetrievalObservation[]; effectiveStatus: EffectiveEvidenceStatus } {
+export function mergeRetrievalObservation(existing: ArtifactRetrievalObservation[] | undefined, observation: ArtifactRetrievalObservation): { observations: ArtifactRetrievalObservation[]; rpcRetrievalStatus: EvidenceConfidence } {
   const observations = [...(existing ?? []), observation];
   const successful = [...observations].reverse().find((item) => item.success && item.artifactHash);
-  const hasMismatch = observations.some((item) => item.success && item.artifactHash && item.artifactHash !== successful?.artifactHash);
-  const effectiveStatus: EffectiveEvidenceStatus = successful ? (hasMismatch ? (observation.success ? "DEPLOYMENT_MISMATCH" : "HISTORICAL_DEPLOYMENT_MISMATCH") : !observation.success ? "HISTORICAL_VERIFIED" : "VERIFIED") : observation.confidence;
-  return { observations, effectiveStatus };
+  const rpcRetrievalStatus: EvidenceConfidence = successful ? (observation.success ? "VERIFIED" : "HISTORICAL_VERIFIED") : observation.confidence;
+  return { observations, rpcRetrievalStatus };
 }
 
 export function attachRetrievalObservation(evidence: DeploymentEvidence, observation: ArtifactRetrievalObservation): DeploymentEvidence {
   const merged = mergeRetrievalObservation(evidence.observations, observation);
-  const historicalMismatch = evidence.status.includes("DEPLOYMENT_MISMATCH") || evidence.effectiveStatus === "HISTORICAL_DEPLOYMENT_MISMATCH";
-  const effectiveStatus = !observation.success && historicalMismatch ? "HISTORICAL_DEPLOYMENT_MISMATCH" : merged.effectiveStatus;
-  return { ...evidence, observations: merged.observations, latestObservation: observation, latestSuccessfulObservation: [...merged.observations].reverse().find((item) => item.success && item.artifactHash), effectiveStatus };
+  return { ...evidence, observations: merged.observations, latestObservation: observation, latestSuccessfulObservation: [...merged.observations].reverse().find((item) => item.success && item.artifactHash), rpcRetrievalStatus: merged.rpcRetrievalStatus };
 }

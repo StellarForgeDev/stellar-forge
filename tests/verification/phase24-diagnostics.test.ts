@@ -136,10 +136,10 @@ describe("Phase 24: Artifact retrieval resilience", () => {
   });
   it("historical evidence preservation (RPC_UNAVAILABLE not converted to mismatch)", () => {
     const verifiedObs = { source: "rpc", success: true, contractReachable: true, wasmAvailable: true, artifactHash: "h", observedAt: "1", retrievalMethod: "m", confidence: "VERIFIED" as const, authoritative: true, supersedesPrevious: true };
-    const base: DeploymentEvidence = { componentId: "t", network: "testnet", contractId: "C", sourceArtifact: { path: "a", sha256: "h" }, prebuiltArtifact: { path: "b", sha256: "h" }, deployedArtifact: { sha256: "h" }, artifactParity: { sourceMatchesPrebuilt: true, prebuiltMatchesDeployed: true, sourceMatchesDeployed: true }, provenance: { metadataCommit: null, currentRepositoryCommit: null }, verification: { verifiedAt: "now", verificationMethod: "stellar-sdk-rpc-getContractWasmByContractId" }, status: ["VERIFIED_MATCH"], observations: [verifiedObs], effectiveStatus: "VERIFIED", latestObservation: verifiedObs, latestSuccessfulObservation: verifiedObs };
+    const base: DeploymentEvidence = { componentId: "t", network: "testnet", contractId: "C", sourceArtifact: { path: "a", sha256: "h" }, prebuiltArtifact: { path: "b", sha256: "h" }, deployedArtifact: { sha256: "h" }, artifactParity: { sourceMatchesPrebuilt: true, prebuiltMatchesDeployed: true, sourceMatchesDeployed: true }, provenance: { metadataCommit: null, currentRepositoryCommit: null }, verification: { verifiedAt: "now", verificationMethod: "stellar-sdk-rpc-getContractWasmByContractId" }, status: ["VERIFIED_MATCH"], observations: [verifiedObs], rpcRetrievalStatus: "VERIFIED", latestObservation: verifiedObs, latestSuccessfulObservation: verifiedObs };
     const obs = { source: "rpc", success: false, contractReachable: null, wasmAvailable: false, artifactHash: null, observedAt: "2", retrievalMethod: "m", confidence: "TRANSIENT_FAILURE" as const, errorCategory: "RPC_UNAVAILABLE" as const, authoritative: false, supersedesPrevious: false };
     const merged = attachRetrievalObservation(base, obs);
-    expect(merged.effectiveStatus).toBe("HISTORICAL_VERIFIED");
+    expect(merged.rpcRetrievalStatus).toBe("HISTORICAL_VERIFIED");
     expect(merged.status).toContain("VERIFIED_MATCH");
     expect(merged.status).not.toContain("DEPLOYMENT_MISMATCH");
   });
@@ -150,7 +150,7 @@ describe("Phase 24: Artifact retrieval resilience", () => {
     expect(token.status).toContain("DEPLOYMENT_MISMATCH");
     // latestObservation may be TRANSIENT_FAILURE if intermittent, but historical verified is preserved
     expect(token.latestSuccessfulObservation?.confidence).toBe("VERIFIED");
-    expect(token.effectiveStatus).toMatch(/HISTORICAL|VERIFIED|DEPLOYMENT_MISMATCH/);
+    expect(token.rpcRetrievalStatus).toMatch(/HISTORICAL|VERIFIED|DEPLOYMENT_MISMATCH/);
   });
   it("Payment mismatch preservation", async () => {
     const raw = await import("node:fs").then((fs) => fs.readFileSync("contracts/testnet-evidence.json", "utf8"));

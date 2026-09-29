@@ -35,7 +35,15 @@ function baseConnectivity(overrides: Record<string, unknown> = {}) {
 
 function baseEvidence() {
   const raw = readFileSync(path.join(process.cwd(), "contracts", "testnet-evidence.json"), "utf8");
-  return (JSON.parse(raw) as { evidence: Array<Record<string, unknown>> }).evidence.map((item) => item.componentId === "access-control" ? { ...item, effectiveStatus: "VERIFIED", latestObservation: { ...(item.latestObservation as Record<string, unknown>), confidence: "VERIFIED", success: true } } : item) as never[];
+  return (JSON.parse(raw) as { evidence: Array<Record<string, unknown>> }).evidence.map((item) => item.componentId === "access-control" ? {
+    ...item,
+    rpcRetrievalStatus: "VERIFIED",
+    sourceArtifact: { path: "a", sha256: EXPECTED_HASH },
+    prebuiltArtifact: { path: "b", sha256: EXPECTED_HASH },
+    deployedArtifact: { sha256: EXPECTED_HASH },
+    status: ["VERIFIED_MATCH"],
+    latestObservation: { ...(item.latestObservation as Record<string, unknown>), confidence: "VERIFIED", success: true }
+  } : item) as never[];
 }
 
 describe("Phase 32: Operator inputs", () => {

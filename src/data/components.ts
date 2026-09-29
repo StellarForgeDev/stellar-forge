@@ -29,6 +29,7 @@ export interface FunctionSpec {
   returns?: string;
   description?: string;
   authorization?: FunctionAuthorization;
+  readOnly?: boolean;
 }
 
 export interface ConfigOption {
@@ -195,6 +196,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "name",
+        readOnly: true,
         params: [],
         returns: "String",
         authorization: "none",
@@ -202,6 +204,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "symbol",
+        readOnly: true,
         params: [],
         returns: "String",
         authorization: "none",
@@ -209,6 +212,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "decimals",
+        readOnly: true,
         params: [],
         returns: "u32",
         authorization: "none",
@@ -217,6 +221,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "balance",
+        readOnly: true,
         params: [{ name: "id", type: "Address" }],
         returns: "i128",
         authorization: "none",
@@ -235,6 +240,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "allowance",
+        readOnly: true,
         params: [
           { name: "from", type: "Address" },
           { name: "spender", type: "Address" },
@@ -459,6 +465,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "allowance",
+        readOnly: true,
         params: [
           { name: "owner", type: "Address" },
           { name: "asset", type: "Address" },
@@ -575,6 +582,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "offer_active",
+        readOnly: true,
         params: [{ name: "offer_id", type: "u64" }],
         returns: "bool",
         authorization: "none",
@@ -674,6 +682,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "unlock_time",
+        readOnly: true,
         params: [{ name: "lock_id", type: "u64" }],
         returns: "Timepoint",
         authorization: "none",
@@ -682,6 +691,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "is_unlocked",
+        readOnly: true,
         params: [{ name: "lock_id", type: "u64" }],
         returns: "bool",
         authorization: "none",
@@ -690,6 +700,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "lock_released",
+        readOnly: true,
         params: [{ name: "lock_id", type: "u64" }],
         returns: "bool",
         authorization: "none",
@@ -784,6 +795,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "balance_of",
+        readOnly: true,
         params: [{ name: "balance_id", type: "u64" }],
         returns: "i128",
         authorization: "none",
@@ -792,6 +804,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "is_claimable",
+        readOnly: true,
         params: [{ name: "balance_id", type: "u64" }],
         returns: "bool",
         authorization: "none",
@@ -800,6 +813,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "expiry",
+        readOnly: true,
         params: [{ name: "balance_id", type: "u64" }],
         returns: "Option<Timepoint>",
         authorization: "none",
@@ -889,6 +903,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "claimed",
+        readOnly: true,
         params: [{ name: "index", type: "u32" }],
         returns: "bool",
         authorization: "none",
@@ -896,6 +911,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "root",
+        readOnly: true,
         params: [],
         returns: "Bytes",
         authorization: "none",
@@ -987,6 +1003,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "latest_price",
+        readOnly: true,
         params: [],
         returns: "i64",
         authorization: "none",
@@ -994,6 +1011,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "latest_time",
+        readOnly: true,
         params: [],
         returns: "Timepoint",
         authorization: "none",
@@ -1101,6 +1119,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "contributors",
+        readOnly: true,
         params: [{ name: "campaign_id", type: "u64" }],
         returns: "Vec<Address>",
         authorization: "none",
@@ -1109,6 +1128,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "contribution_of",
+        readOnly: true,
         params: [
           { name: "campaign_id", type: "u64" },
           { name: "contributor", type: "Address" },
@@ -1119,6 +1139,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "contributions",
+        readOnly: true,
         params: [{ name: "campaign_id", type: "u64" }],
         returns: "Map<Address, i128>",
         authorization: "none",
@@ -1127,6 +1148,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "total_raised",
+        readOnly: true,
         params: [{ name: "campaign_id", type: "u64" }],
         returns: "i128",
         authorization: "none",
@@ -1134,6 +1156,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "goal_reached",
+        readOnly: true,
         params: [{ name: "campaign_id", type: "u64" }],
         returns: "bool",
         authorization: "none",
@@ -1215,6 +1238,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "has_role",
+        readOnly: true,
         params: [
           { name: "role", type: "Symbol" },
           { name: "account", type: "Address" },
@@ -1306,6 +1330,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "status",
+        readOnly: true,
         params: [],
         returns: "u32",
         authorization: "none",
@@ -1399,6 +1424,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "is_approved",
+        readOnly: true,
         params: [{ name: "proposal_id", type: "Symbol" }],
         returns: "bool",
         authorization: "none",
@@ -1475,6 +1501,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "is_active",
+        readOnly: true,
         params: [],
         returns: "bool",
         authorization: "none",
@@ -1572,6 +1599,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "claimable",
+        readOnly: true,
         params: [],
         authorization: "none",
         returns: "i128",
@@ -1580,6 +1608,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "released",
+        readOnly: true,
         params: [],
         authorization: "none",
         returns: "i128",
@@ -1695,6 +1724,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "staked_balance",
+        readOnly: true,
         params: [{ name: "of", type: "Address" }],
         returns: "i128",
         authorization: "none",
@@ -1702,6 +1732,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "earned",
+        readOnly: true,
         params: [{ name: "of", type: "Address" }],
         returns: "i128",
         authorization: "none",
@@ -1710,6 +1741,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "total_staked",
+        readOnly: true,
         params: [],
         returns: "i128",
         authorization: "none",
@@ -1717,6 +1749,7 @@ export const stellarComponents: StellarComponent[] = [
       },
       {
         name: "reward_rate",
+        readOnly: true,
         params: [],
         returns: "i128",
         authorization: "none",

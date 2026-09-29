@@ -1,11 +1,11 @@
 import { Account, Address, MuxedAccount, nativeToScVal, xdr } from "@stellar/stellar-sdk";
-import type { ParameterSpec } from "@/data/components";
+import type { ParameterSpec } from "../../data/components.ts";
 import {
   parseParameterType,
   type BaseParameterType,
   type ParameterType,
-} from "@/lib/transactions/parameter-types";
-import type { TransactionPreparationError } from "@/lib/transactions/types";
+} from "./parameter-types.ts";
+import type { TransactionPreparationError } from "./types.ts";
 
 export type InvocationArgsResult =
   | { ok: true; scVals: xdr.ScVal[] }

@@ -54,4 +54,15 @@ describe("artifact reconciliation", () => {
     expect(result.status).toEqual(["DEPLOYMENT_UNAVAILABLE", "UNKNOWN"]);
     expect(result.artifactParity.prebuiltMatchesDeployed).toBeNull();
   });
+
+  it("regression: previous deployed hash != current unavailable retrieval cannot cause a current DEPLOYMENT_MISMATCH/VERIFIED decision based on that old hash", () => {
+    const result = evidence({
+      deployedArtifact: { sha256: null }, // Current retrieval is unavailable (no hash)
+      sourceArtifact: { path: "source.wasm", sha256: "current-local" },
+      prebuiltArtifact: { path: "prebuilt.wasm", sha256: "current-local" },
+    });
+    expect(result.status).toContain("DEPLOYMENT_UNAVAILABLE");
+    expect(result.status).not.toContain("DEPLOYMENT_MISMATCH");
+    expect(result.status).not.toContain("VERIFIED_MATCH");
+  });
 });

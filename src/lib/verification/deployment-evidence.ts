@@ -1,5 +1,6 @@
 import type { TransactionNetwork } from "../transactions/networks.ts";
-import type { EffectiveEvidenceStatus, EvidenceConfidence, ReconciliationStatus, RetrievalFailureCategory } from "./artifact-status.ts";
+import type { TransactionPreparationErrorCode } from "../transactions/types.ts";
+import type { EvidenceConfidence, ReconciliationStatus, RetrievalFailureCategory } from "./artifact-status.ts";
 
 export type EvidenceVerificationMethod =
   | "stellar-sdk-rpc-getContractWasmByContractId"
@@ -42,7 +43,7 @@ export interface DeploymentEvidence {
   observations?: ArtifactRetrievalObservation[];
   latestObservation?: ArtifactRetrievalObservation;
   latestSuccessfulObservation?: ArtifactRetrievalObservation;
-  effectiveStatus?: EffectiveEvidenceStatus;
+  rpcRetrievalStatus?: EvidenceConfidence;
 }
 
 export interface ArtifactRetrievalObservation {
@@ -66,11 +67,21 @@ export type DeploymentStateVerification =
   | "notVerified"
   | "notQueryable";
 
+/// Outcome of a single catalog-driven, read-only behavioral probe. `observed`
+/// means the read-only call simulated successfully; `rejected` means the
+/// contract declined the call; `unavailable` means the probe could not run for
+/// a transport/setup reason. Absent for observations recorded before behavioral
+/// probing existed.
+export type ReadOnlyProbeStatus = "observed" | "unavailable" | "rejected";
+
 export interface DeploymentStateObservation {
   method: string;
   args: unknown[];
   result: unknown;
   verifiedAt: string;
+  status?: ReadOnlyProbeStatus;
+  errorCode?: TransactionPreparationErrorCode;
+  detail?: string;
 }
 
 export interface DeploymentStateEvidence {

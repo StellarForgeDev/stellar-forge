@@ -14,6 +14,7 @@ import { attachRetrievalObservation, createRpcArtifactRetrieval, makeRetrievalFa
 import type { RetrievalFailureCategory } from "../src/lib/verification/artifact-status.ts";
 import { diagnoseWithBoundedRetries } from "../src/lib/verification/testnet-connectivity.ts";
 import { appendConnectivityHistory } from "../src/lib/verification/connectivity-history.ts";
+import { runReadOnlySmoke } from "../src/lib/verification/read-only-smoke.ts";
 
 const root = process.cwd();
 const prebuiltDir = path.join(root, "contracts", "prebuilt");
@@ -63,6 +64,7 @@ async function main(): Promise<void> {
       deployedSha256 = retrieval.observation.artifactHash;
       if (!retrieval.observation.success) console.warn(`${component.slug}: ${retrieval.observation.errorCategory} (${retrieval.observation.errorMessage})`);
     }
+    const previous = previousEvidence.find((item) => item.componentId === component.slug);
     const current = reconcileArtifacts({
       component,
       network: "testnet",
@@ -75,9 +77,34 @@ async function main(): Promise<void> {
       verifiedAt: observation?.success ? now : null,
       verificationMethod: observation?.success ? "stellar-sdk-rpc-getContractWasmByContractId" : "not-available",
     });
-    const previous = previousEvidence.find((item) => item.componentId === component.slug);
-    const preserved = previous?.deployedArtifact.sha256 && !observation?.success ? previous : current;
-    evidence.push(observation ? attachRetrievalObservation(preserved, observation) : preserved);
+
+    if (previous) {
+      current.observations = previous.observations ?? [];
+      current.latestSuccessfulObservation = previous.latestSuccessfulObservation;
+      current.rpcRetrievalStatus = previous.rpcRetrievalStatus;
+    }
+
+    evidence.push(observation ? attachRetrievalObservation(current, observation) : current);
+  }
+
+  const deploymentState = [];
+  for (const item of evidence) {
+    const component = stellarComponents.find(c => c.slug === item.componentId);
+    let verification: "partiallyVerified" | "notVerified" | "notQueryable" = "notQueryable";
+    let observations: unknown[] = [];
+    if (component && component.slug !== "payment" && item.contractId) {
+      const smoke = await runReadOnlySmoke({ component, network: "testnet", contractId: item.contractId });
+      verification = smoke.verification as "partiallyVerified" | "notVerified" | "notQueryable";
+      observations = smoke.observations;
+    }
+    deploymentState.push({
+      componentId: item.componentId,
+      network: item.network,
+      contractId: item.contractId,
+      verification,
+      constructorVerified: false,
+      observations,
+    });
   }
 
   const output = {
@@ -89,18 +116,11 @@ async function main(): Promise<void> {
     connectivity,
     registry,
     evidence,
-    deploymentState: evidence.map((item) => ({
-      componentId: item.componentId,
-      network: item.network,
-      contractId: item.contractId,
-      verification: "notQueryable",
-      constructorVerified: false,
-      observations: [],
-    })),
+    deploymentState,
   };
   mkdirSync(path.dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
-  writeFileSync(reportPath, renderReport(evidence, registry), "utf8");
+  writeFileSync(reportPath, renderReport(evidence, registry, deploymentState), "utf8");
   console.log(`Wrote ${relative(outputPath)}`);
   console.log(`Wrote ${relative(reportPath)}`);
   console.log(`${registry.expectedCount} components checked; ${registry.accountedCount} explicitly accounted for`);
@@ -123,15 +143,19 @@ function connectivityToRetrievalCategory(category: string | undefined): Retrieva
   return "NETWORK_UNAVAILABLE";
 }
 
-function renderReport(evidence: DeploymentEvidence[], registry: { expectedCount: number; accountedCount: number; errors: string[] }): string {
+function renderReport(evidence: DeploymentEvidence[], registry: { expectedCount: number; accountedCount: number; errors: string[] }, deploymentState: Array<{ componentId: string, verification: string }>): string {
   const count = (status: string) => evidence.filter((item) => item.status.includes(status as never)).length;
   const lines = ["# Testnet Artifact Reconciliation", "", "Read-only verification report. Artifact parity does not by itself verify constructor state or workflow behavior.", "", `- Total components: ${evidence.length}`, `- Artifact verified matches: ${count("VERIFIED_MATCH")}`, `- Deployment mismatches: ${count("DEPLOYMENT_MISMATCH")}`, `- Local artifact mismatches: ${count("LOCAL_ARTIFACT_MISMATCH")}`, `- Stale provenance: ${count("PROVENANCE_STALE")}`, `- Unavailable deployments: ${count("DEPLOYMENT_UNAVAILABLE")}`, `- Unknown: ${count("UNKNOWN")}`, "", `Registry: ${registry.expectedCount} components checked; ${registry.accountedCount} explicitly accounted for.`];
   if (registry.errors.length) lines.push("", "Registry errors:", ...registry.errors.map((error) => `- ${error}`));
-  lines.push("", "| Component | Contract ID | Latest observation | Latest successful | Effective status | Source | Failure | Local | Prebuilt | Deployed |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  lines.push("", "| Component | Contract ID | RPC Retrieval | Artifact Status | Provenance | Behavior | Local | Prebuilt | Deployed |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const item of evidence) {
-    const latest = item.latestObservation;
-    const successful = item.latestSuccessfulObservation;
-    lines.push(`| ${item.componentId} | ${item.contractId ?? "missing"} | ${latest?.confidence ?? "NOT_OBSERVED"} | ${successful?.artifactHash ?? "none"} | ${item.effectiveStatus ?? item.status.join(", ")} | ${latest?.source ?? "none"} | ${latest?.errorCategory ?? "none"} | ${item.sourceArtifact.sha256 ?? "missing"} | ${item.prebuiltArtifact.sha256 ?? "missing"} | ${item.deployedArtifact.sha256 ?? "unavailable"} |`);
+    const ds = deploymentState.find(d => d.componentId === item.componentId);
+    const behavior = ds ? ds.verification : "notQueryable";
+    const retrieval = item.rpcRetrievalStatus ?? "UNKNOWN";
+    const isStale = item.status.includes("PROVENANCE_STALE") ? "STALE" : "OK";
+    const artifactStatus = item.status.filter(s => s !== "PROVENANCE_STALE").join(", ") || "UNKNOWN";
+
+    lines.push(`| ${item.componentId} | ${item.contractId ?? "missing"} | ${retrieval} | ${artifactStatus} | ${isStale} | ${behavior} | ${item.sourceArtifact.sha256 ?? "missing"} | ${item.prebuiltArtifact.sha256 ?? "missing"} | ${item.deployedArtifact.sha256 ?? "unavailable"} |`);
   }
   return `${lines.join("\n")}\n`;
 }

@@ -17,11 +17,11 @@ import {
   networkConfig,
   type NetworkConfig,
   type TransactionNetwork,
-} from "@/lib/transactions/networks";
+} from "../transactions/networks.ts";
 import type {
   SimulationInfo,
   TransactionPreparationError,
-} from "@/lib/transactions/types";
+} from "../transactions/types.ts";
 
 const RPC_TIMEOUT_MS = 10_000;
 const TX_TIMEOUT_SECONDS = 30;

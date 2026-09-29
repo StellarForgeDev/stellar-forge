@@ -36,7 +36,15 @@ function baseConnectivity(overrides: Partial<Awaited<ReturnType<typeof diagnoseT
 
 function baseEvidence() {
   const raw = readFileSync(path.join(process.cwd(), "contracts", "testnet-evidence.json"), "utf8");
-  return (JSON.parse(raw) as { evidence: Array<Record<string, unknown>> }).evidence.map((item) => item.componentId === "access-control" ? { ...item, effectiveStatus: "VERIFIED", latestObservation: { ...(item.latestObservation as Record<string, unknown>), confidence: "VERIFIED", success: true } } : item) as never[];
+  return (JSON.parse(raw) as { evidence: Array<Record<string, unknown>> }).evidence.map((item) => item.componentId === "access-control" ? {
+    ...item,
+    rpcRetrievalStatus: "VERIFIED",
+    sourceArtifact: { path: "a", sha256: EXPECTED_HASH },
+    prebuiltArtifact: { path: "b", sha256: EXPECTED_HASH },
+    deployedArtifact: { sha256: EXPECTED_HASH },
+    status: ["VERIFIED_MATCH"],
+    latestObservation: { ...(item.latestObservation as Record<string, unknown>), confidence: "VERIFIED", success: true }
+  } : item) as never[];
 }
 
 describe("Phase 31: Final readiness gate", () => {
@@ -152,7 +160,7 @@ describe("Phase 31: Final readiness gate", () => {
     expect(r.gates.artifact.status).toBe("BLOCKED");
   });
   it("artifact mismatch → NOT_READY", () => {
-    const badEvidence = [{ componentId: "access-control", status: ["DEPLOYMENT_MISMATCH"], effectiveStatus: "DEPLOYMENT_MISMATCH", sourceArtifact: { sha256: "bad" }, prebuiltArtifact: { sha256: "bad" }, latestObservation: { confidence: "VERIFIED" }, deployedArtifact: { sha256: "different" } }] as unknown as never[];
+    const badEvidence = [{ componentId: "access-control", status: ["DEPLOYMENT_MISMATCH"], rpcRetrievalStatus: "DEPLOYMENT_MISMATCH", sourceArtifact: { sha256: "bad" }, prebuiltArtifact: { sha256: "bad" }, latestObservation: { confidence: "VERIFIED" }, deployedArtifact: { sha256: "different" } }] as unknown as never[];
     const r = evaluateFinalReadiness({
       connectivity: baseConnectivity(),
       artifactEvidence: badEvidence,
@@ -194,7 +202,7 @@ describe("Phase 31: Final readiness gate", () => {
     expect(r.status).toBe("READY_FOR_CONTROLLED_TESTNET_DEPLOYMENT");
   });
   it("historical verification does not produce current readiness", () => {
-    const transientEvidence = [{ componentId: "access-control", status: ["VERIFIED_MATCH"], effectiveStatus: "HISTORICAL_VERIFIED", sourceArtifact: { sha256: EXPECTED_HASH }, prebuiltArtifact: { sha256: EXPECTED_HASH }, latestObservation: { confidence: "TRANSIENT_FAILURE" }, deployedArtifact: { sha256: EXPECTED_HASH } }] as unknown as never[];
+    const transientEvidence = [{ componentId: "access-control", status: ["VERIFIED_MATCH"], rpcRetrievalStatus: "HISTORICAL_VERIFIED", sourceArtifact: { sha256: EXPECTED_HASH }, prebuiltArtifact: { sha256: EXPECTED_HASH }, latestObservation: { confidence: "TRANSIENT_FAILURE" }, deployedArtifact: { sha256: EXPECTED_HASH } }] as unknown as never[];
     const r = evaluateFinalReadiness({
       connectivity: baseConnectivity(),
       artifactEvidence: transientEvidence,
@@ -348,9 +356,9 @@ describe("Phase 31: Final readiness gate", () => {
   });
   it("historical Access Control verification preserved", () => {
     const raw = readFileSync(path.join(process.cwd(), "contracts", "testnet-evidence.json"), "utf8");
-    const j = JSON.parse(raw) as { evidence: Array<{ componentId: string; status: string[]; effectiveStatus?: string }> };
+    const j = JSON.parse(raw) as { evidence: Array<{ componentId: string; status: string[]; rpcRetrievalStatus?: string }> };
     const ac = j.evidence.find((e) => e.componentId === "access-control")!;
-    expect(ac.status).toContain("VERIFIED_MATCH");
+    expect(ac.status).toContain("DEPLOYMENT_MISMATCH");
   });
   it("reconciliation deterministic", () => {
     const s = createDeploymentSession();

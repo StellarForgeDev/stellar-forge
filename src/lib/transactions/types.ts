@@ -1,9 +1,9 @@
 import type {
   NetworkConfig,
   TransactionNetwork,
-} from "@/lib/transactions/networks";
-import type { FunctionAuthorization } from "@/data/components";
-import type { WalletError, WalletStatus } from "@/lib/wallet/types";
+} from "../transactions/networks.ts";
+import type { FunctionAuthorization } from "../../data/components.ts";
+import type { WalletError, WalletStatus } from "../wallet/types.ts";
 
 export interface TransactionBuilderState {
   componentSlug: string;
