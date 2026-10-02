@@ -22,7 +22,7 @@ jobs:
           test -f contracts/Cargo.toml
           test -f contracts/contracts/sandbox-runner/Cargo.toml
           test -f contracts/prebuilt/access-control.wasm
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version: 22
