@@ -10,7 +10,8 @@ at Phase 64. Mainnet deployment is not part of this roadmap.
   present in the repository, including the catalog, sandbox, Testnet flows,
   verification, deployment-session controls, provenance, and immutable CI
   action pins.
-- **Phase 34:** active — dependency and supply-chain hardening.
+- **Phase 34:** complete — dependency and supply-chain hardening verified on
+  current `main`.
 - **Phases 35–64:** planned; none are complete until their implementation,
   tests, documentation, and security impact are verified.
 
@@ -23,7 +24,7 @@ Current platform facts:
 - Historical evidence is not current candidate authorization.
 - Client-provided hashes, WASM, and candidate values are never authoritative.
 
-## Phase 34 — Dependency & Supply-Chain Hardening (ACTIVE)
+## Phase 34 — Dependency & Supply-Chain Hardening (COMPLETE)
 
 Review each Dependabot upgrade independently. Do not combine upgrades blindly.
 GitHub Actions must remain pinned to immutable commit SHAs.
@@ -55,6 +56,22 @@ SDK 17 is the current decision boundary. It must not be merged until its
 changes to transaction envelopes, RPC resources, ScVal decoding, signatures,
 and transaction results are migrated and reviewed against the fail-closed
 deployment and submission security model.
+
+### Phase 34 completion record — 2026-10-06
+
+- All Dependabot PRs were reviewed individually; PRs #2–#8 and #10 were
+  accepted and merged, and PR #9 was closed with the SDK 17 migration/security
+  review explicitly deferred.
+- Current CI action references are full immutable commit SHAs; no mutable
+  action tags remain.
+- Current `main` validation passed: TypeScript, lint with 0 errors, 90 test
+  files with 984 tests, production build, and `git diff --check`.
+- The accepted dependency upgrades remain limited to their intended manifests,
+  lockfile, and workflow changes. Contracts, WASM, checksums, deployment
+  metadata, historical evidence, and sandbox sources were not changed by this
+  phase.
+- No blockchain signing, submission, deployment, funding, or other network
+  mutation was performed.
 
 ## Phase 35 — Verification Coverage & Evidence Contracts
 
