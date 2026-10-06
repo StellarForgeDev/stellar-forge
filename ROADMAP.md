@@ -1,218 +1,220 @@
 # Stellar-Forge Roadmap
 
-This roadmap is the long-term development plan for Stellar-Forge. It is
-organized around meaningful capabilities and milestones, not a sequence of tiny
-phases. Items are direction, not promises; see [Roadmap Rules](#roadmap-rules).
+This is the active execution tracker for Stellar-Forge. Completed work is
+listed only when supported by the repository. The current release scope ends
+at Phase 64. Mainnet deployment is not part of this roadmap.
 
-All "completed" claims below are verified against the repository at the time of
-writing. Proposed/future items describe intent and must be confirmed against the
-repository before being marked done.
+## Current status
 
-## Current State
+- **Baseline through Phase 33:** complete capability and security work is
+  present in the repository, including the catalog, sandbox, Testnet flows,
+  verification, deployment-session controls, provenance, and immutable CI
+  action pins.
+- **Phase 34:** active — dependency and supply-chain hardening.
+- **Phases 35–64:** planned; none are complete until their implementation,
+  tests, documentation, and security impact are verified.
 
-> **Status note (Phase 5, 2026-08-30):** Phase 5 is **COMPLETE**. The catalog has **15 reusable Soroban components**, all with passing Rust tests and local sandbox execution; all 15 have Testnet registry entries in `src/lib/transactions/deployments.ts` with `testnet:true`. Registry entries are not independent proof of every on-chain instance, expected behavior, or exact WASM hash parity. The Token `name` transaction has been manually verified end to end in production. The transaction and integration pipelines are network-aware (`testnet` | `mainnet` | `futurenet`) via centralized `NetworkConfig`: **Testnet is operational** (default), **Mainnet is architecture-aware but unavailable** (0 deployments, all `mainnet:false`), and **Futurenet** plumbing is retained (0 deployments).
+Current platform facts:
 
-Stellar-Forge is at **release-candidate** maturity. The network model is centralized (`NetworkConfig` with `rpcUrl`, `passphrase`, `explorerUrl` and `STELLAR_RPC_*_URL` overrides). All 15 components are implemented and sandbox-executable and **all 15 are registered for Stellar Testnet** (`testnet:true`); Mainnet and Futurenet have no deployments by design. The generic pipeline is catalog-driven without component-specific branching; live transaction verification currently covers Token `name`.
+- 15 catalog components are implemented and sandbox-executable.
+- All 15 have Testnet registry entries; registry presence is not proof of
+  exact on-chain WASM parity or independent behavioral verification.
+- Testnet is operational and Mainnet is deliberately unavailable.
+- Historical evidence is not current candidate authorization.
+- Client-provided hashes, WASM, and candidate values are never authoritative.
 
-### Completed (verified)
+## Phase 34 — Dependency & Supply-Chain Hardening (ACTIVE)
 
-- **Foundation** — Next.js 16 App Router, React 19, TypeScript strict, Tailwind
-  4, foundational UI primitives, design system, landing page.
-- **Catalog** — searchable/filterable component catalog (`src/data/components.ts`)
-  with detail pages (`src/app/components/[slug]`), categories, and status.
-- **Documentation** — documentation hub (`src/app/docs`) covering getting
-  started, component library, Playground, and Integration, plus per-component
-  docs (`src/app/docs/components/[slug]`).
-- **Playground** — interactive Playground (`src/app/playground`) driven by
-  component `config`; for implemented components it runs the real contract WASM
-  in the local sandbox.
-- **Sandbox** — native `sandbox-runner` that executes contract WASM in an
-  isolated Soroban host, deterministic, no network/wallet/gas
-  (`contracts/contracts/sandbox-runner`, `src/app/api/playground`).
-- **Transactions** — builder, real Testnet RPC simulation, Freighter signing,
-  Testnet submission with signature verification and settlement polling
-  (`src/lib/transactions`, `src/app/api/transactions/*`, `src/lib/wallet`).
-- **Wallet integration** — Freighter adapter (`src/lib/wallet/freighter.ts`).
-- **Friendbot** — client-side Testnet funding action
-  (`src/components/transactions/TransactionBuilder.tsx`).
-- **Integration generator** — Rust example generator from a component interface
-  (`src/lib/integration/generators.ts`).
-- **Token implementation/deployment** — SEP-41 token contract with passing Rust
-  tests, deployed to Stellar Testnet; address registered in
-  `src/lib/transactions/deployments.ts`.
-- **Payment implementation (v1)** — stateless `payment` contract
-  (`pay(from, to, asset, amount)`) with passing Rust tests, a catalog record
-  that declares a generic `asset` dependency on `token` (with a `mint` setup
-  call), per-component docs, Playground sandbox execution through the generic
-  dependency mechanism, and integration generation. Testnet deployment is
-  complete (registered in `deployments.ts`, `testnet: true`). No component-specific branching was added; the
-  dependency engine is data-driven.
-- **Vercel build architecture** — `vercel-build` script, Linux runner build
-  (`scripts/vercel-sandbox-build.sh`), `outputFileTracingIncludes` in
-  `next.config.ts`, committed prebuilt WASM. (End-to-end deployment is
-  verified in production for the Playground with real Token WASM execution.)
-- **Escrow implementation (v1)** — stateful `escrow` contract
-  (`__constructor(depositor, beneficiary, arbiter, asset)`, `deposit`,
-  `release`, `refund`, `status`) with passing Rust tests and a cross-contract
-  sandbox execution proof (`escrow_executes_against_provisioned_dependency` in
-  the sandbox-runner). Catalog record declares `constructorArgs` (role identity
-  names + an `asset` dependency alias) and a generic `asset` token dependency
-  with a `mint` setup call. Per-component docs, Playground sandbox execution
-  through the generic dependency mechanism, and integration generation. No
-  component-specific branching was added; only two small generic platform
-  enhancements were required (`constructorArgs` catalog field and
-  `constructorArg` dependency-alias resolution). Its Testnet address is now
-  registered; registry status is configuration evidence and expected on-chain
-  behavior still requires independent verification.
+Review each Dependabot upgrade independently. Do not combine upgrades blindly.
+GitHub Actions must remain pinned to immutable commit SHAs.
 
-## Phase 5 — Completed
+### Dependabot review ledger — 2026-10-06
 
-> **Phase 5 is COMPLETE.** All items below are verified against the repository (`main == origin/main`, working tree clean).
+| PR | Upgrade | Disposition |
+| --- | --- | --- |
+| [#2](https://github.com/StellarForgeDev/stellar-forge/pull/2) | `pnpm/action-setup` 6.1.0 | MERGED as `95e13a1`; SHA preserved |
+| [#3](https://github.com/StellarForgeDev/stellar-forge/pull/3) | `actions/checkout` 7.0.1 | MERGED as `bb89d85`; SHA preserved |
+| [#4](https://github.com/StellarForgeDev/stellar-forge/pull/4) | Rust toolchain action 2.0.0 | MERGED as `3889f4a`; SHA preserved |
+| [#5](https://github.com/StellarForgeDev/stellar-forge/pull/5) | `actions/setup-node` 7.0.0 | MERGED as `902fb2b`; SHA preserved |
+| [#6](https://github.com/StellarForgeDev/stellar-forge/pull/6) | Next 16.3.7 | MERGED as `1b75df7`; local validation passed |
+| [#7](https://github.com/StellarForgeDev/stellar-forge/pull/7) | `eslint-config-next` 16.3.7 | MERGED as `3a607fc`; local validation passed |
+| [#8](https://github.com/StellarForgeDev/stellar-forge/pull/8) | TypeScript 6.0.3 | MERGED as `a802dd3`; local validation passed |
+| [#9](https://github.com/StellarForgeDev/stellar-forge/pull/9) | `@stellar/stellar-sdk` 17.2.1 | CLOSED: application type failures require migration/security review before reopening |
+| [#10](https://github.com/StellarForgeDev/stellar-forge/pull/10) | `@types/node` 26.6.4 | MERGED as `64cb5e5`; CI and Vercel passed |
 
-- **Phase 5.1 — Repo hygiene & contribution foundation** — `CONTRIBUTING.md`, `LICENSE`, `.env.example`, hygiene checks.
-- **Phase 5.2 — Vercel deployment/runtime/serverless sandbox verification** — `vercel-sandbox-build.sh` hardened to build from `contracts/` workspace, `outputFileTracingIncludes`, prebuilt WASM.
-- **Phase 5.3 — Testnet expansion for existing components** — catalog expanded to 15 reusable components (`token`, `payment`, `access-control`, `escrow`, `multi-signature`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`) with generic pipeline validation and 15 Testnet deployments registered.
+Phase 34 completion requires:
 
-  **Phase 5.3B — Authorization-stable sequence** — `5.3B.18` TTL fixed but `auth/invalid_action` discovered (ledger-dependent `expiration_ledger` recomputed in contract caused simulation/execution mismatch); `5.3B.19` implemented caller-supplied stable `expiration_ledger` validated as `current < expiration ≤ current+1_000_000` for `crowdfund`, `allowance`, `claimable-balance` (+ tests + WASM 23227/10820/19465); `5.3B.20` real Testnet lifecycle validation succeeded (10 workflows: crowdfund contribute/withdraw/claim_refund, allowance approve/increase/decrease/transfer_from, claimable deposit/claim/cancel) with `latest+1000` strategy; `5.3B.21` replaced obsolete crowdfund deployment and enabled `allowance`/`claimable-balance` `testnet:true`; `5.3B.22` committed and pushed as `6b21f8e fix: stabilize token approval authorization on testnet` with working tree clean.
+- a disposition for every open Dependabot PR;
+- focused and full validation for every accepted upgrade;
+- no mutable action tags;
+- reasons recorded for deferred or rejected upgrades;
+- no unrelated contract, WASM, checksum, metadata, evidence, or sandbox
+  changes.
 
-- **Phase 5.4 — Configurable network support** — centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) with `rpcUrl`, `passphrase`, `explorerUrl` and `STELLAR_RPC_*_URL` overrides in `src/lib/transactions/networks.ts`; generic `getDeployment(network, slug)`, builder, validation, RPC selection, and integration generators are network-aware; `Testnet` operational (15 registered deployments, default), `Mainnet` architecture-aware but unavailable (0 deployments, all `mainnet:false`, correctly gated), `Futurenet` plumbing retained; committed as `f10764a feat: add configurable network support`.
+SDK 17 is the current decision boundary. It must not be merged until its
+changes to transaction envelopes, RPC resources, ScVal decoding, signatures,
+and transaction results are migrated and reviewed against the fail-closed
+deployment and submission security model.
 
-- **Phase 5.5 — Integration generator strengthening** — TypeScript generators now include `pnpm add @stellar/stellar-sdk`, `STELLAR_RPC_*_URL` override guidance derived from `NetworkConfig`, and `explorerUrl` link; Rust generators include `soroban-sdk = "27"` guidance and local-host clarification; committed as `247decb feat: strengthen integration generators`. No new language, SDK package, or publishing system introduced.
+## Phase 35 — Verification Coverage & Evidence Contracts
 
-**Current network state:** `Testnet = operational (15 registered deployments; Token `name` independently verified)` / `Mainnet = architecture-aware but unavailable (0 deployments, all mainnet:false)` / `Futurenet = plumbing retained (0 deployments)`. No Mainnet deployment was performed. Token and Payment on-chain WASM hashes differ from the current repository prebuilt artifacts; registry presence and working behavior must not be treated as exact byte parity.
+Add route-level and adversarial coverage for `/submit`, `/verify`, `/record`,
+`/deploy/prepare`, reconcile, and restore, including candidate drift,
+candidate unavailability, stale XDR, stale sessions, and restored-session drift.
 
-## Current Priority
+## Phase 36 — Deployment Lifecycle State-Machine Hardening
 
-### Component Standard — Completed (v1)
+Make every deployment-session transition explicit. Artifact, candidate,
+account, admin, and readiness drift must invalidate stale state.
 
-> **Component Standard v1 is complete.** It introduced the `capabilities`
-> model (`implemented`, `sandbox`, `testnet`) in `src/data/components.ts`, made
-> `token` the first conforming component, and moved platform code (catalog, docs,
-> Playground sandbox, transaction builder) to check the specific capability it
-> needs instead of a single coarse status. See `ARCHITECTURE.md`.
+## Phase 37 — Network & Failure-Semantics Hardening
 
-The immediate priority was to establish the architecture that makes components
-**first-class entities** rather than mere catalog entries. This milestone
-connects contract, metadata, docs, playground, integration, and deployment into a
-coherent pipeline (see `ARCHITECTURE.md`).
+Ensure transport failure never becomes authorization. Distinguish unavailable,
+timeout, malformed response, missing contract, verification mismatch, and
+candidate mismatch.
 
-Scope of the milestone:
+## Phase 38 — Testnet Registry Truthfulness
 
-- Define the **component model** (what a component is, what it must declare).
-- Define the **component lifecycle** (Concept → Specified → Implemented →
-  Sandbox-ready → Testnet-ready → Integration-ready → Community-ready).
-- Define the **maturity/status model** that supersedes today's binary
-  `Concept`/`Implemented`.
-- Separate **generic** component logic from **Token-specific** logic so future
-  components reuse the same machinery.
-- Clarify the relationship between contract, metadata, docs, playground,
-  integration, and deployment.
-- Produce/refine the architecture documentation (this roadmap and
-  `ARCHITECTURE.md`).
+Keep registry declaration, historical provenance, fresh RPC retrieval, behavior
+verification, and current candidate authorization separate.
 
-This milestone is primarily **architecture and conventions**; it should not
-require rewriting the existing `token` flow. Do not implement Payment or other
-components as part of this milestone unless separately instructed.
+## Phase 39 — Component Conformance Standard v2
 
-## Subsequent Milestones
+Define one deterministic standard for metadata, WASM, tests, sandbox,
+documentation, dependencies, constructors, read-only behavior, and Testnet
+readiness.
 
-### Engineering Foundation
+## Phase 40 — Developer Onboarding & Documentation
 
-- **Automated testing** — Vitest test suite for web/application domain logic
-  and `cargo test` for Rust contracts (both exist and run in CI).
-- **CI** — continuous integration running lint, typecheck, build, and tests on
-  every change.
-- **Contract test strategy** — standardize and document `cargo test` for every
-  contract.
-- **Web test strategy** — unit/component tests for domain logic and UI.
-- **Build verification** — confirm `pnpm build` and the Vercel path reliably.
-- **Contribution infrastructure** — issue/PR templates, `.env.example`,
-  security headers, contribution guide.
-- **Security baseline** — rate limiting on public routes, headers, and a
-  documented threat model.
+Improve setup, architecture, security, Testnet, sandbox, transaction, and
+contribution documentation using verified repository behavior.
 
-### Payment
+## Phase 41 — Integration Generation & Project Scaffolding
 
-Use **Payment** as the first major test of the Component Standard. Payment
-exercised every layer established by the standard:
+Strengthen generated integrations and add scaffolding only where component
+interfaces and security boundaries support it.
 
-```text
-Contract
-  → Tests
-  → WASM
-  → Metadata
-  → Catalog
-  → Documentation
-  → Playground
-  → Integration
-```
+## Phase 42 — Transaction UX & Observability
 
-It was implemented as a **stateless** payment primitive that delegates balance
-movement to a SEP-41 asset declared as a generic `asset` dependency on `token`
-(with a `mint` setup call). The sandbox-runner provisions that dependency
-generically, so no Payment-specific code was added to the runner, route, or
-UI.
+Improve simulation, signing, submission, settlement, diagnostics, and
+user-visible lifecycle observability without weakening confirmation boundaries.
 
-**Testnet readiness (v1)** — Payment is implemented, sandbox-executable, and
-registered for Testnet use. The generic builder / validate / prepare / submit
-flow discovers it from the catalog and deployment registry without
-component-specific branching. On Testnet the `asset` argument is supplied by
-the caller and can reuse the deployed `token` contract.
+## Phase 43 — Wallet, Signing Security & UX
 
-### Component Ecosystem
+Harden wallet identity, network selection, signing context, stale-state
+handling, and explicit confirmation.
 
-All 15 catalog components are implemented, sandbox-executable, and registered
-for Testnet use. Their current capability and deployment state is maintained in
-`src/data/components.ts` and `src/lib/transactions/deployments.ts`.
+## Phase 44 — Playground Isolation Assurance
 
-- **Escrow**, **Access Control**, **Subscription**, **Multi-signature**,
-  **Vesting**, and **Staking** are implemented v1 components with local sandbox
-  execution and Testnet registrations, following the same generic Component
-  Standard pipeline as Token and Payment.
+Verify process isolation, fixed artifact resolution, resource limits, timeout
+behavior, deterministic execution, and hostile-input handling.
 
-### Developer Integration
+## Phase 45 — Catalog & Metadata Architecture Cleanup
 
-- Stronger integration generation (more languages, more accurate generated
-  code). TypeScript generators were strengthened in Phase 5.5; Rust remains the default
-  and is behaviorally unchanged.
-- Reusable client libraries.
-- **SDK/package extraction** — only if justified by reuse needs (no SDK exists
-  today).
-- Project scaffolding from a component.
-- Improved developer workflows between the Playground and a real project.
+Consolidate catalog metadata and capability declarations without component-
+specific branching in generic platform paths.
 
-Do **not** claim an SDK currently exists.
+## Phase 46 — API Boundary Hardening
 
-### Community
+Harden route schemas, authorization boundaries, payload limits, error contracts,
+and server-side authority decisions.
 
-- Contribution workflows and guidelines.
-- Issue templates and PR templates.
-- Component contribution guidelines (how to add a component that meets the
-  standard).
-- Community feedback loops.
-- A documented release process.
+## Phase 47 — Rate Limiting, Security Headers & Threat Model
 
-### Production Readiness
+Add appropriate rate limits and security headers and maintain a threat model for
+public routes, wallet flows, sandbox execution, and RPC use.
 
-Eventually consider, but do not promise dates for:
+## Phase 48 — Audit Trails & Provenance Reporting
 
-- Security review.
-- Stable versioning and compatibility guarantees.
-- Mainnet strategy (currently unsupported).
-- Production deployment beyond Testnet.
-- Independent verification of the remaining registered Testnet components and
-  their expected behavior.
-- Long-term maintenance ownership.
+Make deployment, verification, candidate authorization, and historical evidence
+auditable without treating historical evidence as current authorization.
 
-## Roadmap Rules
+## Phase 49 — Performance & Caching Safety
 
-- Roadmap items can change; priorities shift as the project learns.
-- Architecture decisions (in `ARCHITECTURE.md`) take precedence over stale
-  assumptions in this file or elsewhere.
-- Completed work must be **verified against the repository** before being marked
-  done; do not mark items complete based on intent.
-- New work must map to a roadmap capability or milestone; speculative features
-  should not displace core reliability work without justification.
-- Proposed/future capabilities are not present until the repository proves them.
-  Payment is implemented for the sandbox and deployed to Testnet (`testnet: true`); an SDK and mainnet
-  are not present.
+Improve performance while preserving candidate identity, network isolation,
+artifact integrity, and freshness guarantees.
+
+## Phase 50 — Reliability & Error-Handling Consolidation
+
+Unify timeout, retry, recovery, malformed-response, and partial-failure
+semantics across the application and deployment lifecycle.
+
+## Phase 51 — CI & Release Engineering Maturity
+
+Strengthen CI, release validation, artifact checks, environment promotion, and
+reproducibility while preserving immutable action pins.
+
+## Phase 52 — Dependency Governance v2
+
+Establish dependency ownership, upgrade classification, security review,
+lockfile policy, and compatibility testing.
+
+## Phase 53 — Versioning & Release Process
+
+Define versioning, changelog, release criteria, rollback, and compatibility
+discipline for the v1 platform.
+
+## Phase 54 — Contribution & Community Workflow
+
+Improve contribution guidance, component proposals, review expectations,
+security reporting, and community maintenance workflows.
+
+## Phase 55 — Security Testing Expansion
+
+Expand adversarial, property-based, integration, dependency, route, wallet,
+sandbox, and artifact security testing.
+
+## Phase 56 — Independent Security Review Readiness
+
+Prepare scope, threat model, evidence, reproducible checks, and known-limitations
+documentation for independent review.
+
+## Phase 57 — Controlled Testnet Release Train
+
+Define a controlled Testnet release train with candidate authorization,
+verification, rollback, evidence, and explicit operator approvals.
+
+## Phase 58 — Mainnet-Readiness Architecture Only
+
+Document architecture constraints and readiness criteria only. **No Mainnet
+deployment is permitted by this roadmap.**
+
+## Phase 59 — Recovery, Backup & Disaster Procedures
+
+Define recovery, backup, evidence preservation, deployment-session restoration,
+and operator disaster procedures.
+
+## Phase 60 — Compatibility & Migration Discipline
+
+Define compatibility contracts, migration procedures, deprecation policy, and
+upgrade rollback expectations.
+
+## Phase 61 — Selective Ecosystem Expansion
+
+Expand ecosystem integrations only when they support demonstrated platform needs
+and preserve the existing security model.
+
+## Phase 62 — SDK/Package Extraction Decision
+
+Extract an SDK or package only if demonstrated reuse justifies it. No SDK is
+currently claimed or promised.
+
+## Phase 63 — Release-Candidate Stabilization
+
+Resolve verified reliability, security, compatibility, and documentation gaps.
+No speculative feature expansion.
+
+## Phase 64 — v1 Release Gate & Long-Term Maintenance
+
+Define and verify the v1 release gate. After Phase 64, development transitions
+to maintenance, security response, compatibility, and a separately approved
+v2 roadmap.
+
+## Roadmap rules
+
+- Completed claims require repository evidence.
+- Proposed work is not current functionality.
+- Work proceeds one phase or tightly bounded sub-phase at a time.
+- Fail-closed security behavior must be preserved.
+- No blockchain signing, submission, deployment, funding, or mutation occurs
+  without explicit authorization.

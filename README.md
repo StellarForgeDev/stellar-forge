@@ -185,47 +185,18 @@ Stellar-Forge is focused on **Stellar Testnet**. The Testnet section (`/testnet`
 
 ## Roadmap
 
-### Completed
+The authoritative phase tracker is [`ROADMAP.md`](./ROADMAP.md).
 
-- Project foundation, design system, and landing page.
-- Component catalog with detail pages, search, and filtering.
-- Documentation hub (getting started, component library, playground, integration).
-- Interactive Playground with real local Soroban sandbox execution for all 15 components.
-- Data-driven Playground and network-aware integration code generator (Rust + TypeScript).
-- Network-aware transaction system: centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`), generic `getDeployment(network, slug)`, RPC selection, builder, simulation, Freighter signing, submission, and Friendbot funding.
-- Testnet deployment registry -- 15 component addresses are registered in `src/lib/transactions/deployments.ts`, with `capabilities.testnet:true`; this is not independent verification of every instance or exact WASM parity.
-- Authorization-stable `expiration_ledger` fix for `crowdfund`, `allowance`, `claimable-balance` (Phase 5.3B.19-5.3B.20): caller-supplied stable `expiration_ledger` validated as `current < expiration <= current+1_000_000`, eliminating the prior `auth/invalid_action` caused by ledger-dependent recomputation and the earlier `max_entry_ttl` failure (`SAFE_ALLOWANCE_TTL=1_000_000`).
-- Vercel build configuration (Linux `sandbox-runner` build, output tracing, prebuilt WASM).
-- Engineering audit and remediation work.
+- **Phases 1–33:** completed baseline capability work, verified against the
+  current repository where claimed.
+- **Phase 34:** active dependency and supply-chain hardening. Dependabot PRs
+  are reviewed individually; major upgrades are not merged blindly.
+- **Phases 35–64:** planned verification, lifecycle, security, reliability,
+  release, and maintenance work.
 
-Deployment verification is repository-authoritative: runtime verification can
-report validated facts, but durable evidence is maintained by committing the
-repository evidence files. The Vercel filesystem is not used as shared runtime
-persistence.
-
-### Phase History
-
-- **Phase 3** -- Component expansion (8 -> 15 reusable Soroban components, generic pipeline, local WASM sandbox).
-- **Phase 4** -- CI, reproducibility, prebuilt WASM integrity, and E2E hardening.
-- **Phase 5.1** -- Repository hygiene and contribution foundation.
-- **Phase 5.2** -- Vercel/serverless build-path verification.
-- **Phase 5.3** -- Testnet expansion and validation (5.3B.18 diagnostic, 5.3B.19 authorization-stable fix, 5.3B.20 Testnet lifecycle validation, 5.3B.21 registration, 5.3B.22 reconciliation -- commit `6b21f8e`).
-- **Phase 5.4** -- Configurable network support (Mainnet architecture-aware, not deployed).
-
-### Planned
-
-Phase 6 is production hardening within the current three-repository architecture. Repository extraction to separate Git submodules (contracts and sandbox) was completed in Phase 38A.
-
-- **Phase 5.5** -- Integration generator strengthening (additional languages, SDK/package considerations).
-- **Phase 6** -- Production hardening of the three-repository architecture, including
-  artifact boundaries, Playground execution reliability, and documentation truth.
-- Continue expanding the catalog via the generic pipeline (no component-specific code).
-- Maintain the dedicated Transactions documentation section as the transaction flow evolves.
-- Automated test/CI hardening.
-- Independent verification of the remaining registered Testnet deployments and their expected behavior.
-- Mainnet deployments (separate, credentialed future phase -- not in 5.4).
-
-No features beyond the above are implied or promised.
+The roadmap preserves the distinction between historical evidence, current
+candidate authorization, and future work. No Mainnet deployment is planned by
+the current release roadmap.
 
 ## Known Limitations
 
