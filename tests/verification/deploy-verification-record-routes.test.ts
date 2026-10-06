@@ -1,26 +1,31 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { verifyCandidateArtifact, getContractWasmByContractId, confirmedTransactionExists, evidencePersistenceMode, readFile, writeFile } = vi.hoisted(() => ({
+const { verifyCandidateArtifact, getContractWasmByContractId, confirmedTransactionExists, prepareDeploymentStage, evidencePersistenceMode, readFile, writeFile, buildInvocationArgs } = vi.hoisted(() => ({
   verifyCandidateArtifact: vi.fn(),
   getContractWasmByContractId: vi.fn(),
   confirmedTransactionExists: vi.fn(),
+  prepareDeploymentStage: vi.fn(),
   evidencePersistenceMode: vi.fn(),
   readFile: vi.fn(),
   writeFile: vi.fn(),
+  buildInvocationArgs: vi.fn(),
 }));
 
 vi.mock("@/lib/verification/artifact-provenance", () => ({ verifyCandidateArtifact }));
 vi.mock("@/lib/transactions/deployment", () => ({
   canonicalTestnetServer: () => ({ getContractWasmByContractId }),
   confirmedTransactionExists,
+  prepareDeploymentStage,
 }));
+vi.mock("@/lib/transactions/args", () => ({ buildInvocationArgs }));
 vi.mock("@/lib/verification/evidence-persistence", () => ({ evidencePersistenceMode }));
 vi.mock("node:fs/promises", () => ({ readFile, writeFile }));
 
 import { POST as _verifyPost } from "@/app/api/transactions/deploy/[action]/route";
 async function verifyPost(req: Request) { return _verifyPost(req, { params: Promise.resolve({ action: "verify" }) }); }
 async function recordPost(req: Request) { return _verifyPost(req, { params: Promise.resolve({ action: "record" }) }); }
+async function preparePost(req: Request) { return _verifyPost(req, { params: Promise.resolve({ action: "prepare" }) }); }
 
 const CONTRACT = "CB5LA255QBGZH4UURMOGL6SJIVQE5PFQXZZ5JSF7UD5SIYQSGVAM3HQY";
 const ACCOUNT = "GBQGCPTQVAB3DDO32QEQDEN6X6EENPMLOMMTA2KE4ZNPHFCYJU7PGWKW";
@@ -52,6 +57,8 @@ describe("deployment verify and record route boundaries", () => {
     verifyCandidateArtifact.mockResolvedValue(candidate());
     getContractWasmByContractId.mockResolvedValue(WASM);
     confirmedTransactionExists.mockResolvedValue(true);
+    prepareDeploymentStage.mockResolvedValue({ stage: "upload", transactionXdr: "prepared-xdr", simulation: { status: "SUCCESS", latestLedger: 1, result: null } });
+    buildInvocationArgs.mockReturnValue({ ok: true, scVals: [] });
     evidencePersistenceMode.mockReturnValue("runtime-non-durable");
     readFile.mockResolvedValue(WASM);
     writeFile.mockResolvedValue(undefined);
@@ -132,5 +139,46 @@ describe("deployment verify and record route boundaries", () => {
     const response = await recordPost(request(recordBody));
     expect(response.status).toBe(409);
     expect(getContractWasmByContractId).not.toHaveBeenCalled();
+  });
+
+  it("prepares only from the server-authorized candidate", async () => {
+    const response = await preparePost(new Request("http://localhost/api/transactions/deploy/prepare", {
+      method: "POST",
+      body: JSON.stringify({
+        network: "testnet",
+        component: "access-control",
+        stage: "upload",
+        sourceAccount: ACCOUNT,
+        constructorArgs: { admin: ACCOUNT },
+        candidateHash: HISTORICAL_HASH,
+        wasm: "client-supplied-wasm-must-not-be-used",
+      }),
+    }));
+    expect(response.status).toBe(200);
+    expect(prepareDeploymentStage).toHaveBeenCalledWith(expect.objectContaining({
+      stage: "upload",
+      sourceAccount: ACCOUNT,
+      wasm: WASM,
+      wasmHash: MOCK_CANDIDATE_HASH,
+    }));
+    expect(prepareDeploymentStage.mock.calls[0]?.[0]).not.toHaveProperty("candidateHash");
+  });
+
+  it("blocks prepare when the current candidate is unavailable", async () => {
+    verifyCandidateArtifact.mockResolvedValue({ status: "CANDIDATE_MANIFEST_UNAVAILABLE", error: "candidate unavailable" });
+    const response = await preparePost(new Request("http://localhost/api/transactions/deploy/prepare", {
+      method: "POST",
+      body: JSON.stringify({ network: "testnet", component: "access-control", stage: "upload", sourceAccount: ACCOUNT, constructorArgs: { admin: ACCOUNT }, candidateHash: MOCK_CANDIDATE_HASH }),
+    }));
+    expect(response.status).toBe(409);
+    expect(prepareDeploymentStage).not.toHaveBeenCalled();
+  });
+
+  it("does not let client candidate fields authorize evidence recording", async () => {
+    const response = await recordPost(request({ ...recordBody, candidateHash: HISTORICAL_HASH, artifactHash: HISTORICAL_HASH }));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.evidence.localArtifactHash).toBe(MOCK_CANDIDATE_HASH);
+    expect(body.evidence.deployedArtifactHash).toBe(MOCK_CANDIDATE_HASH);
   });
 });

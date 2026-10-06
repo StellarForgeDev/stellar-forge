@@ -12,7 +12,8 @@ at Phase 64. Mainnet deployment is not part of this roadmap.
   action pins.
 - **Phase 34:** complete — dependency and supply-chain hardening verified on
   current `main`.
-- **Phases 35–64:** planned; none are complete until their implementation,
+- **Phase 35:** complete — verification coverage and evidence contracts verified.
+- **Phases 36–64:** planned; none are complete until their implementation,
   tests, documentation, and security impact are verified.
 
 Current platform facts:
@@ -73,11 +74,26 @@ deployment and submission security model.
 - No blockchain signing, submission, deployment, funding, or other network
   mutation was performed.
 
-## Phase 35 — Verification Coverage & Evidence Contracts
+## Phase 35 — Verification Coverage & Evidence Contracts (COMPLETE)
 
 Add route-level and adversarial coverage for `/submit`, `/verify`, `/record`,
 `/deploy/prepare`, reconcile, and restore, including candidate drift,
 candidate unavailability, stale XDR, stale sessions, and restored-session drift.
+
+### Phase 35 completion record — 2026-10-06
+
+- Existing route coverage was verified for controlled `/submit`, `/verify`,
+  `/record`, reconcile, restore, candidate drift, candidate unavailability,
+  stale sessions, and stale XDR/recovery behavior.
+- Added adversarial `/deploy/prepare` coverage proving that client-supplied
+  candidate hashes and WASM values do not override the server-authorized
+  candidate, and that unavailable candidates block preparation.
+- Added evidence-recording coverage proving client-supplied candidate/artifact
+  fields do not become authorization.
+- Validation passed: 90 test files, 987 tests, TypeScript, lint with 0 errors,
+  production build, and `git diff --check`.
+- No contract, WASM, deployment metadata, historical evidence, sandbox, or
+  blockchain state was changed.
 
 ## Phase 36 — Deployment Lifecycle State-Machine Hardening
 
