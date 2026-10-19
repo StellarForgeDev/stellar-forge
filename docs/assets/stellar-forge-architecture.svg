@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+  <title id="title">Stellar-Forge architecture</title>
+  <desc id="desc">A catalog-driven flow from reusable Soroban components through documentation, local sandbox execution, integration generation, and controlled Stellar Testnet transactions.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="1" stop-color="#102b3e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#70e1c1"/>
+      <stop offset="1" stop-color="#7dc9ff"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#70e1c1"/>
+    </marker>
+    <style>
+      .label { font: 600 18px ui-sans-serif,system-ui,sans-serif; fill: #f2f7f8; }
+      .small { font: 400 13px ui-sans-serif,system-ui,sans-serif; fill: #a9c0c9; }
+      .eyebrow { font: 600 12px ui-monospace,SFMono-Regular,monospace; letter-spacing: 2px; fill: #70e1c1; }
+    </style>
+  </defs>
+  <rect width="1200" height="430" rx="24" fill="url(#bg)"/>
+  <circle cx="1080" cy="70" r="170" fill="#70e1c1" opacity=".06"/>
+  <circle cx="170" cy="370" r="220" fill="#7dc9ff" opacity=".05"/>
+  <text x="56" y="54" class="eyebrow">STELLAR-FORGE / ONE WORKFLOW</text>
+  <text x="56" y="88" class="label" font-size="26">Discover → understand → experiment → integrate</text>
+  <g fill="#0e2432" stroke="#2f5360" stroke-width="1.5">
+    <rect x="56" y="145" width="190" height="118" rx="16"/>
+    <rect x="294" y="145" width="190" height="118" rx="16"/>
+    <rect x="532" y="145" width="190" height="118" rx="16"/>
+    <rect x="770" y="145" width="190" height="118" rx="16"/>
+    <rect x="1008" y="145" width="136" height="118" rx="16"/>
+  </g>
+  <g stroke="url(#accent)" stroke-width="2" fill="none" marker-end="url(#arrow)">
+    <path d="M246 204H286"/>
+    <path d="M484 204H524"/>
+    <path d="M722 204H762"/>
+    <path d="M960 204H1000"/>
+  </g>
+  <g text-anchor="middle">
+    <text x="151" y="181" class="label">Catalog</text>
+    <text x="151" y="208" class="small">metadata-driven</text>
+    <text x="151" y="229" class="small">Soroban components</text>
+    <text x="389" y="181" class="label">Docs</text>
+    <text x="389" y="208" class="small">interfaces</text>
+    <text x="389" y="229" class="small">dependencies · patterns</text>
+    <text x="627" y="181" class="label">Playground</text>
+    <text x="627" y="208" class="small">native sandbox</text>
+    <text x="627" y="229" class="small">real contract WASM</text>
+    <text x="865" y="181" class="label">Integration</text>
+    <text x="865" y="208" class="small">Rust / TypeScript</text>
+    <text x="865" y="229" class="small">generated starting point</text>
+    <text x="1076" y="181" class="label">Testnet</text>
+    <text x="1076" y="208" class="small">simulate</text>
+    <text x="1076" y="229" class="small">confirm · submit</text>
+  </g>
+  <path d="M151 296V344H1076V296" fill="none" stroke="#416877" stroke-dasharray="5 7"/>
+  <text x="600" y="375" text-anchor="middle" class="small">server-side candidate verification · explicit wallet confirmation · historical evidence kept separate</text>
+  <text x="600" y="400" text-anchor="middle" class="eyebrow">MAINNET DEPLOYMENT IS NOT PART OF THE CURRENT RELEASE SCOPE</text>
+</svg>

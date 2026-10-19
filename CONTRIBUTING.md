@@ -206,7 +206,9 @@ logic outside the catalog data, stop and express it as metadata instead.
 
 ## Issues
 
-Use the provided issue templates. A useful bug report includes expected vs
+Use the [local contributor backlog](./docs/contributor-backlog.md) to choose a
+bounded task before opening a GitHub issue. Use the provided issue templates. A
+useful bug report includes expected vs
 actual behavior, reproduction steps, the affected component/route/page, and the
 environment (network, wallet, OS). Feature requests should map to a `ROADMAP.md`
 capability where possible.
