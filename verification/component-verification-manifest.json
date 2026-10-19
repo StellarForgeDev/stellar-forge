@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-18",
+  "purpose": "Evidence classification for the catalog. This file is not deployment authorization.",
+  "authoritativeSources": {
+    "catalog": "src/data/components.ts",
+    "registry": "src/lib/transactions/deployments.ts",
+    "historicalEvidence": "contracts/testnet-evidence.json",
+    "candidateAuthorization": "contracts/deployment-candidates.json and server-side verification code"
+  },
+  "publicSupport": {
+    "tier": "local-sandbox-and-testnet-preparation",
+    "supportedComponents": ["token", "payment", "access-control"],
+    "scope": "These components are suitable for documented local sandbox use and Testnet transaction preparation. This is not a claim of current on-chain artifact parity or independently verified behavior.",
+    "mainnet": "unavailable",
+    "blockchainMutationPerformed": false
+  },
+  "statusDefinitions": {
+    "catalog": "Declared in the application catalog.",
+    "sandbox": "Covered by the repository's local sandbox/build/test path; this does not prove Testnet behavior.",
+    "testnetRegistry": "An address is configured in the application registry; registry presence is not verification.",
+    "testnetBehavior": "Fresh behavior evidence for a specific workflow, separate from address registration.",
+    "artifactParity": "Comparison between a fresh RPC-retrieved WASM hash and the intended local artifact.",
+    "candidateAuthorization": "Current server-side authorization for a new controlled Testnet deployment only."
+  },
+  "components": [
+    { "slug": "token", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "partial-name-flow", "artifactParity": "mismatch-recorded", "mismatchAssessment": "historical-deployment-before-current-prebuilt-alignment", "candidateAuthorization": "separate" },
+    { "slug": "payment", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "mismatch-recorded", "mismatchAssessment": "historical-deployment-before-current-prebuilt-alignment", "candidateAuthorization": "separate" },
+    { "slug": "access-control", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "multi-signature", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "escrow", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "oracle", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "subscription", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "vesting", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "staking", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "atomic-swap", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "timelock", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "merkle-airdrop", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "crowdfund", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "allowance", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" },
+    { "slug": "claimable-balance", "catalog": "declared", "sandbox": "tested", "testnetRegistry": "declared", "testnetBehavior": "unverified", "artifactParity": "not-established", "candidateAuthorization": "separate" }
+  ]
+}

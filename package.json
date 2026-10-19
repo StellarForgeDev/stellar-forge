@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "sandbox:build": "node scripts/sandbox-build.mjs",
     "verify:prebuilt": "node scripts/verify-prebuilt.mjs",
+    "verify:manifest": "node scripts/validate-component-verification-manifest.mjs",
     "verify:testnet": "node --experimental-strip-types scripts/verify-testnet-artifacts.ts",
     "generate:prebuilt-metadata": "node scripts/verify-prebuilt.mjs --generate",
     "vercel-build": "pnpm run build"
@@ -20,7 +21,7 @@
     "@stellar/stellar-sdk": "^16.2.0",
     "next": "16.4.0",
     "react": "19.3.0",
-    "react-dom": "19.2.8"
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -28,7 +29,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",
     "typescript": "^6",
     "vitest": "^5.0.4"
