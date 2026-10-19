@@ -5,10 +5,33 @@
 
 A developer platform for discovering, understanding, experimenting with, and reusing Stellar/Soroban building blocks. Stellar-Forge catalogs reusable components, documents how they work, and provides an interactive playground plus a transaction workflow that operates against Stellar Testnet.
 
+> Find a component, understand its interface, run it locally, and generate a
+> starting integration example from one catalog-driven workflow.
+
+## Start here
+
+| If you want to… | Go to |
+| --- | --- |
+| Understand the product and boundaries | [Architecture](./ARCHITECTURE.md) |
+| Browse reusable Soroban components | [Live catalog](https://stellar-forge-dev.vercel.app/components) |
+| Learn the workflow step by step | [Documentation hub](https://stellar-forge-dev.vercel.app/docs) |
+| Run real contract WASM locally | [Playground](https://stellar-forge-dev.vercel.app/playground) |
+| Build and simulate a Testnet transaction | [Transactions guide](https://stellar-forge-dev.vercel.app/docs/transactions) |
+| Set up the repository or add a component | [Contributing guide](./CONTRIBUTING.md) |
+| Review security boundaries | [Security policy](./SECURITY.md) |
+
+The three-repository layout is intentional: this repository is the application
+and documentation surface; [stellar-forge-contracts](https://github.com/StellarForgeDev/stellar-forge-contracts)
+contains the Soroban contracts and protected artifacts; and
+[stellar-forge-sandbox](https://github.com/StellarForgeDev/stellar-forge-sandbox)
+contains the native runner used by the local Playground.
+
+![Stellar-Forge architecture](./docs/assets/stellar-forge-architecture.svg)
+
 ## Current Status
 
-- **Release Candidate.**
-- **15 implemented components**, all registered for Stellar Testnet and runnable in the local sandbox: `token`, `payment`, `access-control`, `escrow`, `multi-signature`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`. Registry presence is not, by itself, independent proof of on-chain behavior or WASM hash parity.
+- **Release Candidate (Testnet-focused; not Mainnet-ready).**
+- **15 catalog components**, all registered for Stellar Testnet and runnable in the local sandbox: `token`, `payment`, `access-control`, `escrow`, `multi-signature`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`. Registry presence is not, by itself, independent proof of on-chain behavior or WASM hash parity. The narrower public support scope and evidence levels are recorded in the [component verification manifest](./docs/verification-manifest.md).
 - **Network model:** centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) with `rpcUrl`, `passphrase`, `explorerUrl` and env overrides (`STELLAR_RPC_*_URL`). `Testnet` is operational and the default; `Mainnet` is architecture-aware (config, deployment lookup, validation, and integration generation are network-aware) but has no deployments and no `mainnet:true` capabilities -- it correctly reports "not deployed" and will not submit; `Futurenet` plumbing is retained with no deployments.
 - Transaction flows run against real Testnet RPC via the generic pipeline (builder -> simulation -> Freighter signing -> submission). The Token `name` flow has been manually verified end to end in production; the remaining registry entries are not independently verified by that test. The project is **not production/mainnet ready**.
 
@@ -36,9 +59,9 @@ All fifteen components are implemented contracts with a live local sandbox and T
 
 Verified from `package.json` and the repository:
 
-- **Next.js** `16.3.0` (App Router)
+- **Next.js** `16.4.0` (App Router)
 - **React** `19.2.8`
-- **TypeScript** `^5`
+- **TypeScript** `^6`
 - **Tailwind CSS** `^4`
 - **pnpm** `11.21.0` (package manager)
 - **Rust / Cargo** -- used for the Soroban contracts and the native `sandbox-runner`
@@ -189,9 +212,12 @@ The authoritative phase tracker is [`ROADMAP.md`](./ROADMAP.md).
 
 - **Phases 1–33:** completed baseline capability work, verified against the
   current repository where claimed.
-- **Phase 34:** active dependency and supply-chain hardening. Dependabot PRs
-  are reviewed individually; major upgrades are not merged blindly.
-- **Phases 35–64:** planned verification, lifecycle, security, reliability,
+- **Phase 34:** complete dependency and supply-chain hardening. Dependabot PRs
+  were reviewed individually; the Stellar SDK 17 upgrade remains deferred for
+  migration/security review.
+- **Phase 35:** complete verification coverage and evidence-contract work.
+- **Phase 36:** next — deployment lifecycle state-machine hardening.
+- **Phases 37–64:** planned verification, lifecycle, security, reliability,
   release, and maintenance work.
 
 The roadmap preserves the distinction between historical evidence, current
