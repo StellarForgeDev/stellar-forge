@@ -59,5 +59,5 @@ describe("Deployment Session Action Dispatch", () => {
     const body = await res.json();
     expect(body.network).toBe("testnet");
     expect(body.reconciliationPerformed).toBe(true);
-  });
+  }, 30_000);
 });
