@@ -7,6 +7,13 @@ export interface ComponentCapabilities {
 
 export type ComponentMaturity = "Concept" | "Implemented";
 
+export interface ComponentReadiness {
+  catalogued: boolean;
+  sandboxRunnable: boolean;
+  testnetVerified: boolean;
+  productionReady: boolean;
+}
+
 export function componentMaturity(
   component: StellarComponent,
 ): ComponentMaturity {
@@ -1823,6 +1830,32 @@ export const componentCategories: string[] = (() => {
     .map(([category]) => category);
   return ["All", ...categories];
 })();
+
+/** Public product scope; other crates remain available to the generic build and sandbox pipeline. */
+export const PUBLIC_COMPONENT_SLUGS = [
+  "token",
+  "payment",
+  "access-control",
+] as const;
+
+export const publicComponents = stellarComponents.filter((component) =>
+  PUBLIC_COMPONENT_SLUGS.includes(component.slug as (typeof PUBLIC_COMPONENT_SLUGS)[number]),
+);
+
+export const publicComponentCategories = [
+  "All",
+  ...[...new Set(publicComponents.map((component) => component.category))].sort(),
+];
+
+/** Registry presence and partial historical behavior are not Testnet verification. */
+export function componentReadiness(component: StellarComponent): ComponentReadiness {
+  return {
+    catalogued: PUBLIC_COMPONENT_SLUGS.includes(component.slug as (typeof PUBLIC_COMPONENT_SLUGS)[number]),
+    sandboxRunnable: component.capabilities.sandbox === true,
+    testnetVerified: false,
+    productionReady: false,
+  };
+}
 
 export function getComponentBySlug(slug: string) {
   return stellarComponents.find((component) => component.slug === slug);

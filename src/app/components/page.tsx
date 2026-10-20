@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import { ComponentCard } from "@/components/catalog/ComponentCard";
 import {
-  componentCategories,
-  stellarComponents,
+  componentReadiness,
+  publicComponentCategories,
+  publicComponents,
   componentMaturity,
   orderComponents,
 } from "@/data/components";
@@ -21,7 +22,7 @@ export default function ComponentsPage() {
   const filteredComponents = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    return stellarComponents.filter((component) => {
+    return publicComponents.filter((component) => {
       const matchesCategory =
         selectedCategory === "All" || component.category === selectedCategory;
 
@@ -53,8 +54,15 @@ export default function ComponentsPage() {
         </h1>
 
         <p className="mt-4 max-w-2xl font-sans text-base leading-relaxed text-text-secondary">
-          Reusable building blocks you can inspect, run locally, and integrate.
+          A focused set of components with explicit evidence boundaries. Each
+          card separates catalog status, local sandbox execution, Testnet
+          verification, and production readiness.
         </p>
+
+        <div className="mt-5 rounded-default border border-border bg-surface p-4 text-sm text-text-secondary">
+          <p className="font-mono text-xs uppercase tracking-wide text-accent-stellar">Readiness vocabulary</p>
+          <p className="mt-2 leading-6">Catalogued means documented here. Sandbox-runnable means the real WASM runs locally. Testnet-verified requires fresh artifact and behavior evidence. Production-ready is reserved for a separately approved release gate.</p>
+        </div>
 
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <input
@@ -67,7 +75,7 @@ export default function ComponentsPage() {
           />
 
           <div className="flex flex-wrap gap-2">
-            {componentCategories.map((category) => {
+            {publicComponentCategories.map((category) => {
               const isSelected = selectedCategory === category;
 
               return (
@@ -149,6 +157,7 @@ export default function ComponentsPage() {
                 status={componentMaturity(component)}
                 href={`/components/${component.slug}`}
                 capabilities={component.capabilities}
+                readiness={componentReadiness(component)}
                 functionCount={component.interface?.length ?? 0}
                 functions={component.interface}
                 expandable

@@ -104,6 +104,22 @@ metadata commit. The supported conclusion is historical deployment before the
 current prebuilt alignment, not incorrect current checksums. No artifact or
 historical evidence was overwritten.
 
+### Artifact-parity follow-up — classification fixed, deployment gap remains
+
+The reconciliation model now exposes a non-authorizing `parityAssessment` that
+distinguishes current local artifact mismatch, deployed-artifact mismatch,
+deployed-artifact mismatch with stale provenance, and unavailable deployed
+evidence. This prevents a stale historical record from being described as
+current parity. The Testnet UI and generated report now state explicitly that
+historical evidence is not current candidate authorization.
+
+This fixes the verification-classification gap, not the underlying historical
+deployment difference. Token and Payment still do not match the current
+prebuilt artifacts. Achieving genuine current deployed parity requires a new
+controlled Testnet deployment from a currently authorized candidate, followed
+by fresh RPC retrieval and independent behavior verification. That action was
+not authorized or performed in this audit.
+
 ### P2 — public presentation and social-preview work — completed as reported
 
 The audit branch now includes a “Start here” README, a documentation map, a
@@ -194,8 +210,10 @@ program-specific eligibility are confirmed from the current official program pag
 
 ## Owner actions required
 
-1. Resolve the Token/Payment artifact mismatches in a dedicated evidence task;
-   do not overwrite historical evidence or use it as current authorization.
+1. If current on-chain parity is required, authorize a dedicated controlled
+   Testnet redeployment of Token and Payment from current candidates, then
+   capture fresh RPC and behavior evidence. Do not overwrite historical
+   evidence or use it as current authorization.
 2. Repair or replace the local Windows MSVC/Rust linker environment, then rerun
    `pnpm build`, `pnpm verify:prebuilt`, and the contracts/sandbox Rust tests.
 3. Independently review this branch and the manifest before merging to `main`.
@@ -221,5 +239,24 @@ Changed only on `audit/readiness-20261018`:
 - `docs/verification-manifest.md` — documented the authority boundary.
 - `AUDIT_REPORT.md` — this report.
 
+Artifact-parity follow-up changes on `fix/artifact-parity-20261019`:
+
+- `src/lib/verification/artifact-status.ts` and
+  `src/lib/verification/artifact-verification.ts` — added non-authorizing
+  parity assessment categories.
+- `src/lib/verification/deployment-evidence.ts` and
+  `src/lib/verification/testnet-report.ts` — carried and rendered the
+  assessment without changing authorization gates.
+- `src/app/testnet/page.tsx` — corrected stale-provenance wording.
+- `tests/verification/artifact-verification.test.ts` — added mismatch and
+  unavailable-evidence regression coverage.
+- `ROADMAP.md` and `AUDIT_REPORT.md` — recorded the result and remaining
+  deployment-only blocker.
+
 No commit, push, merge, release, tag, GitHub setting change, deployment, or
 blockchain mutation was performed.
+
+The artifact-parity follow-up also made no commit, push, merge, release, tag,
+deployment, or blockchain mutation. Its isolated worktree remains available
+for independent review at:
+`C:\Users\user\Projects\stellar-forge-public\stellar-forge\.audit-worktrees\artifact-parity-20261019`.

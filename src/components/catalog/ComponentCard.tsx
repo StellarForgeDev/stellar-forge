@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { InterfaceReference } from "@/components/docs/InterfaceReference";
-import type { FunctionSpec } from "@/data/components";
+import type { ComponentReadiness, FunctionSpec } from "@/data/components";
 
 export interface ComponentCardProps {
   name: string;
@@ -17,6 +17,7 @@ export interface ComponentCardProps {
   href: string;
   cta?: string;
   capabilities?: { sandbox: boolean; testnet: boolean };
+  readiness?: ComponentReadiness;
   functionCount?: number;
   functions?: FunctionSpec[];
   expandable?: boolean;
@@ -31,6 +32,7 @@ export function ComponentCard({
   href,
   cta = "View component",
   capabilities,
+  readiness,
   functionCount,
   functions,
   expandable = false,
@@ -58,12 +60,10 @@ export function ComponentCard({
           </div>
           {capabilities && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              <StateBadge tone={capabilities.sandbox ? "local" : "neutral"}>
-                Sandbox
-              </StateBadge>
-              <StateBadge tone={capabilities.testnet ? "testnet" : "neutral"}>
-                Testnet
-              </StateBadge>
+              <StateBadge tone={readiness?.catalogued ? "local" : "neutral"}>Catalogued</StateBadge>
+              <StateBadge tone={readiness?.sandboxRunnable ? "local" : "neutral"}>Sandbox {readiness?.sandboxRunnable ? "runnable" : "—"}</StateBadge>
+              <StateBadge tone={readiness?.testnetVerified ? "testnet" : "neutral"}>Testnet {readiness?.testnetVerified ? "verified" : "unverified"}</StateBadge>
+              <StateBadge tone={readiness?.productionReady ? "success" : "neutral"}>Production {readiness?.productionReady ? "ready" : "not ready"}</StateBadge>
               {functionCount != null && (
                 <StateBadge tone="neutral">{functionCount} fns</StateBadge>
               )}

@@ -31,11 +31,11 @@ contains the native runner used by the local Playground.
 ## Current Status
 
 - **Release Candidate (Testnet-focused; not Mainnet-ready).**
-- **15 catalog components**, all registered for Stellar Testnet and runnable in the local sandbox: `token`, `payment`, `access-control`, `escrow`, `multi-signature`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `oracle`, `crowdfund`, `allowance`, `claimable-balance`. Registry presence is not, by itself, independent proof of on-chain behavior or WASM hash parity. The narrower public support scope and evidence levels are recorded in the [component verification manifest](./docs/verification-manifest.md).
+- **Focused public catalog:** `token`, `payment`, and `access-control`. The repository still contains 15 reusable contract crates, but the remaining crates are not presented as independently verified public product components. Registry presence is not, by itself, proof of on-chain behavior or WASM hash parity. The evidence levels are recorded in the [component verification manifest](./docs/verification-manifest.md) and [repository release audit](./docs/repository-release-audit.md).
 - **Network model:** centralized `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) with `rpcUrl`, `passphrase`, `explorerUrl` and env overrides (`STELLAR_RPC_*_URL`). `Testnet` is operational and the default; `Mainnet` is architecture-aware (config, deployment lookup, validation, and integration generation are network-aware) but has no deployments and no `mainnet:true` capabilities -- it correctly reports "not deployed" and will not submit; `Futurenet` plumbing is retained with no deployments.
 - Transaction flows run against real Testnet RPC via the generic pipeline (builder -> simulation -> Freighter signing -> submission). The Token `name` flow has been manually verified end to end in production; the remaining registry entries are not independently verified by that test. The project is **not production/mainnet ready**.
 
-All components in the catalog are fully implemented contracts, documented throughout this document and in the [Component Catalog Status](#component-catalog-status) section.
+The public catalog is deliberately smaller than the underlying contract workspace. Each public component is labelled separately as catalogued, sandbox-runnable, Testnet-verified, or production-ready; these states are not interchangeable.
 
 ## Features
 
@@ -44,7 +44,7 @@ Functionality that currently exists in the repository:
 - **Component catalog** -- a searchable, filterable list of Stellar/Soroban building blocks (`src/data/components.ts`).
 - **Interactive component documentation** -- per-component catalog pages and a documentation hub with getting-started, component library, playground, and integration sections.
 - **Local Soroban Playground** -- configure a component and inspect the structure it produces.
-- **Real local sandbox execution** -- the Playground executes the real contract WASM for all 15 components (including `token.wasm`, `crowdfund.wasm`, `allowance.wasm`, `claimable-balance.wasm` and 11 others) in an isolated Soroban host, with deterministic execution and no network, wallet, or gas costs.
+- **Real local sandbox execution** -- the Playground executes real contract WASM through an isolated Soroban host. The public catalog currently exposes the three documented components; the underlying workspace retains the broader crate set for repository-level testing.
 - **Transaction builder** -- network-aware assembly, simulation, signing, and submission (Testnet operational, Mainnet architecture-ready, Futurenet plumbing).
 - **Stellar transaction simulation** -- preparation calls the selected network's RPC (Testnet by default) to simulate operations.
 - **Freighter wallet integration** -- connect Freighter to provide a signing account.
@@ -53,7 +53,7 @@ Functionality that currently exists in the repository:
 - **Integration code generator** -- network-aware Rust and TypeScript examples from a component's interface and the current configuration.
 - **Documentation hub** -- `src/app/docs` covering getting started, the component library, the Playground, and Integration.
 
-All fifteen components are implemented contracts with a live local sandbox and Testnet deployment registrations. The generic pipeline (catalog -> playground -> transactions -> integration) is network-aware; the live Testnet transaction path is independently verified for Token `name`, while the other registered entries remain to be verified individually. Mainnet remains architecture-ready but undeployed.
+The contracts workspace contains fifteen implemented crates with Testnet registry entries, while the application presents a focused three-component public catalog. Token `name` has partial historical Testnet behavior evidence, but current artifact parity and independent verification remain separate requirements. Mainnet remains architecture-ready but undeployed.
 
 ## Tech Stack
 
@@ -188,7 +188,7 @@ This setup is **not** a statement of production/mainnet readiness.
 
 ## Component Catalog Status
 
-- **15 implemented components**, all **registered for Stellar Testnet** in `src/lib/transactions/deployments.ts`: `token`, `payment`, `access-control`, `multi-signature`, `escrow`, `oracle`, `subscription`, `vesting`, `staking`, `atomic-swap`, `timelock`, `merkle-airdrop`, `crowdfund`, `allowance`, `claimable-balance`. All support local sandbox execution; the Token `name` transaction was manually verified through production, while the other registry entries are not independently verified here. Contract instance existence, expected behavior, and exact WASM-byte/hash parity are separate claims. The generic transaction pipeline is network-aware: `NetworkConfig` (`testnet` | `mainnet` | `futurenet`) centralizes `rpcUrl`, `passphrase`, and `explorerUrl`; `Testnet` is operational (default), `Mainnet` is architecture-ready but has no deployments (`mainnet:false` for all components) and correctly reports "not deployed" without submitting, `Futurenet` plumbing is retained with no deployments.
+- **Repository contract inventory:** 15 implemented crates remain registered for Stellar Testnet, but only `token`, `payment`, and `access-control` are in the focused public catalog. The UI separates catalogued, sandbox-runnable, Testnet-verified, and production-ready states. None is currently production-ready, and registry presence is not independent artifact or behavior verification. Mainnet is architecture-ready but undeployed.
   - Every catalog entry is an implemented contract; the catalog also documents each component's patterns, use cases, and configuration. The authorization-stable `expiration_ledger` fix (Phase 5.3B) ensures `token.approve` via an intermediate contract remains valid across ledgers (`current < expiration <= current+1_000_000`).
 
 ## Testnet Status

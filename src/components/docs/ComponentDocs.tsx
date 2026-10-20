@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { LinkButton } from "@/components/ui/LinkButton";
 import type { StellarComponent } from "@/data/components";
+import { componentReadiness } from "@/data/components";
 import { buildConfigSnippet } from "@/lib/docs/snippets";
 
 export function ComponentDocs({
@@ -44,16 +45,18 @@ export function ComponentDocs({
           </span>
 
           <div className="flex flex-wrap gap-1.5">
+            <StateBadge tone="local">{componentReadiness(component).catalogued ? "Catalogued" : "Internal catalog"}</StateBadge>
             <StateBadge
               tone={component.capabilities.sandbox ? "local" : "neutral"}
             >
-              Sandbox
+              Sandbox {componentReadiness(component).sandboxRunnable ? "runnable" : "not runnable"}
             </StateBadge>
             <StateBadge
-              tone={component.capabilities.testnet ? "testnet" : "neutral"}
+              tone={componentReadiness(component).testnetVerified ? "testnet" : "neutral"}
             >
-              Testnet
+              Testnet {componentReadiness(component).testnetVerified ? "verified" : "unverified"}
             </StateBadge>
+            <StateBadge tone="neutral">Production not ready</StateBadge>
             {component.interface?.length ? (
               <StateBadge tone="neutral">
                 {component.interface.length} fns
