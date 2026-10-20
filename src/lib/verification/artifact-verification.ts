@@ -5,6 +5,7 @@ import type { ContractDeployment } from "../transactions/deployments.ts";
 import type { TransactionNetwork } from "../transactions/networks.ts";
 import {
   RECONCILIATION_STATUSES,
+  type ArtifactParityAssessment,
   type ReconciliationStatus,
 } from "./artifact-status.ts";
 import type { DeploymentEvidence } from "./deployment-evidence.ts";
@@ -85,6 +86,12 @@ export function reconcileArtifacts(input: ReconciliationInput): DeploymentEviden
       prebuiltMatchesDeployed,
       sourceMatchesDeployed,
     },
+    parityAssessment: assessArtifactParity({
+      sourceMatchesPrebuilt,
+      prebuiltMatchesDeployed,
+      sourceMatchesDeployed,
+      provenanceStale: statuses.includes("PROVENANCE_STALE"),
+    }),
     provenance: {
       metadataCommit: input.metadataCommit,
       currentRepositoryCommit: input.currentRepositoryCommit,
@@ -95,6 +102,25 @@ export function reconcileArtifacts(input: ReconciliationInput): DeploymentEviden
     },
     status: statuses,
   };
+}
+
+export function assessArtifactParity(input: {
+  sourceMatchesPrebuilt: boolean | null;
+  prebuiltMatchesDeployed: boolean | null;
+  sourceMatchesDeployed: boolean | null;
+  provenanceStale: boolean;
+}): ArtifactParityAssessment {
+  if (input.sourceMatchesPrebuilt === false) return "CURRENT_LOCAL_ARTIFACT_MISMATCH";
+  if (input.prebuiltMatchesDeployed === false) {
+    return input.provenanceStale
+      ? "DEPLOYED_ARTIFACT_MISMATCH_WITH_STALE_PROVENANCE"
+      : "DEPLOYED_ARTIFACT_MISMATCH";
+  }
+  if (input.prebuiltMatchesDeployed === null) return "DEPLOYED_ARTIFACT_UNAVAILABLE";
+  if (input.sourceMatchesPrebuilt === true && input.sourceMatchesDeployed === true) {
+    return "CURRENT_ARTIFACTS_MATCH";
+  }
+  return "INSUFFICIENT_ARTIFACT_EVIDENCE";
 }
 
 function equalHashes(left: string | null, right: string | null): boolean | null {

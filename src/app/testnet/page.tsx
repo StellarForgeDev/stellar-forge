@@ -26,7 +26,7 @@ export default async function TestnetExecutionPage() {
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-accent-stellar">Access Control candidate</p>
           <p className="mt-3 font-sans text-sm leading-6 text-text-secondary">Workflow: {ACCESS_CONTROL_WORKFLOW.workflowId}. It reads role state, simulates an admin-only grant, waits for explicit user signing/submission, then observes the post-state.</p>
           <p className="mt-3 font-mono text-sm text-text-primary">Artifact evidence: {artifactReady ? "VERIFIED_MATCH" : "NOT READY"}</p>
-          {evidence?.status.includes("PROVENANCE_STALE") && <p className="mt-2 font-sans text-xs text-accent-forge">Artifact parity is present, but provenance is stale; this candidate is not marked fully ready.</p>}
+          {evidence?.status.includes("PROVENANCE_STALE") && <p className="mt-2 font-sans text-xs text-accent-forge">Artifact parity is not established for this evidence record because its provenance is stale; historical evidence is not current candidate authorization.</p>}
         </div>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <div className="rounded-default border border-border bg-surface p-5">

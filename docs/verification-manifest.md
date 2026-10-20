@@ -18,11 +18,18 @@ authorization. Historical deployment records are evidence about the past and do
 not authorize a new deployment. Client-provided hashes, WASM bytes, and candidate
 values are never authoritative.
 
-The current public scope is intentionally narrow: `token`, `payment`, and
+The current public catalog is intentionally narrow: `token`, `payment`, and
 `access-control` are documented for local sandbox use and Testnet transaction
-preparation. The manifest does not claim current on-chain artifact parity or
-independent behavioral verification for those components. Mainnet remains
-unavailable, and this audit performed no blockchain mutation.
+preparation. The other contract crates remain available to the generic
+repository pipeline but are not presented as independently verified public
+components. The manifest does not claim current on-chain artifact parity or
+independent behavioral verification for the three public components. Mainnet
+remains unavailable, and this audit performed no blockchain mutation.
+
+The product uses four separate readiness states: catalogued, sandbox-runnable,
+Testnet-verified, and production-ready. Catalogued and sandbox-runnable do not
+imply Testnet verification; Testnet verification does not imply production
+readiness.
 
 The Token and Payment mismatches are classified as historical deployments from
 before the current prebuilt-artifact alignment. Their deployed hashes remain

@@ -24,6 +24,10 @@ Current platform facts:
 - Testnet is operational and Mainnet is deliberately unavailable.
 - Historical evidence is not current candidate authorization.
 - Client-provided hashes, WASM, and candidate values are never authoritative.
+- Current committed prebuilt integrity is checked independently by CI and the
+  checksum verifier. Token and Payment remain historical deployed-artifact
+  mismatches against the current prebuilt artifacts; no current parity claim is
+  made until a separately authorized deployment and fresh RPC verification.
 
 ## Phase 34 — Dependency & Supply-Chain Hardening (COMPLETE)
 
@@ -94,6 +98,18 @@ candidate unavailability, stale XDR, stale sessions, and restored-session drift.
   production build, and `git diff --check`.
 - No contract, WASM, deployment metadata, historical evidence, sandbox, or
   blockchain state was changed.
+
+### Artifact parity follow-up — 2026-10-19
+
+- Added a non-authorizing parity assessment to distinguish current local
+  mismatch, deployed mismatch, stale provenance, and unavailable evidence.
+- Corrected Testnet UI and report wording so stale historical evidence is never
+  presented as current artifact parity or candidate authorization.
+- Preserved Token/Payment deployed hashes and historical evidence; no artifact
+  was rewritten and no deployment was performed.
+- Focused verification tests (75), full application tests (989), TypeScript,
+  lint, and diff checks pass. Native build/prebuilt and Rust validation still
+  require the known Windows linker remediation.
 
 ## Phase 36 — Deployment Lifecycle State-Machine Hardening
 

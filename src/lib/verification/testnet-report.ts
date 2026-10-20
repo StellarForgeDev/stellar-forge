@@ -42,6 +42,7 @@ export function renderTestnetReport(
     "Artifact parity does not verify constructor state or workflow behavior; a",
     "successful behavioral probe does not imply exact WASM hash parity; and a",
     "behaviorally reachable contract may still be a hash mismatch.",
+    "A deployed-artifact mismatch with stale provenance is reported as historical-or-stale evidence; it is not current candidate authorization.",
     "",
     `- Total components: ${evidence.length}`,
     `- Artifact verified matches: ${count("VERIFIED_MATCH")}`,
@@ -80,7 +81,7 @@ export function renderTestnetReport(
     const successful = item.latestSuccessfulObservation;
     const behavior = behaviorByComponent.get(item.componentId);
     const probe = behavior?.observations?.[0]?.method ?? "—";
-    const artifactStatus = item.status.length ? item.status.join(", ") : "none";
+    const artifactStatus = [item.parityAssessment, ...item.status].filter(Boolean).join(", ") || "none";
     const registryStatus = item.contractId ? "PASS" : "MISSING";
     const provenance = item.status.includes("PROVENANCE_STALE") ? "STALE" : "current";
     lines.push(

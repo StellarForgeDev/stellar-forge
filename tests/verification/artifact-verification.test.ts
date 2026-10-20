@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reconcileArtifacts } from "@/lib/verification/artifact-verification";
+import { assessArtifactParity, reconcileArtifacts } from "@/lib/verification/artifact-verification";
 import type { StellarComponent } from "@/data/components";
 
 const component = { slug: "example", capabilities: { testnet: true } } as StellarComponent;
@@ -36,8 +36,20 @@ describe("artifact reconciliation", () => {
   });
 
   it("detects prebuilt/deployed mismatch", () => {
-    expect(evidence({ deployedArtifact: { sha256: "b" } }).status)
+    const result = evidence({ deployedArtifact: { sha256: "b" } });
+    expect(result.status)
       .toContain("DEPLOYMENT_MISMATCH");
+    expect(result.parityAssessment).toBe("DEPLOYED_ARTIFACT_MISMATCH");
+  });
+
+  it("labels a mismatch with stale provenance without calling it current authorization", () => {
+    const result = evidence({ deployedArtifact: { sha256: "b" }, currentRepositoryCommit: "new" });
+    expect(result.parityAssessment).toBe("DEPLOYED_ARTIFACT_MISMATCH_WITH_STALE_PROVENANCE");
+  });
+
+  it("does not call unavailable deployed evidence a mismatch", () => {
+    expect(assessArtifactParity({ sourceMatchesPrebuilt: true, prebuiltMatchesDeployed: null, sourceMatchesDeployed: null, provenanceStale: false }))
+      .toBe("DEPLOYED_ARTIFACT_UNAVAILABLE");
   });
 
   it("reports simultaneous mismatch and stale provenance issues", () => {

@@ -1,6 +1,6 @@
 import type { TransactionNetwork } from "../transactions/networks.ts";
 import type { TransactionPreparationErrorCode } from "../transactions/types.ts";
-import type { EvidenceConfidence, ReconciliationStatus, RetrievalFailureCategory } from "./artifact-status.ts";
+import type { ArtifactParityAssessment, EvidenceConfidence, ReconciliationStatus, RetrievalFailureCategory } from "./artifact-status.ts";
 
 export type EvidenceVerificationMethod =
   | "stellar-sdk-rpc-getContractWasmByContractId"
@@ -34,6 +34,8 @@ export interface DeploymentEvidence {
   prebuiltArtifact: ArtifactEvidence;
   deployedArtifact: DeploymentArtifactEvidence;
   artifactParity: ArtifactParityEvidence;
+  /** Explanatory only; never an authorization decision. */
+  parityAssessment?: ArtifactParityAssessment;
   provenance: ProvenanceEvidence;
   verification: {
     verifiedAt: string | null;

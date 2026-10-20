@@ -9,6 +9,21 @@ export const RECONCILIATION_STATUSES = [
 
 export type ReconciliationStatus = (typeof RECONCILIATION_STATUSES)[number];
 
+/**
+ * A non-authorizing explanation of the hash comparison. This deliberately
+ * does not replace ReconciliationStatus: callers that gate deployment must
+ * continue to require VERIFIED_MATCH and current candidate verification.
+ */
+export const ARTIFACT_PARITY_ASSESSMENTS = [
+  "CURRENT_ARTIFACTS_MATCH",
+  "CURRENT_LOCAL_ARTIFACT_MISMATCH",
+  "DEPLOYED_ARTIFACT_MISMATCH",
+  "DEPLOYED_ARTIFACT_MISMATCH_WITH_STALE_PROVENANCE",
+  "DEPLOYED_ARTIFACT_UNAVAILABLE",
+  "INSUFFICIENT_ARTIFACT_EVIDENCE",
+] as const;
+export type ArtifactParityAssessment = (typeof ARTIFACT_PARITY_ASSESSMENTS)[number];
+
 export const EVIDENCE_CONFIDENCE = [
   "VERIFIED",
   "HISTORICAL_VERIFIED",
