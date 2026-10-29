@@ -1,7 +1,11 @@
 # Stellar-Forge
 
+![Stellar-Forge core application](./assets/stellar-forge-core-banner.svg)
+
 [![CI](https://github.com/StellarForgeDev/stellar-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/StellarForgeDev/stellar-forge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Runtime: Next.js](https://img.shields.io/badge/runtime-Next.js%2016.4.0-black.svg)](https://nextjs.org/)
+[![Status: Release candidate](https://img.shields.io/badge/status-release--candidate-6ea8ff.svg)](./ROADMAP.md)
 
 A developer platform for discovering, understanding, experimenting with, and reusing Stellar/Soroban building blocks. Stellar-Forge catalogs reusable components, documents how they work, and provides an interactive playground plus a transaction workflow that operates against Stellar Testnet.
 
