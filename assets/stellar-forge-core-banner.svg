@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">Stellar-Forge core application</title>
+  <desc id="desc">A dark technical banner showing a catalog, sandbox, and Testnet evidence flow.</desc>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#08111f"/><stop offset="1" stop-color="#102d46"/></linearGradient><linearGradient id="accent" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#62e6d5"/><stop offset="1" stop-color="#6ea8ff"/></linearGradient></defs>
+  <rect width="1200" height="300" rx="24" fill="url(#bg)"/><path d="M0 236h1200M0 190h1200M0 144h1200" stroke="#24435c" opacity=".55"/>
+  <path d="M760 60h250M760 86h180M760 112h220" stroke="#62e6d5" stroke-width="3" stroke-linecap="round" opacity=".7"/>
+  <g fill="none" stroke="url(#accent)" stroke-width="4"><rect x="760" y="150" width="90" height="58" rx="10"/><rect x="920" y="150" width="90" height="58" rx="10"/><path d="M850 179h70M1010 179h78v55H760"/></g><circle cx="1088" cy="179" r="7" fill="#62e6d5"/>
+  <text x="72" y="112" fill="#62e6d5" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="4">STELLAR-FORGE</text><text x="72" y="162" fill="#f4f8fb" font-family="Arial,sans-serif" font-size="42" font-weight="700">Deterministic developer workflows</text><text x="72" y="204" fill="#b8cbe0" font-family="Arial,sans-serif" font-size="21">Catalog · sandbox · Testnet evidence</text><text x="72" y="252" fill="#7f9ab5" font-family="Arial,sans-serif" font-size="15">APPLICATION / DOCUMENTATION / VERIFICATION SURFACE</text>
+</svg>
